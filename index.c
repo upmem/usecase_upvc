@@ -50,7 +50,7 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
   for (v=0; v<NB_SEED; v++)
     {
       x = (COUNT[v] / MAX_SIZE_IDX_SEED) + 1;             // pour chaque graine on calcule le nombre d'index
-      k = COUNT[v] / x;                                   // k = nombre de voisinage
+      k = (COUNT[v] / x)+1;                               // k = nombre de voisinage
       C = (INDEX_SEED *) malloc(sizeof(INDEX_SEED));      // on alloue en memoire le nombre d'index necessaire
       C->nb_nbr = k;
       C->next = NULL;
@@ -98,10 +98,15 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
 	  sizeidx[k] += C->nb_nbr;
 	  workload[k] += (long) (C->nb_nbr * COUNT[seed]);
 	  C->num_dpu = k;
-	  C = C->next;
+	  //printf ("%x (%d) %d %ld %d %d\n",seed,COUNT[seed],k,workload[k],C->nb_nbr,sizeidx[k]);
 	  d = (d+1)%NB_DPU;
+	  C = C->next;
 	}
     }
+
+  //for (i=0; i<NB_DPU; i++) printf ("%d %ld %d\n",i,workload[i],sizeidx[i]);
+  //exit (0);
+
 
   // calcul des offsets
   // initialisation du tableau IXH->OFFSET

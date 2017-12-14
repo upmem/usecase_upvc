@@ -50,10 +50,17 @@ GENOME *get_genome(char* name, TIMES *CT)
 	  k = strlen(BUF);
 	  for (i=0; i<k-1; i++) 
 	    {
-	      j = (int) BUF[i];
-	      G->data[x++] = (j>>1)&3; // A -> 0, C -> 1, G -> 3, T -> 2
+	      if (BUF[i]!='N')
+		{
+		  j = (int) BUF[i];
+		  G->data[x++] = (j>>1)&3; // A -> 0, C -> 1, G -> 3, T -> 2
+		}
+	      else
+		{
+		  G->data[x++] = rand()&3;
+		}
 	      G->len_seq[G->nb_seq-1]++;
-	      }
+	    }
 	  }
       }
   fclose(fgen);

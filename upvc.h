@@ -44,7 +44,7 @@ typedef struct {
   long      sizefile;              // taille du fichier fasta
 } GENOME;
 
-// index associe aux graines
+// index associe a une graine
 typedef struct INDEX_SEED INDEX_SEED;
 struct INDEX_SEED {
   int nb_nbr;        // nombre de voisinage

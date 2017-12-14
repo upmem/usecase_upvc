@@ -27,16 +27,20 @@ typedef struct {
 
 MEM_DPU *MDPU; 
 
+// pour le calcul des statistiques
+/*
+long stat_nb_read[NB_DPU];
+long stat_nb_nbr[NB_DPU];
+long stat_nb_dp[NB_DPU];
+*/
+
+
 int mini (int a, int b) { if (a<b) return a; else return b; }
 
 // calcul d'une distance d'alignement par programmation dynamique
 // sur les diagonales de la matrice
 // optimisation des resources 
 // s'arrete quand le score a depasse le seuil MAX_SCORE
-
-long stat_nb_read[NB_DPU];
-long stat_nb_nbr[NB_DPU];
-long stat_nb_dp[NB_DPU];
 
 int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 {
@@ -50,7 +54,7 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 
   for (i=1; i<NB_DIAG/2+1; i++)
     {
-      stat_nb_dp[numdpu]++;
+      //stat_nb_dp[numdpu]++;
       pp = i%2;
       lp = (i-1)%2;
       D[pp][0] = i*COST_SUB;
@@ -68,7 +72,7 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 
   for (i=NB_DIAG/2+1; i<SIZE_NBR4-NB_DIAG/2; i++)
     {
-      stat_nb_dp[numdpu]++;
+      //stat_nb_dp[numdpu]++;
       min_score = 99;
       pp = i%2;
       lp = (i-1)%2;
