@@ -4,7 +4,7 @@ Common work Dominique Lavenier (INRIA) and uPmem.
 version 1.0
 =========================================================
 11-12-2017
-
+==========
 
 Installation
 
@@ -23,4 +23,15 @@ Run
 
   the program generates the file:
     - name_dataset.vcf        ==> list of small variants
+
+
+==========
+17-01-2018
+==========
+
+- correct a bug in get_genome (getgenome.c)
+- lower NB_DPU to 128 (upvc.h)
+- modify the function align (upvc_dpu.c)
+   - replace ODPD by noDP
+   - suppress decoding step
 

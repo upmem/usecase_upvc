@@ -40,7 +40,6 @@ void dispatch_read(INDEX_SEED **SEED, int8_t* BUF_READ, int nb_read, TIMES *CT)
     }
   for (numdpu=0; numdpu < NB_DPU; numdpu++)
     {
-      printf ("%d : %d\n",numdpu,COUNT_READ[numdpu]); 
       k = COUNT_READ[numdpu];
       write_num(numdpu,k,-1);
     }

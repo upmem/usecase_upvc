@@ -33,7 +33,7 @@ GENOME *get_genome(char* name, TIMES *CT)
   G = (GENOME *) malloc(sizeof(GENOME));
   G->sizefile = sizefile;
   G->data    = (int8_t *) malloc(sizeof(int8_t) * sizefile); 
-  G->pt_seq  = (int *) malloc(sizeof(int) * MAX_SEQ_GEN);
+  G->pt_seq  = (long *) malloc(sizeof(long) * MAX_SEQ_GEN);
   G->len_seq = (int *) malloc(sizeof(int) * MAX_SEQ_GEN);
   G->nb_seq = 0;
   x = 0;

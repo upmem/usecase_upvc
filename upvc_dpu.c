@@ -117,38 +117,58 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
   return min_score;
 }
 
+int noDP( int8_t *s1, int8_t *s2)
+{
+  int i,j,s;
+  int8_t x1, x2;
+  s = 0;
+  for (i=0; i<SIZE_NBR; i++)
+    {
+      for (j=0; j<4; j++)
+	{
+	  x1 = (s1[i]>>(2*j))&3;
+	  x2 = (s2[i]>>(2*j))&3;
+	  if (x1!=x2)
+	    {
+	      s = s + COST_SUB;
+	      if (s > MAX_SCORE) return s;
+	    }
+	}
+    }
+  return s;
+}
+
 // mapping des reads
 // M point sur une memoire d'un des DPUs
 // M.num[nr] == -1 : ==> marqueur de fin
 
 void align(int numdpu)
 {
-  int nr, ix, t, score, offset, mini, nb_map_start;
+  int nr, ix, score, offset, mini, nb_map_start;
   int nb_map = 0;
   MEM_DPU M = MDPU[numdpu];
-  int8_t R[SIZE_NBR*4];
-  int8_t V[SIZE_NBR*4];
+  //int8_t R[SIZE_NBR*4];
+  //int8_t V[SIZE_NBR*4];
 
   //stat_nb_read[numdpu]=0;
   //stat_nb_nbr[numdpu]=0;
   //stat_nb_dp[numdpu]=0;
 
   nr = 0;
-  t = 0;
   M.out_num[nb_map] = -1;
   while (M.num[nr] != -1)   // nr = indice qui parcours les reads a traiter
     {
       //stat_nb_read[numdpu]++;
-      decode_neighbor(&M.neighbor_read[nr*SIZE_NBR],R); // dans R on met le voisinage de la graine du read 
+      //decode_neighbor(&M.neighbor_read[nr*SIZE_NBR],R); // dans R on met le voisinage de la graine du read 
       offset = M.offset[nr];                            // offset = adresse du 1er voisinage
       mini = MAX_SCORE;
       nb_map_start = nb_map;
       for (ix=0; ix<M.count[nr]; ix++)                  // count = nombre de voisinages
 	{
 	  //stat_nb_nbr[numdpu]++;
-	  t++;
-	  decode_neighbor(&M.neighbor_idx[(offset+ix)*SIZE_NBR],V); // dans V on met le voisinage de la graine
-	  score = ODPD(numdpu,V,R); // compare.c
+	  //decode_neighbor(&M.neighbor_idx[(offset+ix)*SIZE_NBR],V); // dans V on met le voisinage de la graine
+	  //score = ODPD(numdpu,V,R); 
+	  score = noDP(&M.neighbor_read[nr*SIZE_NBR],&M.neighbor_idx[(offset+ix)*SIZE_NBR]);
 	  if (score <= mini)
 	    {
 	      if (score <  mini)

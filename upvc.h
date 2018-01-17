@@ -1,6 +1,6 @@
 #define SIZE_SEED         12
 #define NB_SEED           16777216
-#define NB_DPU            256
+#define NB_DPU            128
 #define SIZE_IDX_HOST     (NB_SEED/NB_DPU)
 #define MAX_NB_DPU_READ   16384                  // nombre de reads par DPU par passe
 #define MAX_BUF_READ      1048576                // nombre de reads total par passe
@@ -39,7 +39,7 @@ typedef struct {
 typedef struct {
   int8_t    *data;                 // Chaine d'entiers (8 bits) qui contient le genome de reference
   int        nb_seq;               // Nombre de sequences qui composent le genome
-  int       *pt_seq;               // pointeur dans data sur le debut des sequences
+  long      *pt_seq;               // pointeur dans data sur le debut des sequences
   int       *len_seq;              // taille des séquences
   long      sizefile;              // taille du fichier fasta
 } GENOME;
