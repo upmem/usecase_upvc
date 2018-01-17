@@ -1,0 +1,5 @@
+upvc
+object/*.o
+cmake-build-debug/
+*.log
+
