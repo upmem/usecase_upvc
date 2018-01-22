@@ -35,3 +35,9 @@ Run
    - replace ODPD by noDP
    - suppress decoding step
 
+==========
+22-01-2018
+==========
+
+- mixe the use of noDP et DDPD functions in the align function (upvc_dpu.c)
+

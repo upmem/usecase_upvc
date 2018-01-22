@@ -117,11 +117,46 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
   return min_score;
 }
 
+// construction d'un profil du voisinage sur les mots de 2 nucleotides
+// mot de 2 nt ==> 16 most possibles
+// le profil est mis dans p, un tableau de 16 entiers courts (16x8bits)
+void makeProfil(int8_t *s, int8_t *p)
+{
+  int i;
+  int8_t x;
+  for (i=0; i<16; i++) p[i]=0;
+  for (i=0; i<SIZE_NBR4-1; i++)
+    {
+      x = s[i] + (s[i+1]<<2);
+      p[x]++;
+    }
+}
+
+// p1 et p2 sont 2 profils
+// si leur distance est <= 18, cela veut dire qu'il y a probablement
+// des similarités sur le voisinage
+int filterProfil(int8_t *p1, int8_t *p2)
+{
+  int i;
+  int x=0;
+  for (i=0; i<16; i++)
+    {
+      if (p1[i]>p2[i]) x = x + (int) (p1[i]-p2[i]); else x = x + (int) (p2[i]-p1[i]);
+      if (x > 18) return 0;
+    }
+  return 1;
+}
+
+// retourne une distance sans prendre en compte les indels
+// retourne également la position du 1er caractere different
+// entre les 2 voisinages
+// s = distance ----  k = position car diff.
 int noDP( int8_t *s1, int8_t *s2)
 {
-  int i,j,s;
+  int i,j,s,k;
   int8_t x1, x2;
   s = 0;
+  k = -1;
   for (i=0; i<SIZE_NBR; i++)
     {
       for (j=0; j<4; j++)
@@ -130,12 +165,13 @@ int noDP( int8_t *s1, int8_t *s2)
 	  x2 = (s2[i]>>(2*j))&3;
 	  if (x1!=x2)
 	    {
+	      if (k == -1) k=4*i+j;
 	      s = s + COST_SUB;
-	      if (s > MAX_SCORE) return s;
+	      if (s > MAX_SCORE) return s + (k<<16);
 	    }
 	}
     }
-  return s;
+  return s + (k<<16);
 }
 
 // mapping des reads
@@ -144,11 +180,13 @@ int noDP( int8_t *s1, int8_t *s2)
 
 void align(int numdpu)
 {
-  int nr, ix, score, offset, mini, nb_map_start;
+  int nr, ix, pos, score, score_pos, offset, mini, nb_map_start;
   int nb_map = 0;
   MEM_DPU M = MDPU[numdpu];
-  //int8_t R[SIZE_NBR*4];
-  //int8_t V[SIZE_NBR*4];
+  int8_t PV[16];
+  int8_t PR[16];
+  int8_t R[SIZE_NBR4];
+  int8_t V[SIZE_NBR4];
 
   //stat_nb_read[numdpu]=0;
   //stat_nb_nbr[numdpu]=0;
@@ -159,16 +197,31 @@ void align(int numdpu)
   while (M.num[nr] != -1)   // nr = indice qui parcours les reads a traiter
     {
       //stat_nb_read[numdpu]++;
-      //decode_neighbor(&M.neighbor_read[nr*SIZE_NBR],R); // dans R on met le voisinage de la graine du read 
+      decode_neighbor(&M.neighbor_read[nr*SIZE_NBR],R); // dans R on met le voisinage de la graine du read 
+      makeProfil(R,PR);                                 // dans PR on met le profil du voisinage
       offset = M.offset[nr];                            // offset = adresse du 1er voisinage
       mini = MAX_SCORE;
       nb_map_start = nb_map;
       for (ix=0; ix<M.count[nr]; ix++)                  // count = nombre de voisinages
 	{
 	  //stat_nb_nbr[numdpu]++;
-	  //decode_neighbor(&M.neighbor_idx[(offset+ix)*SIZE_NBR],V); // dans V on met le voisinage de la graine
-	  //score = ODPD(numdpu,V,R); 
-	  score = noDP(&M.neighbor_read[nr*SIZE_NBR],&M.neighbor_idx[(offset+ix)*SIZE_NBR]);
+	  // noDP calcule une distance que sur la base des substitutions (16 bits de poids faible)
+          // elle retourne également la position du 1er caractere different entre 2 voisinage (16 bits de poids forts)
+	  score_pos = noDP(&M.neighbor_read[nr*SIZE_NBR],&M.neighbor_idx[(offset+ix)*SIZE_NBR]);
+	  score = score_pos & 0xFFFF;
+	  if (score > MAX_SCORE)
+	    {
+	      pos = score_pos>>16;
+	      if (pos >= 8) // c'est équivalent à considérer des graines de taille 24 (pour les indels)
+		{
+		  decode_neighbor(&M.neighbor_idx[(offset+ix)*SIZE_NBR],V); // dans V on met le voisinage de la graine
+		  makeProfil(V,PV);              // dans PV on met le profil du voisinage
+		  if (filterProfil(PR,PV) == 1 ) // on ne lance ODPD que si les profils des voisinages sont similaires
+		    {
+		      score = ODPD(numdpu,V,R); 
+		    }
+		}
+	    }
 	  if (score <= mini)
 	    {
 	      if (score <  mini)

@@ -1,3 +1,4 @@
+#define VERSION           "VERSION 1.1"
 #define SIZE_SEED         12
 #define NB_SEED           16777216
 #define NB_DPU            128

@@ -69,6 +69,7 @@ int main (int argc, char *argv[])
   TIMES *CT;                       // temps de calcul
 
   if (argc != 2) { printf ("\nusage:\n  %s <genome> \n\n",argv[0]); exit (255); }
+  printf ("%s\n",VERSION);
 
   // initialisation des compteurs de temps de calcul
   CT = (TIMES *) malloc(sizeof(TIMES));
