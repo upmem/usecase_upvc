@@ -17,8 +17,8 @@ static int cmplong (void const *a, void const *b)
 INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
 {
   double t1,t2;
-  int seed, d,i, is, x, z, v, k, numdpu;
-  long c, ns;
+  int seed, d,i, x, z, v, k, numdpu;
+  long c, ns, lx, is;
   INDEX_SEED *C;
   long workload[NB_DPU];
   int sizeidx[NB_DPU];
@@ -37,14 +37,13 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
   for (i=0; i<NB_SEED; i++) COUNT[i]=0; // initialisation de tous les compteurs a zero
   for (ns=0; ns<RG->nb_seq; ns++) // pour chaque sequence du genome
     {
-      x = RG->pt_seq[ns]; // x = position dans GENOME du 1er caractere de la sequence numero ns
+      lx = RG->pt_seq[ns]; // x = position dans GENOME du 1er caractere de la sequence numero ns
       for (is=0; is<RG->len_seq[ns]-SIZE_NBR-SIZE_SEED+1; is++) // pour chaque graine de la sequence
 	{
-	  v=code_seed(&RG->data[x+is]); // v contient le code de la graine
+	  v=code_seed(&RG->data[lx+is]); // v contient le code de la graine
 	  COUNT[v]++; // incrementation du compteur des graines
 	}
     }
-
 
   // initialisation des index des graines a repartir sur les DPUs
   for (v=0; v<NB_SEED; v++)
@@ -72,6 +71,7 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
   for (i=0; i<NB_SEED; i++) TMP[i] = (((long) COUNT[i]) << 32) + ((long) i); // aggregation count + seed
   qsort(TMP,NB_SEED,sizeof(long),cmplong);
 
+
   // 2 - repartition dans les DPUS
   for (numdpu=0; numdpu<NB_DPU; numdpu++) { workload[numdpu] = 0; sizeidx[numdpu] = 0; }
 
@@ -98,13 +98,13 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
 	  sizeidx[k] += C->nb_nbr;
 	  workload[k] += (long) (C->nb_nbr * COUNT[seed]);
 	  C->num_dpu = k;
-	  //printf ("%x (%d) %d %ld %d %d\n",seed,COUNT[seed],k,workload[k],C->nb_nbr,sizeidx[k]);
 	  d = (d+1)%NB_DPU;
 	  C = C->next;
 	}
     }
 
-  //for (i=0; i<NB_DPU; i++) printf ("%d %ld %d\n",i,workload[i],sizeidx[i]);
+  //data for ploting the size of the index
+  //for (i=0; i<NB_DPU; i++) printf ("%d %ld %d\n",i,workload[i],sizeidx[i]*35);
   //exit (0);
 
 
@@ -133,10 +133,10 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
   for (i=0; i<NB_SEED; i++) CC[i] = 0;
   for (ns=0; ns<RG->nb_seq; ns++) // pour chaque sequence du genome
     {
-      x = RG->pt_seq[ns]; // x = position dans GENOME du 1er caractere de la sequence numero ns
+      lx = RG->pt_seq[ns]; // x = position dans GENOME du 1er caractere de la sequence numero ns
       for (is=0; is<RG->len_seq[ns]-SIZE_NBR-SIZE_SEED+1; is++) // pour chaque graine de la sequence
 	{
-	  v=code_seed(&RG->data[x+is]);
+	  v=code_seed(&RG->data[lx+is]);
 	  C = SEED[v];
 	  z = 0;
 	  while (C!= NULL)
@@ -148,7 +148,7 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
 	  k = C->offset+CC[v]-z;
 	  // codage et ecriture des voisinage dans le DPU concerne
 	  // a remplacer par les transactions memoire correspondantes
-	  code_neighbor(&RG->data[x+is+SIZE_SEED],buf);
+	  code_neighbor(&RG->data[lx+is+SIZE_SEED],buf);
 	  write_neighbor_idx(C->num_dpu,k,buf);
 	  write_coordinate(C->num_dpu,k,((ns<<32)+is));
 	  CC[v]++;

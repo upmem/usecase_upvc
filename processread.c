@@ -272,7 +272,7 @@ int process_read(GENOME *RG, int8_t *BUF_READ, int nb_read,  VARINDEL **INDEL, i
 	// score[x] = score min du type x
 	for (k=0; k<4; k++) { score[k] = 1000; offset[k] = -1; nbread[k] = 0; }
 	numpair = A[i].num_read / 4;
-	while ((numpair == A[i].num_read/4)&&(i<nb_match)) // on recupres tous les reads d'une paire
+	while ((i<nb_match) && (numpair == A[i].num_read/4)) // on recupres tous les reads d'une paire
 	  {
 	    type = A[i].num_read % 4;
 	    // normalement, la fonction cmpalign tri par numero de read et par score

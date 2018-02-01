@@ -41,3 +41,14 @@ Run
 
 - mixe the use of noDP et DDPD functions in the align function (upvc_dpu.c)
 
+
+==========
+01-02=2018
+==========
+
+- version 1.2
+- file upvc_dpu.c
+   - suppress filter
+   - supress decoding
+   - optimize noDP
+   - modify ODPD (no need fo decoding)

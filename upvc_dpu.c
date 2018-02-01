@@ -28,11 +28,10 @@ typedef struct {
 MEM_DPU *MDPU; 
 
 // pour le calcul des statistiques
-/*
-long stat_nb_read[NB_DPU];
-long stat_nb_nbr[NB_DPU];
-long stat_nb_dp[NB_DPU];
-*/
+
+long stat_nb_read[NB_DPU];   // data for ploting the number of reads dispatched by DPU
+long stat_nb_nbr[NB_DPU];    // data for ploting the number of distances computed by DPU
+
 
 
 int mini (int a, int b) { if (a<b) return a; else return b; }
@@ -40,9 +39,9 @@ int mini (int a, int b) { if (a<b) return a; else return b; }
 // calcul d'une distance d'alignement par programmation dynamique
 // sur les diagonales de la matrice
 // optimisation des resources 
-// s'arrete quand le score a depasse le seuil MAX_SCORE
+// s'arrete quand le score a depasse le seuil max_score
 
-int ODPD(int numdpu, int8_t *s1, int8_t *s2)
+int ODPD(int8_t *s1, int8_t *s2, int max_score)
 {
   int D[2][SIZE_NBR4+1];				
   int P[2][SIZE_NBR4+1];				
@@ -54,7 +53,7 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 
   for (i=1; i<NB_DIAG/2+1; i++)
     {
-      //stat_nb_dp[numdpu]++;
+      min_score = 99; // ajout v1.2
       pp = i%2;
       lp = (i-1)%2;
       D[pp][0] = i*COST_SUB;
@@ -64,15 +63,17 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 	  Q[pp][j] = mini(D[lp][j]+COST_GAPO,Q[lp][j]+COST_GAPE);
 	  QP = mini(P[pp][j],Q[pp][j]);
 	  d = D[lp][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  //if (s1[i-1]!=s2[j-1]) d+=COST_SUB; // delete v1.2
+	  if (  (( s1[(i-1)/4] >> (2*((i-1)%4)) )&3) != (( s2[(j-1)/4] >> (2*((j-1)%4)) )&3) ) d+=COST_SUB;
 	  D[pp][j] = mini(d,QP);
+	  if (D[pp][j] < min_score) min_score = D[pp][j]; // ajout v1.2
 	}
       Q[pp][j]=99; D[pp][j]=99;
+      if (min_score > max_score) return min_score; // ajout v1.2
     }
 
   for (i=NB_DIAG/2+1; i<SIZE_NBR4-NB_DIAG/2; i++)
     {
-      //stat_nb_dp[numdpu]++;
       min_score = 99;
       pp = i%2;
       lp = (i-1)%2;
@@ -84,17 +85,17 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 	  Q[pp][j] = mini(D[lp][j]+COST_GAPO,Q[lp][j]+COST_GAPE);
 	  QP = mini(P[pp][j],Q[pp][j]);
 	  d = D[lp][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  //if (s1[i-1]!=s2[j-1]) d+=COST_SUB; // delete v1.2
+	  if (   (( s1[(i-1)/4] >> (2*((i-1)%4)) )&3) != (( s2[(j-1)/4] >> (2*((j-1)%4)) )&3) ) d+=COST_SUB;
 	  D[pp][j] = mini(d,QP);
 	  if (D[pp][j] < min_score) min_score = D[pp][j];
 	}
       Q[pp][j]=99; D[pp][j]=99;
-      if (min_score > MAX_SCORE) return min_score;
+      if (min_score > max_score) return min_score;
     }
   min_score = 99;
   for (i=SIZE_NBR4-NB_DIAG/2; i<SIZE_NBR4+1; i++)
     {
-      //stat_nb_dp[numdpu]++;
       pp = i%2;
       lp = (i-1)%2;
       j=i-NB_DIAG/2-1;
@@ -105,7 +106,8 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
 	  Q[pp][j] = mini(D[lp][j]+COST_GAPO,Q[lp][j]+COST_GAPE);
 	  QP = mini(P[pp][j],Q[pp][j]);
 	  d = D[lp][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  //if (s1[i-1]!=s2[j-1]) d+=COST_SUB; // delete v1.2
+	  if (   (( s1[(i-1)/4] >> (2*((i-1)%4)) )&3) != (( s2[(j-1)/4] >> (2*((j-1)%4)) )&3) ) d+=COST_SUB;
 	  D[pp][j] = mini(d,QP);
 	}
       if (D[pp][SIZE_NBR4]<min_score) min_score = D[pp][SIZE_NBR4];
@@ -117,62 +119,114 @@ int ODPD(int numdpu, int8_t *s1, int8_t *s2)
   return min_score;
 }
 
-// construction d'un profil du voisinage sur les mots de 2 nucleotides
-// mot de 2 nt ==> 16 most possibles
-// le profil est mis dans p, un tableau de 16 entiers courts (16x8bits)
-void makeProfil(int8_t *s, int8_t *p)
+int TT[256] = {   0 , 10 , 10 , 10 , 10 , 20 , 20 , 20 , 10 , 20 , 20 , 20 , 10 , 20 , 20 , 20 ,
+		 10 , 20 , 20 , 20 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 ,
+		 10 , 20 , 20 , 20 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 ,
+		 10 , 20 , 20 , 20 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 ,
+		 10 , 20 , 20 , 20 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 10 , 20 , 20 , 20 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 10 , 20 , 20 , 20 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 , 20 , 30 , 30 , 30 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
+		 20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 };
+
+
+// version optimisee de noDP
+// retourne un score si pas de détection d'indels
+// sinon (détection d'indels) retourne -1. Dans ce cas on lancera la procédure ODPD
+// fonction qui utilise le casting de pointeurs
+
+int noDP(int8_t *s1, int8_t *s2, int max_score)
 {
-  int i;
-  int8_t x;
-  for (i=0; i<16; i++) p[i]=0;
-  for (i=0; i<SIZE_NBR4-1; i++)
+  int i, j, x, v, V, V1, V2;
+  int *X1, *X2;
+  int score = 0;
+  for (i=0; i<SIZE_NBR; i++)
     {
-      x = s[i] + (s[i+1]<<2);
-      p[x]++;
+      x = (int) (s1[i]^s2[i]);
+      x = x&0xFF;
+      v = TT[x];
+      if (v > COST_SUB) // indique si on a plus d'une difference
+	{
+	  j=i+1;
+	  if (j<SIZE_NBR-3)
+	    {
+	      X1 =  (int *) (&s1[j]);
+	      X2 =  (int *) (&s2[j]);
+	      V1 = *X1;
+	      V2 = *X2;
+	      V = (V1 ^ V2)&0xFFFFFF; // on regarde si les 8 caracteres suivants sont identiques
+	      if (V!=0) // si caracteres differents on test les indels
+		{
+		  V = (V1 ^ (V2>>2))&0xFFFFFF;
+		  if (V==0) return -1;
+		  V = (V1 ^ (V2>>4))&0xFFFFFF;
+		  if (V==0) return -1;
+		  V = (V1 ^ (V2>>6))&0xFFFFFF;
+		  if (V==0) return -1;
+		  V = (V1 ^ (V2>>8))&0xFFFFFF;
+		  if (V==0) return -1;
+		  
+		  V = (V2 ^ (V1>>2))&0xFFFFFF;
+		  if (V==0) return -1;
+		  V = (V2 ^ (V1>>4))&0xFFFFFF;
+		  if (V==0) return -1;
+		  V = (V2 ^ (V1>>6))&0xFFFFFF;
+		  if (V==0) return -1;
+		  V = (V2 ^ (V1>>8))&0xFFFFFF;
+		  if (V==0) return -1;
+		}
+	    }
+	}
+      score += v;
+      if (score > max_score) break;
     }
+  return score;
 }
 
-// p1 et p2 sont 2 profils
-// si leur distance est <= 18, cela veut dire qu'il y a probablement
-// des similarités sur le voisinage
-int filterProfil(int8_t *p1, int8_t *p2)
+void print2NBR(int8_t *s1, int8_t *s2)
 {
-  int i;
-  int x=0;
-  for (i=0; i<16; i++)
+  int i,j;
+  int8_t x, x1, x2;
+  for (i=0; i<SIZE_NBR; i++)
     {
-      if (p1[i]>p2[i]) x = x + (int) (p1[i]-p2[i]); else x = x + (int) (p2[i]-p1[i]);
-      if (x > 18) return 0;
+      for (j=0; j<4; j++)
+	{
+	  x = (s1[i]>>(2*j))&3;
+	  printf ("%x",x);
+	}
     }
-  return 1;
-}
-
-// retourne une distance sans prendre en compte les indels
-// retourne également la position du 1er caractere different
-// entre les 2 voisinages
-// s = distance ----  k = position car diff.
-int noDP( int8_t *s1, int8_t *s2)
-{
-  int i,j,s,k;
-  int8_t x1, x2;
-  s = 0;
-  k = -1;
+  printf ("\n");
   for (i=0; i<SIZE_NBR; i++)
     {
       for (j=0; j<4; j++)
 	{
 	  x1 = (s1[i]>>(2*j))&3;
 	  x2 = (s2[i]>>(2*j))&3;
-	  if (x1!=x2)
-	    {
-	      if (k == -1) k=4*i+j;
-	      s = s + COST_SUB;
-	      if (s > MAX_SCORE) return s + (k<<16);
-	    }
+	  if (x1!=x2) printf ("|"); else printf (" ");
 	}
     }
-  return s + (k<<16);
+  printf ("\n");
+  for (i=0; i<SIZE_NBR; i++)
+    {
+      for (j=0; j<4; j++)
+	{
+	  x = (s2[i]>>(2*j))&3;
+	  printf ("%x",x);
+	}
+    }
+  printf ("\n\n");
 }
+
+
+
+
 
 // mapping des reads
 // M point sur une memoire d'un des DPUs
@@ -180,47 +234,30 @@ int noDP( int8_t *s1, int8_t *s2)
 
 void align(int numdpu)
 {
-  int nr, ix, pos, score, score_pos, offset, mini, nb_map_start;
+  int nr, ix, score_noDP, score_ODPD, score, offset, mini, nb_map_start;
   int nb_map = 0;
   MEM_DPU M = MDPU[numdpu];
-  int8_t PV[16];
-  int8_t PR[16];
-  int8_t R[SIZE_NBR4];
-  int8_t V[SIZE_NBR4];
 
-  //stat_nb_read[numdpu]=0;
-  //stat_nb_nbr[numdpu]=0;
-  //stat_nb_dp[numdpu]=0;
+  stat_nb_read[numdpu]=0;
+  stat_nb_nbr[numdpu]=0;
 
   nr = 0;
   M.out_num[nb_map] = -1;
   while (M.num[nr] != -1)   // nr = indice qui parcours les reads a traiter
     {
       //stat_nb_read[numdpu]++;
-      decode_neighbor(&M.neighbor_read[nr*SIZE_NBR],R); // dans R on met le voisinage de la graine du read 
-      makeProfil(R,PR);                                 // dans PR on met le profil du voisinage
       offset = M.offset[nr];                            // offset = adresse du 1er voisinage
       mini = MAX_SCORE;
       nb_map_start = nb_map;
       for (ix=0; ix<M.count[nr]; ix++)                  // count = nombre de voisinages
 	{
-	  //stat_nb_nbr[numdpu]++;
-	  // noDP calcule une distance que sur la base des substitutions (16 bits de poids faible)
-          // elle retourne également la position du 1er caractere different entre 2 voisinage (16 bits de poids forts)
-	  score_pos = noDP(&M.neighbor_read[nr*SIZE_NBR],&M.neighbor_idx[(offset+ix)*SIZE_NBR]);
-	  score = score_pos & 0xFFFF;
-	  if (score > MAX_SCORE)
+	  // stat_nb_nbr[numdpu]++;
+	  score_noDP = noDP(&M.neighbor_read[nr*SIZE_NBR],&M.neighbor_idx[(offset+ix)*SIZE_NBR],mini);
+	  score = score_noDP;
+	  if (score_noDP == -1)
 	    {
-	      pos = score_pos>>16;
-	      if (pos >= 8) // c'est équivalent à considérer des graines de taille 24 (pour les indels)
-		{
-		  decode_neighbor(&M.neighbor_idx[(offset+ix)*SIZE_NBR],V); // dans V on met le voisinage de la graine
-		  makeProfil(V,PV);              // dans PV on met le profil du voisinage
-		  if (filterProfil(PR,PV) == 1 ) // on ne lance ODPD que si les profils des voisinages sont similaires
-		    {
-		      score = ODPD(numdpu,V,R); 
-		    }
-		}
+	      score_ODPD = ODPD(&M.neighbor_read[nr*SIZE_NBR],&M.neighbor_idx[(offset+ix)*SIZE_NBR],mini);
+	      score = score_ODPD;
 	    }
 	  if (score <= mini)
 	    {
@@ -241,7 +278,7 @@ void align(int numdpu)
 	}
       nr++;
     }
-  //printf ("STAT %d %ld %ld %ld\n",numdpu,stat_nb_read[numdpu],stat_nb_nbr[numdpu], stat_nb_dp[numdpu]);
+  //printf ("STAT %d %ld %ld\n",numdpu,stat_nb_read[numdpu],stat_nb_nbr[numdpu]);
 }
 
 // allocation globale de la memoire DPU
