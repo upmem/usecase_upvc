@@ -43,7 +43,7 @@ Run
 
 
 ==========
-01-02=2018
+01-02-2018
 ==========
 
 - version 1.2
@@ -52,3 +52,13 @@ Run
    - supress decoding
    - optimize noDP
    - modify ODPD (no need fo decoding)
+
+
+==========
+07-02-2018
+==========
+
+- version 1.3
+- no modification of file upvc_dpu.c
+- no indexing in low complexity region
+

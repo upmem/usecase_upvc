@@ -37,11 +37,11 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
   for (i=0; i<NB_SEED; i++) COUNT[i]=0; // initialisation de tous les compteurs a zero
   for (ns=0; ns<RG->nb_seq; ns++) // pour chaque sequence du genome
     {
-      lx = RG->pt_seq[ns]; // x = position dans GENOME du 1er caractere de la sequence numero ns
+      lx = RG->pt_seq[ns]; // lx = position dans GENOME du 1er caractere de la sequence numero ns
       for (is=0; is<RG->len_seq[ns]-SIZE_NBR-SIZE_SEED+1; is++) // pour chaque graine de la sequence
 	{
 	  v=code_seed(&RG->data[lx+is]); // v contient le code de la graine
-	  COUNT[v]++; // incrementation du compteur des graines
+	  if (v>=0) COUNT[v]++; // incrementation du compteur des graines
 	}
     }
 
@@ -79,6 +79,7 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
   for (i=0; i<NB_SEED; i++) 
     {
       seed = TMP[i] & 0xFFFFFFFF;  // on recupere les graines qui ont ete triees par ordre decroissant
+      //printf ("%x %d\n",seed,COUNT[seed]);
       C = SEED[seed];
       while (C!= NULL)
 	{
@@ -137,6 +138,7 @@ INDEX_SEED **index_genome(GENOME *RG, TIMES *CT)
       for (is=0; is<RG->len_seq[ns]-SIZE_NBR-SIZE_SEED+1; is++) // pour chaque graine de la sequence
 	{
 	  v=code_seed(&RG->data[lx+is]);
+	  if (v<0) continue;
 	  C = SEED[v];
 	  z = 0;
 	  while (C!= NULL)

@@ -92,7 +92,7 @@ int code_alignment(int8_t *code, int score, int8_t *gen, int8_t *read)
   s = 0;
   for (i=SIZE_SEED; i<SIZE_NBR4+SIZE_SEED; i++) 
     {
-      if (gen[i]!=read[i]) 
+      if ((gen[i]&3)!=read[i]) 
 	{ 
 	  s=s+COST_SUB; 
 	  code[k++] = CODE_SUB; 
@@ -129,12 +129,12 @@ int code_alignment(int8_t *code, int score, int8_t *gen, int8_t *read)
 	    {
 	      code[k++] = CODE_DEL; 
 	      code[k++] = BT[x].ix+SIZE_SEED;
-	      code[k++] = gen[BT[x].ix+SIZE_SEED];
+	      code[k++] = gen[BT[x].ix+SIZE_SEED]&3;
 	      jx = BT[x].jx;
 	      x--; 
 	      while ((BT[x].type == CODE_DEL) && (jx==BT[x].jx)) 
 		{ 
-		  code[k++] = gen[BT[x].ix+SIZE_SEED];
+		  code[k++] = gen[BT[x].ix+SIZE_SEED]&3;
 		  x--; 
 		}
 	    }

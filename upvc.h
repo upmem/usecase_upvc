@@ -1,4 +1,4 @@
-#define VERSION           "VERSION 1.2"
+#define VERSION           "VERSION 1.3"
 #define SIZE_SEED         12
 #define NB_SEED           16777216
 #define NB_DPU            128
@@ -8,6 +8,7 @@
 #define MAX_ALIGN         65536
 #define MAX_SEQ_GEN       1000
 #define MAX_SIZE_IDX_SEED 1000
+#define SIZE_WINDOW_CPLX  11
 
 #define SIZE_LIST_INDEL  (1<<16)
 

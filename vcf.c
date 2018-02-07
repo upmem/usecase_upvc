@@ -61,7 +61,7 @@ int create_vcf(char *filename, GENOME *RG, VARINDEL **INDEL, int *SUB, int8_t *M
 	  if (type != CODE_END)
 	    {
 	      if (type == CODE_SUB) type = 'S'; else if (type == CODE_INS) type = 'I'; else type = 'D';
-	      fprintf (fvcf,"%3d %8d %c ", ns,is,type);
+	      fprintf (fvcf,"%d %d %c ", ns,is,type);
 	      size = (v>>4)&0xF;
 	      count = (v>>8)&0xFF;
 	      content = v>>16;

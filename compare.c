@@ -53,7 +53,7 @@ void DP(int8_t *s1, int8_t *s2)
 	  Q[i][j] = min(D[i-1][j]+COST_GAPO,Q[i-1][j]+COST_GAPE);
 	  QP = min(P[i][j],Q[i][j]);
 	  d = D[i-1][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  if ((s1[i-1]&3)!=(s2[j-1]&3)) d+=COST_SUB;
 	  D[i][j] = min(d,QP);
 	}
     }
@@ -91,7 +91,7 @@ int DPD(int8_t *s1, int8_t *s2, BACKTRACK *bt)
 	  if (D[i-1][j]+COST_GAPO<Q[i-1][j]+COST_GAPE) { Q[i][j] = D[i-1][j]+COST_GAPO; } else { Q[i][j] = Q[i-1][j]+COST_GAPE; }
 	  if (P[i][j] < Q[i][j]) { QP =  P[i][j]; T[i][j] = 1; } else { QP = Q[i][j]; T[i][j] = 2; }
 	  d = D[i-1][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  if ((s1[i-1]&3)!=(s2[j-1]&3)) d+=COST_SUB;
 	  if (d<QP) { D[i][j] =  d; T[i][j] = 0; } else { D[i][j] =  QP; }
 	}
       Q[i][j]=99; D[i][j]=99;
@@ -106,7 +106,7 @@ int DPD(int8_t *s1, int8_t *s2, BACKTRACK *bt)
 	  if (D[i-1][j]+COST_GAPO<Q[i-1][j]+COST_GAPE) { Q[i][j] = D[i-1][j]+COST_GAPO; } else { Q[i][j] = Q[i-1][j]+COST_GAPE; }
 	  if (P[i][j] < Q[i][j]) { QP =  P[i][j]; T[i][j] = 1; } else { QP = Q[i][j]; T[i][j] = 2; }
 	  d = D[i-1][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  if ((s1[i-1]&3)!=(s2[j-1]&3)) d+=COST_SUB;
 	  if (d<QP) { D[i][j] =  d; T[i][j] = 0; } else { D[i][j] =  QP; }
 	}
       Q[i][j]=99; D[i][j]=99;
@@ -122,7 +122,7 @@ int DPD(int8_t *s1, int8_t *s2, BACKTRACK *bt)
 	  if (D[i-1][j]+COST_GAPO<Q[i-1][j]+COST_GAPE) { Q[i][j] = D[i-1][j]+COST_GAPO; } else { Q[i][j] = Q[i-1][j]+COST_GAPE; }
 	  if (P[i][j] < Q[i][j]) { QP =  P[i][j]; T[i][j] = 1; } else { QP = Q[i][j]; T[i][j] = 2; }
 	  d = D[i-1][j-1];
-	  if (s1[i-1]!=s2[j-1]) d+=COST_SUB;
+	  if ((s1[i-1]&3)!=(s2[j-1]&3)) d+=COST_SUB;
 	  if (d<QP) { D[i][j] =  d; T[i][j] = 0; } else { D[i][j] =  QP; }
 	}
       if (D[i][SIZE_NBR4]<min_score) { min_score = D[i][SIZE_NBR4]; ii=i; jj=SIZE_NBR4; }

@@ -14,6 +14,7 @@ int code_seed(int8_t *SEQ)
   int v=0;
   for (i=0; i<SIZE_SEED; i=i+1) 
     {
+      if (SEQ[i] >= 4) return -1;
       v=(v<<2)+SEQ[i]; 
     }
   return v;
@@ -25,7 +26,7 @@ void code_neighbor(int8_t *SEQ, int8_t *CODE)
   for (i=0; i<SIZE_NBR; i++)
     {
       j = i*4;
-      CODE[i] = (SEQ[j+3]<<6) + (SEQ[j+2]<<4) + (SEQ[j+1]<<2) + SEQ[j];
+      CODE[i] = ((SEQ[j+3]&3)<<6) + ((SEQ[j+2]&3)<<4) + ((SEQ[j+1]&3)<<2) + (SEQ[j]&3);
     }
 }
 

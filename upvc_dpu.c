@@ -140,7 +140,7 @@ int TT[256] = {   0 , 10 , 10 , 10 , 10 , 20 , 20 , 20 , 10 , 20 , 20 , 20 , 10 
 // version optimisee de noDP
 // retourne un score si pas de détection d'indels
 // sinon (détection d'indels) retourne -1. Dans ce cas on lancera la procédure ODPD
-// fonction qui utilise le casting de pointeurs
+// cette fonction qui utilise le cast de pointeurs
 
 int noDP(int8_t *s1, int8_t *s2, int max_score)
 {

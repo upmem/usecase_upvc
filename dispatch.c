@@ -43,23 +43,21 @@ void dispatch_read(INDEX_SEED **SEED, int8_t* BUF_READ, int nb_read, TIMES *CT)
       read0 = &BUF_READ[num_read*SIZE_READ];
       v0 = code_seed(read0);
       C0 = SEED[v0];
-
-      read1 = &BUF_READ[(num_read+1)*SIZE_READ];
-      v1 = code_seed(read1);
-      C1 = SEED[v1];
+      writeMemDPU(C0,COUNT_READ,read0,num_read);
 
       read2 = &BUF_READ[(num_read+2)*SIZE_READ];
       v2 = code_seed(read2);
       C2 = SEED[v2];
+      writeMemDPU(C2,COUNT_READ,read2,num_read+2);
+
+      read1 = &BUF_READ[(num_read+1)*SIZE_READ];
+      v1 = code_seed(read1);
+      C1 = SEED[v1];
+      writeMemDPU(C1,COUNT_READ,read1,num_read+1);
 
       read3 = &BUF_READ[(num_read+3)*SIZE_READ];
       v3 = code_seed(read3);
       C3 = SEED[v3];
-
-      writeMemDPU(C0,COUNT_READ,read0,num_read);
-      writeMemDPU(C2,COUNT_READ,read2,num_read+2);
-
-      writeMemDPU(C1,COUNT_READ,read1,num_read+1);
       writeMemDPU(C3,COUNT_READ,read3,num_read+3);
     }
   for (numdpu=0; numdpu < NB_DPU; numdpu++)
