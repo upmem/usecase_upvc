@@ -8,7 +8,8 @@ objects = object/upvc_host.o    \
 	object/dispatch.o    \
 	object/processread.o \
 	object/compare.o     \
-	object/vcf.o
+	object/vcf.o         \
+	object/debug.o
 
 
 version = upvc_1.3
@@ -64,3 +65,6 @@ object/vcf.o : upvc.h vcf.c export.txt
 	cp vcf.c $(version)/ # dl
 	gcc -O3 -Wall -c vcf.c -o object/vcf.o
 
+object/debug.o : upvc.h debug.c export.txt
+	cp debug.c $(version)/ # dl
+	gcc -O3 -Wall -c debug.c -o object/debug.o

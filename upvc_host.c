@@ -13,6 +13,9 @@ int SIZE_READ;
 int SIZE_NBR;
 int SIZE_NBR4;
 
+// UPMEM: to check the consistency of our implementation with this reference.
+void print_index_seeds(INDEX_SEED **SEED, FILE *out);
+
 inline double my_clock(void) {
   struct timeval t;
   gettimeofday(&t, NULL);
@@ -103,6 +106,11 @@ int main (int argc, char *argv[])
   printf ("Index genome\n");
   SEED = index_genome(REFGENOME,CT); // index.c
   printf (" - time: %lf\n",CT->index_genome);
+
+
+    FILE *seedsOut = fopen("seeds.log", "w");
+    print_index_seeds(SEED, seedsOut);
+    fclose(seedsOut);
 
   // initialisation de la couverture du mapping
   MAPCOV = (int8_t *) calloc(sizeof(int8_t), REFGENOME->sizefile);
