@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <ctype.h>
 
 #include "upvc.h"
 
@@ -13,7 +14,7 @@ GENOME *get_genome(char* name, TIMES *CT)
   
   FILE *fgen;          // fichier genome
   long sizefile;       // taille du fichier
-  int  i, j, k;
+  int  i;
   long x;
   double t1, t2;
   char BUF[1024];
@@ -47,13 +48,13 @@ GENOME *get_genome(char* name, TIMES *CT)
 	}
       else
 	{
-	  k = strlen(BUF);
-	  for (i=0; i<k-1; i++) 
+	  size_t k = strlen(BUF);
+	  for (i=0; i<k-1; i++)
 	    {
-	      if (BUF[i]!='N')
+          int c = toupper(BUF[i]);
+	      if (c!='N')
 		{
-		  j = (int) BUF[i];
-		  G->data[x++] = (j>>1)&3; // A -> 0, C -> 1, G -> 3, T -> 2
+		  G->data[x++] = (c>>1)&3; // A -> 0, C -> 1, G -> 3, T -> 2
 		}
 	      else
 		{
