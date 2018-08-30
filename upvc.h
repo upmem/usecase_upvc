@@ -1,4 +1,7 @@
-#define VERSION           "VERSION 1.3"
+#ifndef UPVC_H
+#define UPVC_H
+
+#define VERSION           "VERSION 1.4"
 #define SIZE_SEED         12
 #define NB_SEED           16777216
 #define NB_DPU            128
@@ -27,9 +30,13 @@
 #define CODE_T    2    // ('T'>>1)&3   54H  0101 0100
 #define CODE_G    3    // ('G'>>1)&3   47H  0100 0111
 
+#define SIZE_ALLELE 100
+
 extern int SIZE_NBR;
 extern int SIZE_NBR4;
 extern int SIZE_READ;
+extern int SIZE_INSERT_MEAN;
+extern int SIZE_INSERT_STD;
 
 typedef struct {
   int arg1;
@@ -44,6 +51,8 @@ typedef struct {
   long      *pt_seq;               // pointeur dans data sur le debut des sequences
   int       *len_seq;              // taille des séquences
   long      sizefile;              // taille du fichier fasta
+  char		**name;			       // noms des sequences
+  char		*filename;			   // nom de fichier
 } GENOME;
 
 // index associe a une graine
@@ -97,6 +106,33 @@ typedef struct {
   void *next;    // pointeur sur un autre variant
 } VARINDEL;
 
+// representation de variant
+typedef struct VARIANT {
+  char* chr;
+  int offset;
+  int pos;
+  char* ref;
+  char* alt;
+  int cov;
+  int depth;
+  struct VARIANT* next;
+} VARIANT;
+
+typedef struct VARTREE {
+  int pos;
+  VARIANT* vars;
+  struct VARTREE* right;
+  struct VARTREE* left;
+  int height;
+  int count;
+} VARTREE;
+
+int max(int a, int b); //varlist.c
+VARTREE* initialize(int pos, VARIANT* vars); //varlist.c
+VARTREE* insert(VARTREE* root, VARIANT* var); //varlist.c
+void appendvars(VARIANT* list, VARIANT* v); //varlist.c
+void inorder(VARTREE* root, FILE* fvcf); //varlist.c
+
 double my_clock(void);
 
 GENOME *get_genome(char* name, TIMES *CT);  // getgenome.c
@@ -106,6 +142,8 @@ INDEX_SEED** index_genome(GENOME *G, TIMES *CT); // index.c
 void free_index(INDEX_SEED **SEED);
 
 int  create_vcf(char *filename, GENOME *RG, VARINDEL **INDEL, int *SUB, int8_t *MAPCOV, TIMES *CT); // vcf.c
+
+void normalize(GENOME *RG, VARIANT* var); // normalizevar.c
 
 int  getPEreads(FILE *fpe1, FILE *fpe2, int8_t *BUF_READ, TIMES *CT);
 int  getSeqFastQ(FILE *ff, int8_t *read1, int8_t *read2);
@@ -138,8 +176,10 @@ void write_offset(int d, int k, int v);
 void write_num   (int d, int k, int v);
 
 // presentent dans processread.c
+void getSizeInsert (ALIGN * A, int size);
 int  read_out_num (int d, int k);
 long read_out_coord (int d, int k);
 int  read_out_score (int d, int k);
 
 
+#endif

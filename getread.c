@@ -20,7 +20,10 @@ int getSeqFastQ(FILE *ff, int8_t *read1, int8_t *read2)
   int i;
   if (fgets(PEBUF,MAX_SIZE_READ,ff)==NULL) return -1; //lecture commentaire
   if (fgets(PEBUF,MAX_SIZE_READ,ff)==NULL) return -1;  //lecture sequence
-  for (i=0; i<SIZE_READ; i++) { read1[i] = (((int)PEBUF[i]) >> 1)&3; read2[SIZE_READ-i-1] = INVNT[read1[i]]; }
+  for (i=0; i<SIZE_READ; i++) {
+	  read1[i] = (((int)PEBUF[i]) >> 1)&3;
+	  read2[SIZE_READ-i-1] = INVNT[read1[i]];
+  }
   if (fgets(PEBUF,MAX_SIZE_READ,ff)==NULL) return -1; //lecture commentaire
   if (fgets(PEBUF,MAX_SIZE_READ,ff)==NULL) return -1; //lecture qualité
   return SIZE_READ;
