@@ -1,7 +1,7 @@
 #ifndef UPVC_H
 #define UPVC_H
 
-#define VERSION           "VERSION 1.4"
+#define VERSION           "VERSION 1.5"
 #define SIZE_SEED         12
 #define NB_SEED           16777216
 #define NB_DPU            128
@@ -30,9 +30,10 @@
 #define CODE_T    2    // ('T'>>1)&3   54H  0101 0100
 #define CODE_G    3    // ('G'>>1)&3   47H  0100 0111
 
-#define SIZE_ALLELE 100
+#define MAX_SIZE_ALLELE 10
 
 extern int SIZE_NBR;
+extern int DELTA_NBR;
 extern int SIZE_NBR4;
 extern int SIZE_READ;
 extern int SIZE_INSERT_MEAN;
@@ -50,9 +51,9 @@ typedef struct {
   int        nb_seq;               // Nombre de sequences qui composent le genome
   long      *pt_seq;               // pointeur dans data sur le debut des sequences
   int       *len_seq;              // taille des séquences
-  long      sizefile;              // taille du fichier fasta
-  char		**name;			       // noms des sequences
-  char		*filename;			   // nom de fichier
+  long       sizefile;             // taille du fichier fasta
+  char	   **name;		   // noms des sequences
+  char	    *filename;		   // nom de fichier
 } GENOME;
 
 // index associe a une graine
@@ -95,29 +96,17 @@ typedef struct {
   int jx;
 } BACKTRACK;
 
-// variant de type indel
-typedef struct {
-  int num_seq;   // numero de sequence
-  int pos_seq;   // position du variant sur la sequence
-  int type;      // code du type de variant : CODE_SUB, CODE_DEL, CODE_INS
-  int size;      // taille du variant
-  int content;   // chaine de ATGC codee (max 16)x
-  int count;     // nombre d'occurences du variant
-  void *next;    // pointeur sur un autre variant
-} VARINDEL;
-
 // representation de variant
 typedef struct VARIANT {
   char* chr;
   int offset;
   int pos;
-  char* ref;
-  char* alt;
-  int cov;
+  char ref[MAX_SIZE_ALLELE];
+  char alt[MAX_SIZE_ALLELE];
   int depth;
-  struct VARIANT* next;
 } VARIANT;
 
+// memorisation des variants
 typedef struct VARTREE {
   int pos;
   VARIANT* vars;
@@ -127,11 +116,13 @@ typedef struct VARTREE {
   int count;
 } VARTREE;
 
-int max(int a, int b); //varlist.c
-VARTREE* initialize(int pos, VARIANT* vars); //varlist.c
-VARTREE* insert(VARTREE* root, VARIANT* var); //varlist.c
-void appendvars(VARIANT* list, VARIANT* v); //varlist.c
-void inorder(VARTREE* root, FILE* fvcf); //varlist.c
+typedef struct LIST_VARIANTS {
+  VARTREE *vt;
+}LIST_VARIANTS;
+
+VARTREE* initialize(int pos, VARIANT* vars); //vartree.c
+void insertVariants(LIST_VARIANTS *LV, VARIANT* var); //vartree.c
+void visuVariants(LIST_VARIANTS *LV); //vartree.c
 
 double my_clock(void);
 
@@ -141,14 +132,12 @@ void free_genome(GENOME *G);
 INDEX_SEED** index_genome(GENOME *G, TIMES *CT); // index.c
 void free_index(INDEX_SEED **SEED);
 
-int  create_vcf(char *filename, GENOME *RG, VARINDEL **INDEL, int *SUB, int8_t *MAPCOV, TIMES *CT); // vcf.c
-
-void normalize(GENOME *RG, VARIANT* var); // normalizevar.c
+int  create_vcf(char *filename, GENOME *RG, LIST_VARIANTS *LV, int *SUB, int8_t *MAPCOV, TIMES *CT); // vcf.c
 
 int  getPEreads(FILE *fpe1, FILE *fpe2, int8_t *BUF_READ, TIMES *CT);
 int  getSeqFastQ(FILE *ff, int8_t *read1, int8_t *read2);
 void dispatch_read(INDEX_SEED **SEED, int8_t* BUF_READ, int nb_pair, TIMES *CT);
-int  process_read(GENOME *RG, int8_t *BUF_READ, int nb_read,  VARINDEL **INDEL, int *SUB, int8_t* MAPCOV, TIMES *CT);
+int  process_read(GENOME *RG, int8_t *BUF_READ, int nb_read, LIST_VARIANTS *LV, int *SUB, int8_t *MAPCOV, FILE *f1, FILE *f2, int round, TIMES *CT);
 int  getSizeRead (char *name);
 void align(int d);
 

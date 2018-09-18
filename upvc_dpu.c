@@ -147,7 +147,7 @@ int noDP(int8_t *s1, int8_t *s2, int max_score)
   int i, j, x, v, V, V1, V2;
   int *X1, *X2;
   int score = 0;
-  for (i=0; i<SIZE_NBR; i++)
+  for (i=0; i<SIZE_NBR-DELTA_NBR; i++)   // modif DL v1.5
     {
       x = (int) (s1[i]^s2[i]);
       x = x&0xFF;
@@ -155,33 +155,30 @@ int noDP(int8_t *s1, int8_t *s2, int max_score)
       if (v > COST_SUB) // indique si on a plus d'une difference
 	{
 	  j=i+1;
-	  if (j<SIZE_NBR-3)
+	  // detection des indels < 5
+	  if (j<SIZE_NBR-DELTA_NBR-3)   // modif DL v1.5
 	    {
 	      X1 =  (int *) (&s1[j]);
 	      X2 =  (int *) (&s2[j]);
-	      V1 = *X1;
-	      V2 = *X2;
-	      V = (V1 ^ V2)&0xFFFFFF; // on regarde si les 8 caracteres suivants sont identiques
-	      if (V!=0) // si caracteres differents on test les indels
-		{
-		  V = (V1 ^ (V2>>2))&0xFFFFFF;
-		  if (V==0) return -1;
-		  V = (V1 ^ (V2>>4))&0xFFFFFF;
-		  if (V==0) return -1;
-		  V = (V1 ^ (V2>>6))&0xFFFFFF;
-		  if (V==0) return -1;
-		  V = (V1 ^ (V2>>8))&0xFFFFFF;
-		  if (V==0) return -1;
-		  
-		  V = (V2 ^ (V1>>2))&0xFFFFFF;
-		  if (V==0) return -1;
-		  V = (V2 ^ (V1>>4))&0xFFFFFF;
-		  if (V==0) return -1;
-		  V = (V2 ^ (V1>>6))&0xFFFFFF;
-		  if (V==0) return -1;
-		  V = (V2 ^ (V1>>8))&0xFFFFFF;
-		  if (V==0) return -1;
-		}
+	      V1 = X1[0];
+	      V2 = X2[0];
+	      V = (V1 ^ (V2>>2))&0x3FFFFFFF;
+	      if (V==0) return -1;
+	      V = (V1 ^ (V2>>4))&0xFFFFFFF;
+	      if (V==0) return -1;
+	      V = (V1 ^ (V2>>6))&0x3FFFFFF;
+	      if (V==0) return -1;
+	      V = (V1 ^ (V2>>8))&0xFFFFFF;
+	      if (V==0) return -1;
+	      
+	      V = (V2 ^ (V1>>2))&0x3FFFFFFF;
+	      if (V==0) return -1;
+	      V = (V2 ^ (V1>>4))&0xFFFFFFF;
+	      if (V==0) return -1;
+	      V = (V2 ^ (V1>>6))&0x3FFFFFF;
+	      if (V==0) return -1;
+	      V = (V2 ^ (V1>>8))&0xFFFFFF;
+	      if (V==0) return -1;
 	    }
 	}
       score += v;

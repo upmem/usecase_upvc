@@ -41,61 +41,62 @@ GENOME *get_genome(char* name, TIMES *CT)
 
   x = 0;
   while (fgets(BUF,1024,fgen)!=NULL)
-  {
+    {
       if (BUF[0] == '>')
-      {
-		  G->pt_seq[G->nb_seq] = x;
-		  G->len_seq[G->nb_seq] = 0;
-
-		  // get the sequence name ("CHROMOSOME" column in VCF) without the first char (>) nor the last (\n)
-		  G->name[G->nb_seq] = strndup(&BUF[1], strlen(BUF)-2);
-
-		  G->nb_seq++;
-      }
+	{
+	  G->pt_seq[G->nb_seq] = x;
+	  G->len_seq[G->nb_seq] = 0;
+	  // get the sequence name ("CHROMOSOME" column in VCF) without the first char (>) nor the last (\n)
+	  BUF[strlen(BUF)-1] = '\0';
+	  G->name[G->nb_seq] = strndup(&BUF[1], strlen(BUF)-1);
+	  G->nb_seq++;
+	}
       else
-      {
-		  k = strlen(BUF);
-		  for (i=0; i<k-1; i++)
-		  {
-			  if (BUF[i]!='N')
-			  {
-				  j = (int) BUF[i];
-				  G->data[x++] = (j>>1)&3; // A -> 0, C -> 1, G -> 3, T -> 2
-			  }
-			  else
-			  {
-				  G->data[x++] = 4; // doit etre considere comme zone faible complexite
-			  }
-			  G->len_seq[G->nb_seq-1]++;
-		  }
+	{
+	  k = strlen(BUF);
+	  for (i=0; i<k-1; i++)
+	    {
+	      if (BUF[i]!='N')
+		{
+		  j = (int) BUF[i];
+		  G->data[x++] = (j>>1)&3; // A -> 0, C -> 1, G -> 3, T -> 2
+		}
+	      else
+		{
+		  G->data[x++] = 4; // doit etre considere comme zone faible complexite
+		}
+	      G->len_seq[G->nb_seq-1]++;
+	    }
 	  }
-  }
+    }
   fclose(fgen);
 
+
   // detection des zones de faible complexite
+  if (0)
   {
     int ns;
     long is, lx;
     int v, x, k;
     
     for (ns=0; ns < G->nb_seq; ns++)
-    {
-		lx = G->pt_seq[ns]; // lx = position dans GENOME du 1er caractere de la sequence numero ns
-		for (is=0; is < G->len_seq[ns]-SIZE_SEED; is++)
-		{
-			v=code_seed(&G->data[lx+is]);
-			x = 0;
-			for (k=0; k<16; k++)
-			{
-				if (v==x)
-				{
-					G->data[lx+is] = G->data[lx+is]|4;  // marque zone de faible complexite
-					break;
-				}
-				x = x + 0x111111;
-			}
-		}
-    }
+      {
+	lx = G->pt_seq[ns]; // lx = position dans GENOME du 1er caractere de la sequence numero ns
+	for (is=0; is < G->len_seq[ns]-SIZE_SEED; is++)
+	  {
+	    v=code_seed(&G->data[lx+is]);
+	    x = 0;
+	    for (k=0; k<16; k++)
+	      {
+		if (v==x)
+		  {
+		    G->data[lx+is] = G->data[lx+is]|4;  // marque zone de faible complexite
+		    break;
+		  }
+		x = x + 0x111111;
+	      }
+	  }
+      }
   }
 
   t2 = my_clock();

@@ -5,9 +5,8 @@ objects = object/upvc_host.o    \
 	object/getread.o     \
 	object/index.o       \
 	object/dispatch.o    \
-	object/processread.o \
 	object/compare.o     \
-	object/normalizevar.o \
+	object/processread.o \
 	object/vartree.o \
 	object/vcf.o
 
@@ -25,7 +24,7 @@ debug : all
 PREFLAGS = -O$(OPTIMIZATION_INDEX) -Wall
 
 
-version = upvc_1.4
+version = upvc_1.5
 
 upvc : $(objects) 
 	gcc $(PREFLAGS) -o upvc $(objects) -lm
@@ -41,9 +40,6 @@ object/upvc_dpu.o : upvc.h upvc_dpu.c
 object/code.o : upvc.h code.c 
 	gcc $(PREFLAGS) -c code.c -o object/code.o
 
-object/compare.o : upvc.h compare.c 
-	gcc $(PREFLAGS) -c compare.c -o object/compare.o
-
 object/getgenome.o : upvc.h getgenome.c 
 	gcc $(PREFLAGS) -c getgenome.c -o object/getgenome.o
 
@@ -53,6 +49,9 @@ object/getread.o : upvc.h getread.c
 object/index.o : upvc.h index.c 
 	gcc $(PREFLAGS) -c index.c -o object/index.o
 
+object/compare.o : upvc.h compare.c 
+	gcc $(PREFLAGS) -c compare.c -o object/compare.o
+
 object/dispatch.o : upvc.h dispatch.c 
 	gcc $(PREFLAGS) -c dispatch.c -o object/dispatch.o
 
@@ -61,9 +60,6 @@ object/processread.o : upvc.h processread.c
 
 object/vartree.o : upvc.h vartree.c 
 	gcc $(PREFLAGS) -c vartree.c -o object/vartree.o
-
-object/normalizevar.o :  upvc.h normalizevar.c 
-	gcc $(PREFLAGS) -c normalizevar.c -o object/normalizevar.o
 
 object/vcf.o : upvc.h vcf.c 
 	gcc $(PREFLAGS) -c vcf.c -o object/vcf.o

@@ -30,6 +30,7 @@ void code_neighbor(int8_t *SEQ, int8_t *CODE)
     }
 }
 
+/*
 void decode_neighbor(int8_t *CODE, int8_t *SEQ)
 {
   int i;
@@ -41,4 +42,4 @@ void decode_neighbor(int8_t *CODE, int8_t *SEQ)
       SEQ[i+3] = (CODE[i/4]>>6)&3;
     }
 }
-
+*/
