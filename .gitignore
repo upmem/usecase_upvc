@@ -2,4 +2,6 @@ upvc
 object/*.o
 cmake-build-debug/
 *.log
-
+GPATH
+GRTAGS
+GTAGS
