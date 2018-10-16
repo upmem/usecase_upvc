@@ -1,4 +1,6 @@
+cmake_minimum_required(VERSION 3.6)
 project(upvc)
-set( CMAKE_C_FLAGS "-O3")
-add_executable(upvc code.c compare.c dispatch.c getgenome.c getread.c index.c processread.c vcf.c upvc_dpu.c upvc_host.c vartree.c)
+set( CMAKE_C_FLAGS "-O3 --std=c99")
+include_directories("inc")
+add_executable(upvc src/code.c src/compare.c src/dispatch.c src/genome.c src/getread.c src/index.c src/processread.c src/vcf.c src/upvc_dpu.c src/upvc_host.c src/vartree.c)
 target_link_libraries(upvc pthread)
