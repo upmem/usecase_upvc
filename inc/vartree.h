@@ -18,10 +18,10 @@ typedef struct variant_tree {
         struct variant_tree* right;
         struct variant_tree* left;
         int height;
-        int count;
 } variant_tree_t;
 
 void insert_variants(variant_tree_t **variant_list, variant_t* var);
+// TODO: if not used at the end, remove this function
 void visu_variants(variant_tree_t **variant_list);
 void free_variant_tree(variant_tree_t *variant_list);
 

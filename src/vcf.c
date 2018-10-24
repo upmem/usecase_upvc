@@ -84,7 +84,7 @@ int create_vcf(char *chromosome_name,
         fprintf(vcf_file, "##fileDate=%s\n", filedate);
 
         // print reference genome file name
-        fprintf(vcf_file, "##reference=%s\n", ref_genome->filename);
+        fprintf(vcf_file, "##reference=%s\n", ref_genome->fasta_file_name);
 
         // print the column names (fields are tab-delimited in VCF)
         fprintf(vcf_file, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n");

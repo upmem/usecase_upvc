@@ -16,6 +16,7 @@ void code_neighbour(int8_t *sequence, int8_t *code, reads_info_t *reads_info);
 /*
  * Compute the sequence of a neighbour from its code.
  * The size is found in the "reads_info" argument.
+ * TODO: if not used at the end, remove this function
  */
 void decode_neighbour(int8_t *code, int8_t *sequence, reads_info_t *reads_info);
 

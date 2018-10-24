@@ -76,6 +76,7 @@ index_seed_t **index_genome(genome_t *ref_genome, times_ctx_t *times_ctx, reads_
         }
 
         /* Distribute indexs between DPUs */
+        /* Sort the seeds from the most to the least used. */
         qsort(seed_counter, NB_SEED, sizeof(seed_counter_t), cmp_seed_counter);
         {
                 int current_dpu = 0;

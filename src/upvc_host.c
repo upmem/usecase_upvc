@@ -184,8 +184,8 @@ int main(int argc, char *argv[])
         index_seed = index_genome(ref_genome, &times_ctx, &reads_info);
         printf(" - time: %lf\n", times_ctx.index_genome);
 
-        mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->sizefile);
-        substitution_list = (int *) calloc(sizeof(int), ref_genome->sizefile);
+        mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
+        substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
 
 
         map_var_call(argv[1], 0, ref_genome, index_seed,

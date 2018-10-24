@@ -27,8 +27,8 @@ genome_t *get_genome(char* filename_prefix, times_ctx_t *times_ctx)
 
         genome = (genome_t *)malloc(sizeof(genome_t));
         genome->data = (int8_t *)malloc(sizeof(int8_t) * genome_file_size);
-        genome->filename = strdup((const char *)filename);
-        genome->sizefile = genome_file_size;
+        genome->fasta_file_name = strdup((const char *)filename);
+        genome->fasta_file_size = genome_file_size;
         genome->nb_seq = 0;
 
         {
@@ -67,7 +67,7 @@ void free_genome(genome_t *genome)
         for (int i = 0; i < genome->nb_seq; i++) {
                 free(genome->seq_name[i]);
         }
-        free(genome->filename);
+        free(genome->fasta_file_name);
         free(genome->data);
         free(genome);
 }

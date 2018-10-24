@@ -10,7 +10,8 @@ typedef struct {
         int jx;
 } backtrack_t;
 
-void display_DPD_matrix(int **M, int start, reads_info_t *reads_info);
+// TODO: if not used at the end, remove this function
+void display_DPD_matrix(int **M, reads_info_t *reads_info);
 /*
  * Compute the alignment distance by dynamical programming on the diagonals of the matrix.
  * Return the backtrack.

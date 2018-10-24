@@ -2,6 +2,7 @@
 #define __GETREAD_H__
 
 #include <stdint.h>
+#include <stdio.h>
 #include "upvc.h"
 
 /*

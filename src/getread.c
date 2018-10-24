@@ -16,22 +16,22 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, reads_info_t *
 {
         int offset = 0;
         int size_read = reads_info->size_read;
-        char commentary[MAX_BUF_SIZE];
+        char comment[MAX_BUF_SIZE];
         char sequence_buffer[MAX_SEQ_SIZE];
         int invnt[4] = {2,3,0,1};
 
-        if (fgets(commentary, MAX_BUF_SIZE, f) == NULL) { /* Commentary */
+        if (fgets(comment, MAX_BUF_SIZE, f) == NULL) { /* Commentary */
                 return -1;
         }
         if (fgets(sequence_buffer, MAX_SEQ_SIZE, f) == NULL) { /* Sequence */
                 return -1;
         }
 
-        /* If the commentary start with ">>12"
+        /* If the comment start with ">>12"
          * it means that we need the skip the first 12 characters of the read.
          */
-        if (commentary[1] == '>') {
-                sscanf(&commentary[2], "%d", &offset);
+        if (comment[1] == '>') {
+                sscanf(&comment[2], "%d", &offset);
         }
         for (int i = 0; i < size_read - offset; i++) {
                 read1[i] = ( ((int)sequence_buffer[i]) >> 1) & 3;
@@ -42,13 +42,13 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, reads_info_t *
                 read2[i] = 0;
         }
 
-        if (commentary[0] == '>') {
+        if (comment[0] == '>') {
                 return size_read;
         }
-        if (fgets(commentary,MAX_BUF_SIZE,f)==NULL) { /* Commentary */
+        if (fgets(comment,MAX_BUF_SIZE,f)==NULL) { /* Commentary */
                 return -1;
         }
-        if (fgets(sequence_buffer,MAX_SEQ_SIZE,f)==NULL) { /* Line with sequence quality informations (unused) */
+        if (fgets(sequence_buffer,MAX_SEQ_SIZE,f)==NULL) { /* Line with sequence quality information (unused) */
                 return -1;
         }
         return size_read;
@@ -86,7 +86,7 @@ int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_c
 int get_read_size(char *filename_prefix)
 {
         FILE *f;
-        int size;
+        size_t size;
         char filename[MAX_BUF_SIZE];
         char sequence_buffer[MAX_SEQ_SIZE];
 
@@ -102,5 +102,5 @@ int get_read_size(char *filename_prefix)
         size &= ~((int)0x3);
 
         fclose(f);
-        return size;
+        return (int) size;
 }

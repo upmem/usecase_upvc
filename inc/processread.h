@@ -2,10 +2,13 @@
 #define __PROCESSREAD_H__
 
 #include <stdint.h>
+#include <stdio.h>
 #include "genome.h"
 #include "vartree.h"
 #include "upvc.h"
 
+// TODO: to be commented based on DL's feedbacks
+// TODO: rename f1 f2
 int process_read(genome_t *ref_genome,
                  int8_t *reads_buffer,
                  variant_tree_t **variant_list,

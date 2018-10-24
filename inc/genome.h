@@ -7,13 +7,13 @@
 #define MAX_SEQ_GEN (1000)
 
 typedef struct {
-        int8_t *data;                   // Byte list of the genome
-        int nb_seq;                     // Numbers of sequences composing the genome
-        int pt_seq[MAX_SEQ_GEN];        // Index in data of the start of each sequence
-        int len_seq[MAX_SEQ_GEN];       // Sequence lengths
-        long sizefile;                  // Size of the original file
-        char *seq_name[MAX_SEQ_GEN];    // Sequence names
-        char *filename;                 // Name of the original file
+        int8_t *data;                   /* Byte list of the genome                        */
+        int nb_seq;                     /* Numbers of sequences composing the genome      */
+        int pt_seq[MAX_SEQ_GEN];        /* Index in data of the start of each sequence    */
+        int len_seq[MAX_SEQ_GEN];       /* Sequence lengths                               */
+        long fasta_file_size;           /* Size of the original file                      */
+        char *seq_name[MAX_SEQ_GEN];    /* Sequence names                                 */
+        char *fasta_file_name;          /* Name of the original file                      */
 } genome_t;
 
 /*

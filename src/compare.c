@@ -14,7 +14,7 @@ static int min(int a, int b)
         return a < b ? a : b;
 }
 
-void display_DPD_matrix(int **Matrix, int start, reads_info_t *reads_info)
+void display_DPD_matrix(int **Matrix, reads_info_t *reads_info)
 {
         int size_neighbour = reads_info->size_neighbour_in_32bits_words;
 
