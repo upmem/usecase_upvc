@@ -148,8 +148,9 @@ int main(int argc, char *argv[])
         int *substitution_list;
         int8_t *mapping_coverage;
         reads_info_t reads_info;
-        times_ctx_t times_ctx = {0.0};
+        times_ctx_t times_ctx;
 
+        memset(&times_ctx, 0, sizeof(times_ctx_t));
         if (argc != 2){
                 printf("\nusage:\n  %s <genome> \n\n", argv[0]);
                 exit(255);

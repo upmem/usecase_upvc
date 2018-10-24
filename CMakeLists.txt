@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.6)
 project(upvc)
-set( CMAKE_C_FLAGS "-O3 --std=c99")
-include_directories("inc")
-add_executable(upvc src/code.c src/compare.c src/dispatch.c src/genome.c src/getread.c src/index.c src/processread.c src/vcf.c src/upvc_dpu.c src/upvc_host.c src/vartree.c)
-target_link_libraries(upvc pthread)
+
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_FLAGS "-O3 -Wall -Wextra -Werror")
+
+set(DPU_DIRECTORY dpu)
+set(CMAKE_UTILS_DIRECTORY cmake_utils)
+include(cmake_utils/CMakeDpu.cmake)
+
+add_subdirectory(host)
+# add_subdirectory(dpu)

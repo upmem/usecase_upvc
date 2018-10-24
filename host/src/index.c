@@ -86,7 +86,7 @@ index_seed_t **index_genome(genome_t *ref_genome, times_ctx_t *times_ctx, reads_
                         index_seed_t *seed = index_seed[seed_code];
 
                         while (seed != NULL) {
-                                int dpu_for_current_seed;
+                                int dpu_for_current_seed = current_dpu;
                                 if (nb_seed_counted != 0) {
                                         long max_dpu_workload = LONG_MAX;
                                         for (int j = 0; j < NB_DPU; j++) {
@@ -96,8 +96,6 @@ index_seed_t **index_genome(genome_t *ref_genome, times_ctx_t *times_ctx, reads_
                                                 }
                                                 current_dpu = (current_dpu + 1) % NB_DPU;
                                         }
-                                } else {
-                                        dpu_for_current_seed = current_dpu;
                                 }
                                 dpu_index_size[dpu_for_current_seed] += seed->nb_nbr;
                                 dpu_workload[dpu_for_current_seed] += (long) (seed->nb_nbr * nb_seed_counted);

@@ -42,7 +42,7 @@ genome_t *get_genome(char* filename_prefix, times_ctx_t *times_ctx)
                                         strndup(&genome_file_line[1], strlen(genome_file_line)-1);
                                 genome->nb_seq++;
                         } else {
-                                for (int i = 0; i < strlen(genome_file_line) - 1; i++) {
+                                for (unsigned int i = 0; i < strlen(genome_file_line) - 1; i++) {
                                         if (genome_file_line[i] != 'N') { /* A -> 0, C -> 1, G -> 3, T -> 2 */
                                                 genome->data[current_data_idx++] =
                                                         ( ((int)genome_file_line[i]) >> 1) & 3;

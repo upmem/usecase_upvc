@@ -31,7 +31,7 @@ static int min (int a, int b)
 }
 
 #define PQD_INIT_VAL (99)
-static int ODPD_compute(int i,
+static void ODPD_compute(int i,
                         int j,
                         int8_t *s1,
                         int8_t *s2,
@@ -214,34 +214,6 @@ static int noDP(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
         return score;
 }
 
-static void print2NBR(int8_t *s1, int8_t *s2, reads_info_t *reads_info)
-{
-        int size_neighbour = reads_info->size_neighbour_in_bytes;
-        for (int i = 0; i < size_neighbour; i++) {
-                for (int j = 0; j < 4; j++) {
-                        printf("%x", (s1[i] >> (2 * j)) & 3);
-                }
-        }
-        printf("\n");
-        for (int i = 0; i < size_neighbour; i++) {
-                for (int j = 0; j < 4; j++) {
-                        if ( ((s1[i] >> (2 * j)) & 3) != ((s2[i] >> (2 * j)) & 3) ) {
-                                printf("|");
-                        } else {
-                                printf(" ");
-                        }
-                }
-        }
-        printf("\n");
-        for (int i = 0; i < size_neighbour; i++) {
-                for (int j = 0; j < 4; j++) {
-                        printf("%x", (s2[i] >> (2 * j)) & 3);
-                }
-        }
-        printf("\n\n");
-}
-
-
 #define MAX_SCORE        40
 
 void *align_on_dpu(void *arg)
@@ -342,7 +314,6 @@ void write_neighbour_read (int num_dpu, int read_idx, int8_t *values, reads_info
 
 void write_neighbour_idx (int num_dpu, int index_idx, int8_t *values, reads_info_t *reads_info)
 {
-        int i;
         int size_neighbour = reads_info->size_neighbour_in_bytes;
         for (int i = 0; i < size_neighbour; i++) {
                 MDPU[num_dpu].neighbour_idx[index_idx * size_neighbour + i] = values[i];
