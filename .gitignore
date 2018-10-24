@@ -4,3 +4,4 @@ cmake-build-debug/
 GPATH
 GRTAGS
 GTAGS
+.idea
