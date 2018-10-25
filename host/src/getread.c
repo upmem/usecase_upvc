@@ -83,15 +83,13 @@ int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_c
         return nb_read;
 }
 
-int get_read_size(char *filename_prefix)
+int get_read_size(char *input_pe1_file)
 {
         FILE *f;
         size_t size;
-        char filename[MAX_BUF_SIZE];
         char sequence_buffer[MAX_SEQ_SIZE];
 
-        sprintf(filename, "%s_PE1.fastq", filename_prefix);
-        f = fopen(filename, "r");
+        f = fopen(input_pe1_file, "r");
         if (fgets(sequence_buffer, MAX_SEQ_SIZE, f) == NULL) { /* Commentary */
                 return -1;
         }

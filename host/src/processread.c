@@ -269,11 +269,12 @@ int process_read(genome_t *ref_genome,
                  FILE *f1,
                  FILE *f2,
                  int round,
+                 int nb_dpu,
                  times_ctx_t *times_ctx,
                  reads_info_t *reads_info)
 {
         double t1, t2;
-        align_t *align_tab = (align_t *) malloc(sizeof(align_t) * MAX_ALIGN * NB_DPU);
+        align_t *align_tab = (align_t *) malloc(sizeof(align_t) * MAX_ALIGN * nb_dpu);
         int nb_match = 0;
         char nucleotide[4] = {'A','C','T','G'};
         int nb_read_map = 0;
@@ -286,7 +287,7 @@ int process_read(genome_t *ref_genome,
         t1 = my_clock();
 
         /* Get output data from DPUs */
-        for (int numdpu = 0; numdpu < NB_DPU; numdpu++) {
+        for (int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 int k = 0;
                 int num_read = read_out_num(numdpu, k);
 

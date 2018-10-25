@@ -3,7 +3,6 @@
 
 #define VERSION           "VERSION 1.5"
 #define SIZE_SEED         12
-#define NB_DPU            128
 #define MAX_NB_DPU_READ   16384                  /* Maximum number of read by DPU by round */
 #define MAX_READS_BUFFER  1048576                /* Maximum number of read by round        */
 #define MAX_ALIGN         65536
@@ -17,6 +16,11 @@
 #define CODE_DEL 11
 #define CODE_INS 12
 #define CODE_END 13
+
+#define CODE_A    0    // ('A'>>1)&3   41H  0100 0001
+#define CODE_C    1    // ('C'>>1)&3   43H  0100 0011
+#define CODE_T    2    // ('T'>>1)&3   54H  0101 0100
+#define CODE_G    3    // ('G'>>1)&3   47H  0100 0111
 
 typedef struct {
         int size_read;
@@ -47,5 +51,10 @@ static inline double my_clock(void)
         gettimeofday(&t, NULL);
         return (1.0e-6 * t.tv_usec + t.tv_sec);
 }
+
+#include <stdlib.h>
+
+#define ERROR(fmt, ...) do { fprintf(stderr, "ERROR: " fmt "\n", ##__VA_ARGS__);} while(0)
+#define ERROR_EXIT(fmt, ...) do { ERROR(fmt, ##__VA_ARGS__); exit(255);} while(0)
 
 #endif /* __UPVC_H__ */

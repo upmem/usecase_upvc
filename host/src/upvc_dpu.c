@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
+#include "mdpu.h"
+#include "vmi.h"
 #include "upvc_dpu.h"
 #include "upvc.h"
 
@@ -9,6 +12,9 @@
 typedef struct {
         int8_t *neighbour_idx;      /* datas : table of the neighbours of the seed from the reference genome in the DPU */
         long *coordinate;           /* datas : [sequence id, offset in sequence] of each seed in the DPU                */
+        unsigned int neighbour_idx_len;  // Size of neighbour_idx, in bytes
+        unsigned int coordinate_len;    // Size of coordinate, in bytes
+
         int8_t *neighbour_read;     /* datas : table of neighbours                                                      */
         int *offset;                /* datas : address of the first neighbour                                           */
         int *count;                 /* datas : number of neighbour for each read                                        */
@@ -20,10 +26,6 @@ typedef struct {
 } MEM_DPU;
 
 static MEM_DPU *MDPU;
-
-/* Statistics */
-static long stat_nb_read[NB_DPU]; /* Number of reads dispatched by DPU */
-static long stat_nb_nbr[NB_DPU];  /* Number of distances computed by DPU */
 
 static int min (int a, int b)
 {
@@ -226,9 +228,6 @@ void *align_on_dpu(void *arg)
         MEM_DPU M = MDPU[numdpu];
         int current_read = 0;
 
-        stat_nb_read[numdpu]=0;
-        stat_nb_nbr[numdpu]=0;
-
         M.out_num[nb_map] = -1;
         while (M.num[current_read] != -1) {
                 int offset = M.offset[current_read]; /* address of the first neighbour */
@@ -267,10 +266,14 @@ void *align_on_dpu(void *arg)
 }
 
 
-void malloc_dpu(reads_info_t *reads_info)
+void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
 {
-        MDPU = (MEM_DPU *) malloc(sizeof(MEM_DPU) * NB_DPU);
-        for (int num_dpu = 0; num_dpu < NB_DPU; num_dpu++) {
+        MDPU = (MEM_DPU *) malloc(sizeof(MEM_DPU) * nb_dpu);
+        for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
+                MDPU[num_dpu].neighbour_idx = NULL;
+                MDPU[num_dpu].neighbour_idx_len = 0;
+                MDPU[num_dpu].coordinate = NULL;
+                MDPU[num_dpu].coordinate_len = 0;
                 MDPU[num_dpu].neighbour_read =
                         (int8_t *) malloc(sizeof(int8_t) * reads_info->size_neighbour_in_bytes * MAX_NB_DPU_READ);
                 MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_NB_DPU_READ);
@@ -284,13 +287,15 @@ void malloc_dpu(reads_info_t *reads_info)
 
 void malloc_neighbour_idx (int num_dpu, int nb_index, reads_info_t *reads_info)
 {
-        MDPU[num_dpu].neighbour_idx = (int8_t *) malloc(sizeof(int8_t) * nb_index * reads_info->size_neighbour_in_bytes);
-        MDPU[num_dpu].coordinate = (long *) malloc(sizeof(long) * nb_index);
+        MDPU[num_dpu].neighbour_idx_len = sizeof(int8_t) * nb_index * reads_info->size_neighbour_in_bytes;
+        MDPU[num_dpu].neighbour_idx = (int8_t *) malloc(MDPU[num_dpu].neighbour_idx_len);
+        MDPU[num_dpu].coordinate_len = sizeof(long) * nb_index;
+        MDPU[num_dpu].coordinate = (long *) malloc(MDPU[num_dpu].coordinate_len);
 }
 
-void free_dpu()
+void free_dpu(int nb_dpu)
 {
-        for (int num_dpu = 0; num_dpu<NB_DPU; num_dpu++) {
+        for (int num_dpu = 0; num_dpu<nb_dpu; num_dpu++) {
                 free (MDPU[num_dpu].neighbour_idx);
                 free (MDPU[num_dpu].neighbour_read);
                 free (MDPU[num_dpu].coordinate);
@@ -302,6 +307,25 @@ void free_dpu()
                 free (MDPU[num_dpu].out_coord);
         }
         free(MDPU);
+}
+
+void write_neighbors_and_coordinates(int d, int nr_nbrs, long *nbrs, reads_info_t *reads_info) {
+    MEM_DPU *mdpu = &(MDPU[d]);
+
+    unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+    size_t long_aligned_nbr_len = (size_t) ((size_neighbour_in_bytes + 7) & (~7));
+    unsigned int input_pattern_len = sizeof(long) + long_aligned_nbr_len;
+    uint8_t *input_pattern_ptr = (uint8_t *) nbrs;
+
+    for (int each_nbr = 0; each_nbr < nr_nbrs; each_nbr++) {
+        long this_coords = ((long *) input_pattern_ptr)[0];
+        uint8_t *this_nbr = input_pattern_ptr + sizeof(long);
+        (void) memcpy(mdpu->neighbour_idx + (each_nbr * size_neighbour_in_bytes),
+                      this_nbr,
+                      (size_t) size_neighbour_in_bytes);
+        mdpu->coordinate[each_nbr] = this_coords;
+        input_pattern_ptr += input_pattern_len;
+    }
 }
 
 void write_neighbour_read (int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info)
@@ -328,3 +352,68 @@ void write_num         (int num_dpu, int read_idx, int value)  { MDPU[num_dpu].n
 int read_out_num       (int num_dpu, int align_idx) { return MDPU[num_dpu].out_num[align_idx];   }
 int read_out_score     (int num_dpu, int align_idx) { return MDPU[num_dpu].out_score[align_idx]; }
 long read_out_coord    (int num_dpu, int align_idx) { return MDPU[num_dpu].out_coord[align_idx]; }
+
+static void print_byte_to_sym(uint8_t byte, unsigned int offset, FILE *out) {
+        uint8_t as_byte = (uint8_t) ((byte >> offset) & 0x3);
+        char as_char;
+        switch (as_byte) {
+        case CODE_A:
+                as_char = 'A';
+                break;
+        case CODE_C:
+                as_char = 'C';
+                break;
+        case CODE_G:
+                as_char = 'G';
+                break;
+        default:
+                as_char = 'T';
+        }
+        fprintf(out, "%c", as_char);
+}
+
+void print_neighbour_idx(int d, int offs, int nr_nbr, FILE *out, reads_info_t *reads_info)
+{
+        unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+        for (int each_nbr = 0; each_nbr < nr_nbr; each_nbr++) {
+                fprintf(out, "\t");
+                unsigned int i;
+                for (i = 0; i < size_neighbour_in_bytes; i++) {
+                        uint8_t this_byte = (uint8_t) MDPU[d].neighbour_idx[(offs + each_nbr) * size_neighbour_in_bytes + i];
+                        print_byte_to_sym(this_byte, 0, out);
+                        print_byte_to_sym(this_byte, 2, out);
+                        print_byte_to_sym(this_byte, 4, out);
+                        print_byte_to_sym(this_byte, 6, out);
+                }
+                fprintf(out, "\n");
+        }
+        fprintf(out, "\n");
+}
+
+void print_coordinates(int d, int offs, int l, FILE *out)
+{
+        for (int i = 0; i < l; i++) {
+                fprintf(out, " %lu", MDPU[d].coordinate[offs + i]);
+        }
+        fprintf(out, "\n");
+}
+
+void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, unsigned int nb_dpu, reads_info_t *reads_info)
+{
+        printf("Creating MRAM images\n");
+        mram_info_t *mram_image = mram_create(reads_info);
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
+                vmi_t *this_vmi = vmis + each_dpu;
+                mram_reset(mram_image, reads_info);
+                mram_copy_vmi(mram_image, this_vmi, nbr_counts[each_dpu], reads_info);
+                mram_save(mram_image, each_dpu);
+        }
+        mram_free(mram_image);
+}
+
+void write_result(int d, int k, unsigned int num, long coords, unsigned int score) {
+    printf("R: %u %u %lu\n", num, score, coords);
+    MDPU[d].out_num[k] = num;
+    MDPU[d].out_coord[k] = coords;
+    MDPU[d].out_score[k] = score;
+}

@@ -8,26 +8,25 @@
 
 #define MAX_BUF_SIZE (1024)
 
-genome_t *get_genome(char* filename_prefix, times_ctx_t *times_ctx)
+genome_t *get_genome(char* fasta_file, times_ctx_t *times_ctx)
 {
         FILE *genome_file;
         long genome_file_size;
         double t1, t2;
         char genome_file_line[MAX_BUF_SIZE];
-        char filename[MAX_BUF_SIZE];
         genome_t *genome;
 
+        printf("Read genome\n");
         t1 = my_clock();
 
-        sprintf(filename,"%s.fasta", filename_prefix);
-        genome_file = fopen(filename, "r");
+        genome_file = fopen(fasta_file, "r");
         fseek(genome_file, 0, SEEK_END);
         genome_file_size = ftell(genome_file);
         rewind(genome_file);
 
         genome = (genome_t *)malloc(sizeof(genome_t));
         genome->data = (int8_t *)malloc(sizeof(int8_t) * genome_file_size);
-        genome->fasta_file_name = strdup((const char *)filename);
+        genome->fasta_file_name = strdup((const char *)fasta_file);
         genome->fasta_file_size = genome_file_size;
         genome->nb_seq = 0;
 
@@ -58,6 +57,9 @@ genome_t *get_genome(char* filename_prefix, times_ctx_t *times_ctx)
 
         t2 = my_clock();
         times_ctx->get_genome = t2-t1;
+
+        printf(" - #seq: %d\n", genome->nb_seq);
+        printf(" - time: %lf\n", times_ctx->get_genome);
 
         return genome;
 }

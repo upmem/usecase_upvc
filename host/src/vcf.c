@@ -48,12 +48,12 @@ static int print_variant_tree(variant_tree_t *variant_tree, int8_t *mapping_cove
         return nb_variant;
 }
 
-int create_vcf(char *chromosome_name,
-               genome_t *ref_genome,
-               variant_tree_t **variant_list,
-               int *substitution_list,
-               int8_t *mapping_coverage,
-               times_ctx_t *times_ctx)
+void create_vcf(char *chromosome_name,
+                genome_t *ref_genome,
+                variant_tree_t **variant_list,
+                int *substitution_list,
+                int8_t *mapping_coverage,
+                times_ctx_t *times_ctx)
 {
         double t1, t2;
         FILE *vcf_file, *variant_file;
@@ -61,6 +61,7 @@ int create_vcf(char *chromosome_name,
         int nb_variant;
         char filename[MAX_BUFFER_SIZE];
 
+        printf("Create VCF\n");
         t1 = my_clock();
 
         sprintf(filename, "%svars_upvc.vcf", chromosome_name);
@@ -127,5 +128,6 @@ int create_vcf(char *chromosome_name,
         t2 = my_clock();
         times_ctx->vcf = t2-t1;
 
-        return nb_variant;
+        printf(" - number of variants: %d\n", nb_variant);
+        printf(" - time: %lf sec.\n", times_ctx->vcf);
 }

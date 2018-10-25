@@ -12,6 +12,6 @@ int  get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_
 /*
  * Get the size of one read.
  */
-int  get_read_size(char *filename_prefix);
+int  get_read_size(char *input_pe1_file);
 
 #endif /* __GETREAD_H__ */

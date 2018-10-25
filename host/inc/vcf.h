@@ -9,7 +9,7 @@
 /*
  * Produce the final VCF file
  */
-int create_vcf(char *chromosome_name,
+void create_vcf(char *chromosome_name,
                 genome_t *ref_genome,
                 variant_tree_t **variant_list,
                 int *substitution_list,

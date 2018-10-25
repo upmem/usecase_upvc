@@ -17,6 +17,7 @@ int process_read(genome_t *ref_genome,
                  FILE *f1,
                  FILE *f2,
                  int round,
+                 int nb_dpu,
                  times_ctx_t *times_ctx,
                  reads_info_t *reads_info);
 
