@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -70,40 +74,40 @@ void create_vcf(char *chromosome_name,
         sprintf(filename, "%svars_upvc.var", chromosome_name);
         variant_file = fopen(filename,"w");
 
-        // ####### START OF HEADER #######
+        /* ####### START OF HEADER ####### */
 
-        // print vcf version (required)
+        /* print vcf version (required) */
         fprintf(vcf_file, "##fileformat=VCFv4.3\n");
 
-        // print source of VCF file (this program)
+        /* print source of VCF file (this program) */
         fprintf(vcf_file, "##source=UPVC %s\n", VERSION);
 
-        // get the file date
+        /* get the file date */
         char filedate[10];
         time_t mytime = time(NULL);
         strftime(filedate, 100, "%Y%d%m", localtime(&mytime));
         fprintf(vcf_file, "##fileDate=%s\n", filedate);
 
-        // print reference genome file name
+        /* print reference genome file name */
         fprintf(vcf_file, "##reference=%s\n", ref_genome->fasta_file_name);
 
-        // print the column names (fields are tab-delimited in VCF)
+        /* print the column names (fields are tab-delimited in VCF) */
         fprintf(vcf_file, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n");
 
 
-        // ####### END OF HEADER #######
+        /* ####### END OF HEADER ####### */
 
-        // insert substitution variant in the variant_t tree
-        // for each sequence in the genome
+        /* insert substitution variant in the variant_t tree */
+        /* for each sequence in the genome */
         for (int seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
                 int start_position = ref_genome->pt_seq[seq_number];
-                // for each position in the sequence
+                /* for each position in the sequence */
                 for (int seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
-                        // get the substitution at the `start_position+seq_position`th position in the genome
+                        /* get the substitution at the `start_position+seq_position`th position in the genome */
                         int current_position = start_position + seq_position;
                         int substitution = substitution_list[current_position];
                         for (int i = 0; i < 4; i++) {
-                                // get number of substitutions for the base nt[i] at that position
+                                /* get number of substitutions for the base nt[i] at that position */
                                 int nb_substitution = (substitution >> (i * 8)) & 0xFF;
                                 if (nb_substitution > 7) {
                                         variant_t *newvar = (variant_t*)malloc(sizeof(variant_t));

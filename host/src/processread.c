@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -8,7 +12,6 @@
 #include "genome.h"
 #include "upvc.h"
 
-// alignement
 typedef struct {
         int num_read;
         int coord_seq;
@@ -146,7 +149,7 @@ static int code_alignment(int8_t *code, int score, int8_t *gen, int8_t *read, re
         return code_idx;
 }
 
-static void set_variant(align_t A,
+static void set_variant(align_t align_match,
                         genome_t *ref_genome,
                         int8_t *reads_buffer,
                         variant_tree_t **variant_list,
@@ -158,17 +161,17 @@ static void set_variant(align_t A,
         int8_t code_align_tab[256];
         int8_t *read;
         char nucleotide[4] = {'A','C','T','G'};
-        int genome_pos = ref_genome->pt_seq[A.coord_seq] + A.coord_pos;
+        int genome_pos = ref_genome->pt_seq[align_match.coord_seq] + align_match.coord_pos;
         int size_read = reads_info->size_read;
 
-        /* Update "mapping_coverage" withe the number of reads that match at this position of the genome */
+        /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
         for (int i = 0; i < size_read; i++) {
                 mapping_coverage[genome_pos + i] += 1;
         }
 
         /* Get the differences betweend the read and the sequence of the reference genome that match */
-        read = &reads_buffer[A.num_read * size_read];
-        code_alignment(code_align_tab, A.score, &ref_genome->data[genome_pos], read, reads_info);
+        read = &reads_buffer[align_match.num_read * size_read];
+        code_alignment(code_align_tab, align_match.score, &ref_genome->data[genome_pos], read, reads_info);
 
         code_align_idx = 0;
         while (code_align_tab[code_align_idx] != CODE_END) {
@@ -188,8 +191,8 @@ static void set_variant(align_t A,
                         int ps_var_read = pos_variant_read;
                         variant_t *newvar = (variant_t*) malloc(sizeof(variant_t));
 
-                        newvar->offset = ref_genome->pt_seq[A.coord_seq];
-                        newvar->chr = ref_genome->seq_name[A.coord_seq];
+                        newvar->offset = ref_genome->pt_seq[align_match.coord_seq];
+                        newvar->chr = ref_genome->seq_name[align_match.coord_seq];
                         newvar->depth = 1;
                         code_align_idx += 2;
 
@@ -225,8 +228,8 @@ static void set_variant(align_t A,
                         int ps_var_read = pos_variant_read;
                         variant_t *newvar = (variant_t*) malloc(sizeof(variant_t));
 
-                        newvar->offset = ref_genome->pt_seq[A.coord_seq];
-                        newvar->chr = ref_genome->seq_name[A.coord_seq];
+                        newvar->offset = ref_genome->pt_seq[align_match.coord_seq];
+                        newvar->chr = ref_genome->seq_name[align_match.coord_seq];
                         newvar->depth = 1;
                         code_align_idx += 2;
 
@@ -266,8 +269,8 @@ int process_read(genome_t *ref_genome,
                  variant_tree_t **variant_list,
                  int *substitution_list,
                  int8_t *mapping_coverage,
-                 FILE *f1,
-                 FILE *f2,
+                 FILE *fpe1,
+                 FILE *fpe2,
                  int round,
                  int nb_dpu,
                  times_ctx_t *times_ctx,
@@ -380,23 +383,23 @@ int process_read(genome_t *ref_genome,
                           * (keep the already computed offset for next round).
                           */
                         int8_t *read = &reads_buffer[numpair * size_read];
-                        fprintf(f1, ">>%d\n", SIZE_SEED * (round + 1));
+                        fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
                         for (int j = SIZE_SEED; j < size_read; j++) {
-                                fprintf(f1, "%c", nucleotide[read[j]&3]);
+                                fprintf(fpe1, "%c", nucleotide[read[j]&3]);
                         }
                         for (int j = 0; j < SIZE_SEED; j++) {
-                                fprintf(f1, "A");
+                                fprintf(fpe1, "A");
                         }
-                        fprintf(f1, "\n");
+                        fprintf(fpe1, "\n");
                         read = &reads_buffer[(numpair+2) * size_read];
-                        fprintf(f2, ">>%d\n", SIZE_SEED * (round + 1));
+                        fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
                         for (int j = SIZE_SEED; j < size_read; j++) {
-                                fprintf(f2, "%c", nucleotide[read[j]&3]);
+                                fprintf(fpe2, "%c", nucleotide[read[j]&3]);
                         }
                         for (int j = 0; j < SIZE_SEED; j++) {
-                                fprintf(f2, "A");
+                                fprintf(fpe2, "A");
                         }
-                        fprintf(f2, "\n");
+                        fprintf(fpe2, "\n");
                 }
         }
 

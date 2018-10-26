@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -22,18 +26,16 @@ static nb_dpu_t nb_dpu = nb_dpu_unknown;
 /**************************************************************************************/
 static void usage()
 {
-        fprintf(stderr,
-                "usage: %s -i <input_prefix> -d <number_of_dpus> [-s | -t <type> -g <goal> -b <dpu_binary>]\n"
-                "options:\n"
-                "\t-i\tInput prefix that will be used to find the inputs files\n"
-                "\t-d\tNumber of DPUs to use - value=128|256\n"
-                "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
-                "\t-t\tTarget type - values=hsim|fpga\n"
-                "\t-g\tGoal of the run - values=index|check|map\n"
-                "\t-b\tDPU binary to use\n"
-                ,
-                prog_name);
-        exit(255);
+        ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> [-s | -t <type> -g <goal> -b <dpu_binary>]\n"
+                   "options:\n"
+                   "\t-i\tInput prefix that will be used to find the inputs files\n"
+                   "\t-d\tNumber of DPUs to use - value=128|256\n"
+                   "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
+                   "\t-t\tTarget type - values=hsim|fpga\n"
+                   "\t-g\tGoal of the run - values=index|check|map\n"
+                   "\t-b\tDPU binary to use"
+                   ,
+                   prog_name);
 }
 
 static void check_args()
@@ -65,7 +67,7 @@ static void check_args()
 static void verify_that_file_exists(const char *path)
 {
         if (access(path, R_OK)) {
-                ERROR_EXIT("input file %s does not exist or is not readable\n", path);
+                ERROR_EXIT(25, "input file %s does not exist or is not readable (errno : %i)\n", path, errno);
         }
 }
 

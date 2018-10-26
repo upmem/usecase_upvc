@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -66,39 +70,42 @@ static void write_vmi(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *n
 index_seed_t **load_index_seeds()
 {
     FILE *f = fopen(SEED_FILE, "r");
-    index_seed_t *seed;
-    char line[512];
+    index_seed_t **index_seed;
+
     if (f == NULL) {
-        ERROR_EXIT("*** could not open 'seeds.txt' for reading");
+            ERROR_EXIT(14, "*** could not open 'seeds.txt' for reading");
     }
 
-    index_seed_t **index_seed = (index_seed_t **) malloc(sizeof(index_seed_t *) * NB_SEED);
+    index_seed = (index_seed_t **) malloc(sizeof(index_seed_t *) * NB_SEED);
 
-    // First line is just a comment, skip
-    if (fgets(line, sizeof(line), f) == NULL) {
-        ERROR("failed to read seeds.txt");
-        fclose(f);
-        free_index(index_seed);
-        exit(255);
+    { /* First line is just a comment, skip */
+            char line[512];
+            if (fgets(line, sizeof(line), f) == NULL) {
+                    fclose(f);
+                    free_index(index_seed);
+                    ERROR_EXIT(15, "failed to read seeds.txt");
+            }
     }
 
-    unsigned int seed_id = 0, dpu = 0, offset = 0, nr_nbr = 0;
-    while (fscanf(f, "%u %u %u %u", &seed_id, &dpu, &offset, &nr_nbr) == 4) {
-            seed = index_seed[seed_id];
-            if (seed == NULL) {
-                    index_seed[seed_id] = seed = (index_seed_t *) malloc(sizeof(index_seed_t));
-            } else {
-                    while (seed->next != NULL) {
+    {
+            unsigned int seed_id = 0, dpu = 0, offset = 0, nb_nbr = 0;
+            while (fscanf(f, "%u %u %u %u", &seed_id, &dpu, &offset, &nb_nbr) == 4) {
+                    index_seed_t *seed = index_seed[seed_id];
+                    if (seed == NULL) {
+                            index_seed[seed_id] = seed = (index_seed_t *) malloc(sizeof(index_seed_t));
+                    } else {
+                            while (seed->next != NULL) {
+                                    seed = seed->next;
+                            }
+                            seed->next = (index_seed_t *) malloc(sizeof(index_seed_t));
                             seed = seed->next;
                     }
-                    seed->next = (index_seed_t *) malloc(sizeof(index_seed_t));
-                    seed = seed->next;
-            }
 
-            seed->num_dpu = dpu;
-            seed->nb_nbr = nr_nbr;
-            seed->offset = offset;
-            seed->next = NULL;
+                    seed->num_dpu = dpu;
+                    seed->nb_nbr = nb_nbr;
+                    seed->offset = offset;
+                    seed->next = NULL;
+            }
     }
 
     fclose(f);
@@ -111,10 +118,10 @@ void save_index_seeds(index_seed_t **index_seed)
     FILE *f = fopen(SEED_FILE, "w");
 
     if (f == NULL) {
-        ERROR_EXIT("*** could not save seeds into 'seeds.txt' - aborting!");
+            ERROR_EXIT(16, "*** could not save seeds into 'seeds.txt' - aborting!");
     }
 
-    fprintf(f, "# seed dpu offset nr_nbr\n");
+    fprintf(f, "# seed dpu offset nb_nbr\n");
     for (int i = 0; i < NB_SEED; i++) {
         seed = index_seed[i];
         while (seed != NULL) {
@@ -262,7 +269,6 @@ index_seed_t **index_genome(genome_t *ref_genome,
                         }
                         align_idx = seed->offset + seed_counter[seed_code].nb_seed - total_nb_neighbour;
 
-                        /* TODO: to be replace by transfer with DPUs memory */
                         code_neighbour(&ref_genome->data[sequence_start_idx+sequence_idx+SIZE_SEED],
                                        buf_code_neighbour,
                                        reads_info);
@@ -310,11 +316,11 @@ void free_index(index_seed_t **index_seed)
         free(index_seed);
 }
 
-void print_index_seeds(index_seed_t **SEED, FILE *out, reads_info_t *reads_info)
+void print_index_seeds(index_seed_t **index_seed, FILE *out, reads_info_t *reads_info)
 {
     for (int i = 0; i < NB_SEED; i++) {
         fprintf(out, "SEED=%u\n", i);
-        index_seed_t *seed = SEED[i];
+        index_seed_t *seed = index_seed[i];
         while (seed != NULL) {
             fprintf(out, "\tPU %u @%u[%u]\n", seed->num_dpu, seed->offset, seed->nb_nbr);
             print_neighbour_idx(seed->num_dpu, seed->offset, seed->nb_nbr, out, reads_info);

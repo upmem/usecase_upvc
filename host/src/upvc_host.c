@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,40 +53,39 @@ static void run_dpu_simulation(unsigned int nb_dpu,
 static void run_on_dpu(dispatch_t dispatch,
                        const char *dpu_binary,
                        unsigned int nb_dpu,
+                       times_ctx_t *times_ctx,
                        reads_info_t *reads_info)
 {
-        unsigned int nr_dpus_per_run = get_nr_dpus_per_run();
-        uint64_t t0s[nr_dpus_per_run];
+        double t1, t2;
+        unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
+        uint64_t t0s[nb_dpus_per_run];
 
-#ifdef TEST_JUST_RUN_ONE_DPU
-        for (unsigned int first_dpu = 0; first_dpu < 1; first_dpu += nr_dpus_per_run)
-#else
-        for (unsigned int first_dpu = 0; first_dpu < nb_dpu; first_dpu += nr_dpus_per_run)
-#endif
-        {
-                devices_t devices = dpu_try_alloc_for(nr_dpus_per_run, dpu_binary);
+        t1 = my_clock();
+
+        for (unsigned int first_dpu = 0; first_dpu < nb_dpu; first_dpu += nb_dpus_per_run) {
+                devices_t devices = dpu_try_alloc_for(nb_dpus_per_run, dpu_binary);
                 if (devices == NULL) {
-                        exit(1);
+                        ERROR("Unable to alloc devices!");
                 }
 
-                for (unsigned int each_dpu = 0; each_dpu < nr_dpus_per_run; each_dpu++) {
+                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nr_reads != 0) {
-                                printf("() write MRAM #%d %u reads\n", this_dpu, dispatch[this_dpu].nr_reads);
+                        if (dispatch[this_dpu].nb_reads != 0) {
+                                printf("() write MRAM #%d %u reads\n", this_dpu, dispatch[this_dpu].nb_reads);
                                 dpu_try_load_mram_number(this_dpu, each_dpu, devices, reads_info);
                                 dpu_try_write_dispatch_into_mram(each_dpu, devices,
-                                                                 dispatch[this_dpu].nr_reads,
+                                                                 dispatch[this_dpu].nb_reads,
                                                                  dispatch[this_dpu].reads_area,
                                                                  reads_info);
-                                // DEBUG
-                                // if (each_dpu == 0) dpu_try_backup_mram(each_dpu, devices, "mram_dbg.bin");
+                                /* DEBUG */
+                                /* if (each_dpu == 0) dpu_try_backup_mram(each_dpu, devices, "mram_dbg.bin"); */
                         }
                 }
 
-                unsigned int nr_booted_dpus = 0;
-                for (unsigned int each_dpu = 0; each_dpu < nr_dpus_per_run; each_dpu++) {
+                unsigned int nb_booted_dpus = 0;
+                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nr_reads != 0) {
+                        if (dispatch[this_dpu].nb_reads != 0) {
 #ifdef TEST_BACKUP_MRAM_ON_DPU_NR
                                 if (this_dpu == TEST_BACKUP_MRAM_ON_DPU_NR) {
                                         dpu_try_backup_mram(this_dpu, dpus[each_dpu], "mram.bck");
@@ -90,15 +93,15 @@ static void run_on_dpu(dispatch_t dispatch,
 #endif
                                 printf("() boot DPU #%d\n", this_dpu);
                                 t0s[each_dpu] = dpu_try_run(each_dpu, devices);
-                                nr_booted_dpus++;
+                                nb_booted_dpus++;
                         }
                 }
 
-                // Wait for DPUs to complete: use a bitfield to mark every DPU stopped.
+                /* Wait for DPUs to complete: use a bitfield to mark every DPU stopped. */
                 uint32_t cmask = 0, mask_ok = 0;
-                for (unsigned int each_dpu = 0; each_dpu < nr_dpus_per_run; each_dpu++) {
+                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nr_reads != 0) {
+                        if (dispatch[this_dpu].nb_reads != 0) {
                                 mask_ok |= (1 << each_dpu);
                         }
                 }
@@ -114,11 +117,11 @@ static void run_on_dpu(dispatch_t dispatch,
                         /*         debug_count = 0; */
                         /* } */
 
-                        for (unsigned int each_dpu = 0; each_dpu < nr_dpus_per_run; each_dpu++) {
+                        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                                 uint32_t mask = (uint32_t) (1 << each_dpu);
                                 unsigned int this_dpu = first_dpu + each_dpu;
                                 if (!(cmask & mask)) {
-                                        if (dispatch[this_dpu].nr_reads != 0) {
+                                        if (dispatch[this_dpu].nb_reads != 0) {
                                                 if (dpu_try_check_status(each_dpu, devices)) {
                                                         cmask |= mask;
                                                         printf("DPU #%u completed\n", this_dpu);
@@ -128,17 +131,16 @@ static void run_on_dpu(dispatch_t dispatch,
                         }
                 } while (mask_ok != cmask);
 
-                // Gather results and free DPUs
-                for (unsigned int each_dpu = 0; each_dpu < nr_dpus_per_run; each_dpu++) {
+                /* Gather results and free DPUs */
+                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nr_reads != 0) {
+                        if (dispatch[this_dpu].nb_reads != 0) {
                                 dpu_try_log(each_dpu, devices, t0s[each_dpu]);
                                 dpu_result_out_t *results = dpu_try_get_results(this_dpu, devices);
                                 int i;
                                 for (i = 0; results[i].num != -1; i++) {
                                         if (i == MAX_DPU_RESULTS) {
-                                                printf("BUG! no EOR marker found when parsing DPU results!\n");
-                                                exit(66);
+                                                ERROR_EXIT(22, "BUG! no EOR marker found when parsing DPU results!\n");
                                         }
 
                                         long coords = ((long) results[i].seed_nr) |
@@ -152,7 +154,7 @@ static void run_on_dpu(dispatch_t dispatch,
                                                        results[i].seq_nr,
                                                        results[i].score);
                                         }
-#endif // TEST_PRINT_FIRST_DPU_RESULTS
+#endif /* TEST_PRINT_FIRST_DPU_RESULTS */
                                 }
                                 write_result(this_dpu, i, (unsigned int) -1, -1L, (unsigned int) -1);
 
@@ -162,6 +164,10 @@ static void run_on_dpu(dispatch_t dispatch,
 
                 dpu_try_free(devices);
         }
+
+        t2 = my_clock();
+        times_ctx->map_read = t2 - t1;
+        times_ctx->tot_map_read += t2 - t1;
 }
 
 static void run_dpu(dispatch_t dispatch,
@@ -174,7 +180,7 @@ static void run_dpu(dispatch_t dispatch,
         if (simulation_mode) {
                 run_dpu_simulation(nb_dpu, times_ctx, reads_info);
         } else {
-                run_on_dpu(dispatch, dpu_binary, nb_dpu, reads_info);
+                run_on_dpu(dispatch, dpu_binary, nb_dpu, times_ctx, reads_info);
         }
 }
 
@@ -190,8 +196,8 @@ static int map_var_call(char *filename_prefix,
                         bool simulation_mode)
 {
         char filename[1024];
-        FILE *fipe1, *fipe2;  // pair-end input file descriptor
-        FILE *fope1, *fope2;  // pair-end output file descriptor
+        FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
+        FILE *fope1, *fope2;  /* pair-end output file descriptor */
         int8_t *reads_buffer;
         int nb_read;
         int nb_read_total = 0;
@@ -290,14 +296,14 @@ static index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info)
 {
         index_seed_t **index_seed;
         mram_info_t *mram = mram_create(reads_info);
-        unsigned int nr_dpus = get_nb_dpu();
+        unsigned int nb_dpus = get_nb_dpu();
         /* Will unwrap the MRAM contents into the MDPU's PMEM. */
 
-        for (unsigned int each_dpu = 0; each_dpu < nr_dpus; each_dpu++) {
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus; each_dpu++) {
                 mram_reset(mram, reads_info);
                 mram_load(mram, each_dpu);
-                malloc_neighbour_idx(each_dpu, mram->nr_nbr, reads_info);
-                write_neighbors_and_coordinates(each_dpu, mram->nr_nbr, mram_neighbors_area(mram), reads_info);
+                malloc_neighbour_idx(each_dpu, mram->nb_nbr, reads_info);
+                write_neighbours_and_coordinates(each_dpu, mram->nb_nbr, mram_neighbours_area(mram), reads_info);
         }
 
         index_seed = load_index_seeds();
@@ -404,7 +410,8 @@ int main(int argc, char *argv[])
                 do_mapping(get_simulation_mode(), &reads_info, &times_ctx);
                 break;
         case goal_unknown:
-                ERROR_EXIT("goal has not been specified!");
+        default:
+                ERROR_EXIT(23, "goal has not been specified!");
         }
 
         free_args();

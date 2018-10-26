@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +14,7 @@
 
 static void dispatch_request_reset(dispatch_request_t *reads)
 {
-        reads->nr_reads = 0;
+        reads->nb_reads = 0;
         if (reads->reads_area != NULL) {
                 free(reads->reads_area);
         }
@@ -21,16 +25,11 @@ static void dispatch_request_free(dispatch_request_t *reads)
         dispatch_request_reset(reads);
 }
 
-/**
- * @brief Creates a new pool of requests on the DPUs
- * @return The new array of requests, NULL if the memory is full
- */
 static dispatch_request_t *dispatch_create(unsigned int nb_dpu)
 {
         dispatch_request_t *result = (dispatch_request_t *) calloc(nb_dpu, sizeof(dispatch_request_t));
         if (result == NULL) {
-                ERROR_EXIT("*** could not allocate memory to store %u dispatch requests - aborting!", nb_dpu);
-                exit(-3);
+                ERROR_EXIT(26, "*** could not allocate memory to store %u dispatch requests - aborting!", nb_dpu);
         }
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
@@ -41,25 +40,15 @@ static dispatch_request_t *dispatch_create(unsigned int nb_dpu)
 
 static unsigned int the_size_of_one_read_request(reads_info_t *reads_info)
 {
-        // Ensure that every read request is aligned on a 64 bits address
-        // Remember that the dispatch_read_t structure contains the nbr field, representing the
-        // 4 first bytes of the neighborhood. This length must be removed from SIZE_NBR_IN_BYTES.
+        /* Ensure that every read request is aligned on a 64 bits address
+         * Remember that the dispatch_read_t structure contains the nbr field, representing the
+         * 4 first bytes of the neighbourhood. This length must be removed from the size of neighbour in bytes.
+         */
         unsigned int unaligned_length =
                 sizeof(dispatch_read_t) + (reads_info->size_neighbour_in_bytes - sizeof(uint32_t));
         return (unaligned_length + 7) & ~7;
 }
 
-/**
- * @brief Records a new request
- *
- * The request is stored into a list in such a way that its address is aligned on 64 bits.
- *
- * @var   reads    the existing list of requests, to be completed with this new one
- * @param offset   the first neighbor address
- * @param count    the number of neighbors
- * @param num      a reference to the original request
- * @param nbr      neighbor of this recorded read (SIZE_NBR_IN_BYTES bytes)
- */
 static void dispatch_request_add(dispatch_request_t *reads,
                                  unsigned int offset,
                                  unsigned int count,
@@ -67,19 +56,23 @@ static void dispatch_request_add(dispatch_request_t *reads,
                                  int8_t *nbr,
                                  reads_info_t *reads_info)
 {
-        unsigned int read_index = reads->nr_reads;
-        reads->nr_reads++;
+        unsigned int new_read_list_size_in_bytes;
+        dispatch_read_t *new_read;
+        unsigned int read_index = reads->nb_reads;
+        reads->nb_reads++;
 
-        if (reads->nr_reads >= MAX_NB_DPU_READ) {
-                ERROR_EXIT("*** buffer full - cannot register more reads on one DPU - aborting");
+        if (reads->nb_reads >= MAX_NB_DPU_READ) {
+                ERROR_EXIT(27, "*** buffer full - cannot register more reads on one DPU - aborting");
         }
 
-        unsigned int new_read_list_size_in_bytes = reads->nr_reads * the_size_of_one_read_request(reads_info);
+        new_read_list_size_in_bytes = reads->nb_reads * the_size_of_one_read_request(reads_info);
         reads->reads_area = realloc(reads->reads_area, new_read_list_size_in_bytes);
-        dispatch_read_t *new_read = (dispatch_read_t *) (reads->reads_area + read_index * the_size_of_one_read_request(reads_info));
+
+        new_read = (dispatch_read_t *) (reads->reads_area + read_index * the_size_of_one_read_request(reads_info));
         new_read->offset = offset;
         new_read->count = count;
         new_read->num = num;
+
         memcpy(&(new_read->nbr), nbr, (size_t) reads_info->size_neighbour_in_bytes);
 }
 
@@ -115,7 +108,6 @@ static void write_mem_DPU(index_seed_t *seed,
                 code_neighbour(&read[SIZE_SEED], buf, reads_info);
 
                 if (simulation_mode) {
-                        // TODO: to be replace by tranfer with DPUs memory
                         write_count(seed->num_dpu, nb_read_written, seed->nb_nbr);
                         write_offset(seed->num_dpu, nb_read_written, seed->offset);
                         write_num(seed->num_dpu, nb_read_written, num_read);
@@ -127,8 +119,7 @@ static void write_mem_DPU(index_seed_t *seed,
                 counted_read[seed->num_dpu]++;
 
                 if (counted_read[seed->num_dpu] >= MAX_NB_DPU_READ - 1) {
-                        printf("\nBuffer full (DPU %d)\n", seed->num_dpu);
-                        exit(255);
+                        ERROR_EXIT(28, "\nBuffer full (DPU %d)", seed->num_dpu);
                 }
                 seed = seed->next;
         }

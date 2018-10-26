@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -9,20 +13,35 @@
 #include "upvc.h"
 
 /* DPU memory layout */
+/**
+ * @brief DPU memory layout
+ *
+ * @var neighbour_idx        datas : table of the neighbours of the seed from the reference genome in the DPU
+ * @var coordinate           datas : [sequence id, offset in sequence] of each seed in the DPU
+ * @var neighbour_idx_len    Size of neighbour_idx, in bytes
+ * @var coordinate_len       Size of coordinate, in bytes
+ * @var neighbour_read       datas : table of neighbours
+ * @var offset               datas : address of the first neighbour
+ * @var count                datas : number of neighbour for each read
+ * @var num                  datas : reads id
+ * @var out_score            output : score
+ * @var out_num              output : number of the read that matched
+ * @var out_coord            output : coordinate on the genome where the read matched
+ */
 typedef struct {
-        int8_t *neighbour_idx;      /* datas : table of the neighbours of the seed from the reference genome in the DPU */
-        long *coordinate;           /* datas : [sequence id, offset in sequence] of each seed in the DPU                */
-        unsigned int neighbour_idx_len;  // Size of neighbour_idx, in bytes
-        unsigned int coordinate_len;    // Size of coordinate, in bytes
+        int8_t *neighbour_idx;
+        long *coordinate;
+        unsigned int neighbour_idx_len;
+        unsigned int coordinate_len;
 
-        int8_t *neighbour_read;     /* datas : table of neighbours                                                      */
-        int *offset;                /* datas : address of the first neighbour                                           */
-        int *count;                 /* datas : number of neighbour for each read                                        */
-        int *num;                   /* datas : reads id                                                                 */
+        int8_t *neighbour_read;
+        int *offset;
+        int *count;
+        int *num;
 
-        int *out_score;             /* output : score                                                                   */
-        int *out_num;               /* output : number of the read that matched                                         */
-        long *out_coord;            /* output : coordinate on the genome where the read matched                         */
+        int *out_score;
+        int *out_num;
+        long *out_coord;
 } MEM_DPU;
 
 static MEM_DPU *MDPU;
@@ -34,17 +53,17 @@ static int min (int a, int b)
 
 #define PQD_INIT_VAL (99)
 static void ODPD_compute(int i,
-                        int j,
-                        int8_t *s1,
-                        int8_t *s2,
-                        int *Pppj,
-                        int Pppjm,
-                        int *Qppj,
-                        int Qlpj,
-                        int *Dppj,
-                        int Dppjm,
-                        int Dlpj,
-                        int Dlpjm)
+                         int j,
+                         int8_t *s1,
+                         int8_t *s2,
+                         int *Pppj,
+                         int Pppjm,
+                         int *Qppj,
+                         int Qlpj,
+                         int *Dppj,
+                         int Dppjm,
+                         int Dlpj,
+                         int Dlpjm)
 {
         int d = Dlpjm;
         int QP;
@@ -59,8 +78,8 @@ static void ODPD_compute(int i,
         *Dppj = min(d, QP);
 }
 
-/*
- * Compute the alignment distance by dynamical programming on the diagonals of the matrix.
+/**
+ * @brief Compute the alignment distance by dynamical programming on the diagonals of the matrix.
  * Stops when score is greater than max_score
  */
 static int ODPD(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
@@ -87,9 +106,9 @@ static int ODPD(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
                 D[pp][0] = i * COST_SUB;
                 for (int j = 1; j < i + diagonal; j++) {
                         ODPD_compute(i, j, s1, s2,
-                             &P[pp][j], P[pp][j - 1],
-                             &Q[pp][j], Q[lp][j],
-                             &D[pp][j], D[pp][j - 1], D[lp][j], D[lp][j - 1]);
+                                     &P[pp][j], P[pp][j - 1],
+                                     &Q[pp][j], Q[lp][j],
+                                     &D[pp][j], D[pp][j - 1], D[lp][j], D[lp][j - 1]);
                         if (D[pp][j] < min_score) {
                                 min_score = D[pp][j];
                         }
@@ -109,9 +128,9 @@ static int ODPD(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
                 D[pp][i - diagonal] = PQD_INIT_VAL;
                 for (int j = i + 1 - diagonal; j < i + diagonal; j++) {
                         ODPD_compute(i, j, s1, s2,
-                             &P[pp][j], P[pp][j - 1],
-                             &Q[pp][j], Q[lp][j],
-                             &D[pp][j], D[pp][j - 1], D[lp][j], D[lp][j - 1]);
+                                     &P[pp][j], P[pp][j - 1],
+                                     &Q[pp][j], Q[lp][j],
+                                     &D[pp][j], D[pp][j - 1], D[lp][j], D[lp][j - 1]);
                         if (D[pp][j] < min_score) {
                                 min_score = D[pp][j];
                         }
@@ -130,9 +149,9 @@ static int ODPD(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
                 D[pp][i - diagonal] = PQD_INIT_VAL;
                 for (int j = i + 1 - diagonal; j < matrix_size; j++) {
                         ODPD_compute(i, j, s1, s2,
-                             &P[pp][j], P[pp][j - 1],
-                             &Q[pp][j], Q[lp][j],
-                             &D[pp][j], D[pp][j - 1], D[lp][j], D[lp][j - 1]);
+                                     &P[pp][j], P[pp][j - 1],
+                                     &Q[pp][j], Q[lp][j],
+                                     &D[pp][j], D[pp][j - 1], D[lp][j], D[lp][j - 1]);
                 }
                 if (D[pp][matrix_size - 1] < min_score)
                         min_score = D[pp][matrix_size - 1];
@@ -165,8 +184,8 @@ static int translation_table[256] = {0 , 10 , 10 , 10 , 10 , 20 , 20 , 20 , 10 ,
                                      20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 ,
                                      20 , 30 , 30 , 30 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 , 30 , 40 , 40 , 40 };
 
-/*
- * Optimized version of ODPD (if no INDELS)
+/**
+ * @brief Optimized version of ODPD (if no INDELS)
  * If it detects INDELS, return -1. In this case we will need the run the full ODPD.
  */
 static int noDP(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
@@ -309,23 +328,24 @@ void free_dpu(int nb_dpu)
         free(MDPU);
 }
 
-void write_neighbors_and_coordinates(int d, int nr_nbrs, long *nbrs, reads_info_t *reads_info) {
-    MEM_DPU *mdpu = &(MDPU[d]);
+void write_neighbours_and_coordinates(int d, int nb_nbrs, long *nbrs, reads_info_t *reads_info)
+{
+        MEM_DPU *mdpu = &(MDPU[d]);
 
-    unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-    size_t long_aligned_nbr_len = (size_t) ((size_neighbour_in_bytes + 7) & (~7));
-    unsigned int input_pattern_len = sizeof(long) + long_aligned_nbr_len;
-    uint8_t *input_pattern_ptr = (uint8_t *) nbrs;
+        unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+        size_t long_aligned_nbr_len = (size_t) ((size_neighbour_in_bytes + 7) & (~7));
+        unsigned int input_pattern_len = sizeof(long) + long_aligned_nbr_len;
+        uint8_t *input_pattern_ptr = (uint8_t *) nbrs;
 
-    for (int each_nbr = 0; each_nbr < nr_nbrs; each_nbr++) {
-        long this_coords = ((long *) input_pattern_ptr)[0];
-        uint8_t *this_nbr = input_pattern_ptr + sizeof(long);
-        (void) memcpy(mdpu->neighbour_idx + (each_nbr * size_neighbour_in_bytes),
-                      this_nbr,
-                      (size_t) size_neighbour_in_bytes);
-        mdpu->coordinate[each_nbr] = this_coords;
-        input_pattern_ptr += input_pattern_len;
-    }
+        for (int each_nbr = 0; each_nbr < nb_nbrs; each_nbr++) {
+                long this_coords = ((long *) input_pattern_ptr)[0];
+                uint8_t *this_nbr = input_pattern_ptr + sizeof(long);
+                (void) memcpy(mdpu->neighbour_idx + (each_nbr * size_neighbour_in_bytes),
+                              this_nbr,
+                              (size_t) size_neighbour_in_bytes);
+                mdpu->coordinate[each_nbr] = this_coords;
+                input_pattern_ptr += input_pattern_len;
+        }
 }
 
 void write_neighbour_read (int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info)
@@ -353,7 +373,8 @@ int read_out_num       (int num_dpu, int align_idx) { return MDPU[num_dpu].out_n
 int read_out_score     (int num_dpu, int align_idx) { return MDPU[num_dpu].out_score[align_idx]; }
 long read_out_coord    (int num_dpu, int align_idx) { return MDPU[num_dpu].out_coord[align_idx]; }
 
-static void print_byte_to_sym(uint8_t byte, unsigned int offset, FILE *out) {
+static void print_byte_to_sym(uint8_t byte, unsigned int offset, FILE *out)
+{
         uint8_t as_byte = (uint8_t) ((byte >> offset) & 0x3);
         char as_char;
         switch (as_byte) {
@@ -372,10 +393,10 @@ static void print_byte_to_sym(uint8_t byte, unsigned int offset, FILE *out) {
         fprintf(out, "%c", as_char);
 }
 
-void print_neighbour_idx(int d, int offs, int nr_nbr, FILE *out, reads_info_t *reads_info)
+void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *reads_info)
 {
         unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-        for (int each_nbr = 0; each_nbr < nr_nbr; each_nbr++) {
+        for (int each_nbr = 0; each_nbr < nb_nbr; each_nbr++) {
                 fprintf(out, "\t");
                 unsigned int i;
                 for (i = 0; i < size_neighbour_in_bytes; i++) {
@@ -400,8 +421,9 @@ void print_coordinates(int d, int offs, int l, FILE *out)
 
 void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, unsigned int nb_dpu, reads_info_t *reads_info)
 {
+        mram_info_t *mram_image;
         printf("Creating MRAM images\n");
-        mram_info_t *mram_image = mram_create(reads_info);
+        mram_image = mram_create(reads_info);
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
                 vmi_t *this_vmi = vmis + each_dpu;
                 mram_reset(mram_image, reads_info);
@@ -411,9 +433,10 @@ void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, uns
         mram_free(mram_image);
 }
 
-void write_result(int d, int k, unsigned int num, long coords, unsigned int score) {
-    printf("R: %u %u %lu\n", num, score, coords);
-    MDPU[d].out_num[k] = num;
-    MDPU[d].out_coord[k] = coords;
-    MDPU[d].out_score[k] = score;
+void write_result(int d, int k, unsigned int num, long coords, unsigned int score)
+{
+        printf("R: %u %u %lu\n", num, score, coords);
+        MDPU[d].out_num[k] = num;
+        MDPU[d].out_coord[k] = coords;
+        MDPU[d].out_score[k] = score;
 }

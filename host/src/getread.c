@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,9 +12,15 @@
 #define MAX_SEQ_SIZE (512)
 #define MAX_BUF_SIZE (1024)
 
-/*
- * Parse the file "f".
- * Return the next read in the file and its pair
+/**
+ * @brief Parse the file "f" to get the next read in the file and its pair.
+ *
+ * @param f          File to parse.
+ * @param read1      Output the next read in the file.
+ * @param read2      Output the pair of the next read in the file.
+ * @param reads_info Information on the size of the seed and the neighbour.
+ *
+ * @return The size of the read.
  */
 static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, reads_info_t *reads_info)
 {

@@ -1,8 +1,9 @@
-/*
- * Copyright (c) 2014-2018 - uPmem
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
  */
-#ifndef INTEGRATION_DOUT_H
-#define INTEGRATION_DOUT_H
+
+#ifndef __INTEGRATION_DOUT_H__
+#define __INTEGRATION_DOUT_H__
 
 #include <mram.h>
 #include "debug.h"
@@ -51,10 +52,10 @@
  * See dpus.h/dpu_result_out_t for consistency of definitions.
  */
 typedef struct {
-    unsigned int num;
-    uint32_t seq_nr;
-    uint32_t seed_nr;
-    unsigned int score;
+        unsigned int num;
+        uint32_t seq_nr;
+        uint32_t seed_nr;
+        unsigned int score;
 } result_out_t;
 
 /**
@@ -66,97 +67,109 @@ typedef struct {
  * See dpus.h/dpu_stats_out_t for consistency of definitions.
  */
 typedef struct {
-    uint32_t nr_reqs;
-    uint32_t nr_nodp_calls;
-    uint32_t nr_odpd_calls;
-    uint32_t nr_results;
-    uint32_t mram_data_load;
-    uint32_t mram_result_store;
-    uint32_t mram_load;
-    uint32_t mram_store;
+        uint32_t nb_reqs;
+        uint32_t nb_nodp_calls;
+        uint32_t nb_odpd_calls;
+        uint32_t nb_results;
+        uint32_t mram_data_load;
+        uint32_t mram_result_store;
+        uint32_t mram_load;
+        uint32_t mram_store;
 } dpu_tasklet_stats_t;
 
 /**
  * @brief The results produces by one tasklet when processing one read.
- * @var nr_results     total number of results stored
- * @var outs           a local cache of nr_results results
- * @var mram_base      base address of the swap area assigned to this tasklet
- * @var nr_cached_out  number of results in the local cache
- * @var nr_page_out    number of pages of MAX_LOCAL_RESULTS_PER_READ put into the swap area
+
+ * @var nb_results     Total number of results stored.
+ * @var outs           A local cache of nb_results results.
+ * @var mram_base      Base address of the swap area assigned to this tasklet.
+ * @var nb_cached_out  Number of results in the local cache.
+ * @var nb_page_out    Number of pages of MAX_LOCAL_RESULTS_PER_READ put into the swap area.
  */
 typedef struct {
-    unsigned int nr_results;
-    result_out_t *outs;
-    mram_addr_t mram_base;
-    unsigned int nr_cached_out;
-    unsigned int nr_page_out;
+        unsigned int nb_results;
+        result_out_t *outs;
+        mram_addr_t mram_base;
+        unsigned int nb_cached_out;
+        unsigned int nb_page_out;
 } dout_t;
 
 /**
  * @brief Clears the results to start a new request.
- * @param dout cleared data output
+ *
+ * @param dout  Cleared data output.
  */
-static void dout_clear(dout_t *dout) {
-    dout->nr_results = 0;
-    dout->nr_page_out = 0;
-    dout->nr_cached_out = 0;
+static void dout_clear(dout_t *dout)
+{
+        dout->nb_results = 0;
+        dout->nb_page_out = 0;
+        dout->nb_cached_out = 0;
 }
 
 /**
- * @brief Initializes a data out structure for a given tasklet
- * @param tid the tasklet identifier
- * @param dout the initialized structure
+ * @brief Initializes a data out structure for a given tasklet.
+ *
+ * @param tid the tasklet identifier.
+ * @param dout the initialized structure.
  */
-static void dout_init(unsigned int tid, dout_t *dout) {
-    dout->mram_base = MRAM_SIZE -
-                      (MAX_DPU_RESULTS * sizeof(result_out_t)) -
-                      (16 * MAX_RESULTS_PER_READ * sizeof(result_out_t)) +
-                      (tid * MAX_RESULTS_PER_READ * sizeof(result_out_t));
-    dout->outs = mem_alloc_dma(LOCAL_RESULTS_PAGE_SIZE);
-    dout_clear(dout);
+static void dout_init(unsigned int tid, dout_t *dout)
+{
+        dout->mram_base = MRAM_SIZE -
+                (MAX_DPU_RESULTS * sizeof(result_out_t)) -
+                (16 * MAX_RESULTS_PER_READ * sizeof(result_out_t)) +
+                (tid * MAX_RESULTS_PER_READ * sizeof(result_out_t));
+        dout->outs = mem_alloc_dma(LOCAL_RESULTS_PAGE_SIZE);
+        dout_clear(dout);
 }
 
 /**
- * @brief records a new result
- * @param dout    data output
- * @param num     request number
- * @param score   recorded scored
- * @param seed_nr recorded seed number
- * @param seq_nr  recorded sequence number
- * @param stats   to update statistical report
+ * @brief Tecords a new result
+ *
+ * @param dout     Data output.
+ * @param num      Request number.
+ * @param score    Recorded scored.
+ * @param seed_nr  Recorded seed number.
+ * @param seq_nr   Recorded sequence number.
+ * @param stats    To update statistical report.
  */
-static void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, uint32_t seq_nr, dpu_tasklet_stats_t *stats) {
-    if (dout->nr_cached_out == MAX_LOCAL_RESULTS_PER_READ) {
-        // Local cache is full, copy into the swap area.
-        // This shall never happen, but let's verify that we remain inside our assigned swap area.
-        if (dout->nr_page_out >= MAX_RESULTS_PER_READ / MAX_LOCAL_RESULTS_PER_READ) {
-            printf("WARNING! too many swapped pages!\n");
-            halt();
+static void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, uint32_t seq_nr, dpu_tasklet_stats_t *stats)
+{
+        result_out_t *new_out;
+        if (dout->nb_cached_out == MAX_LOCAL_RESULTS_PER_READ) {
+                mram_addr_t swap_addr;
+
+                /* Local cache is full, copy into the swap area.
+                 * This shall never happen, but let's verify that we remain inside our assigned swap area. */
+                if (dout->nb_page_out >= MAX_RESULTS_PER_READ / MAX_LOCAL_RESULTS_PER_READ) {
+                        printf("WARNING! too many swapped pages!\n");
+                        halt();
+                }
+                swap_addr = dout->mram_base + dout->nb_page_out * LOCAL_RESULTS_PAGE_SIZE;
+                mram_writeX(dout->outs, swap_addr, LOCAL_RESULTS_PAGE_SIZE);
+                stats->mram_store += LOCAL_RESULTS_PAGE_SIZE;
+                dout->nb_cached_out = 0;
+                dout->nb_page_out++;
         }
-        mram_addr_t swap_addr = dout->mram_base + dout->nr_page_out * LOCAL_RESULTS_PAGE_SIZE;
-        mram_writeX(dout->outs, swap_addr, LOCAL_RESULTS_PAGE_SIZE);
-        stats->mram_store += LOCAL_RESULTS_PAGE_SIZE;
-        dout->nr_cached_out = 0;
-        dout->nr_page_out++;
-    }
 
-    result_out_t *new_out = dout->outs + dout->nr_cached_out;
-    new_out->num = num;
-    new_out->score = score;
-    new_out->seed_nr = seed_nr;
-    new_out->seq_nr = seq_nr;
+        new_out = dout->outs + dout->nb_cached_out;
+        new_out->num = num;
+        new_out->score = score;
+        new_out->seed_nr = seed_nr;
+        new_out->seq_nr = seq_nr;
 
-    dout->nr_cached_out++;
-    dout->nr_results++;
+        dout->nb_cached_out++;
+        dout->nb_results++;
 }
 
 /**
- * @brief locates a swap page for a given data out structure
- * @param dout    data output
- * @param pageno  the requested page number
+ * @brief locates a swap page for a given data out structure.
+ *
+ * @param dout    Data output.
+ * @param pageno  The requested page number.
  */
-static mram_addr_t dout_swap_page_addr(const dout_t *dout, unsigned int pageno) {
-    return (mram_addr_t) (dout->mram_base + (pageno * LOCAL_RESULTS_PAGE_SIZE));
+static mram_addr_t dout_swap_page_addr(const dout_t *dout, unsigned int pageno)
+{
+        return (mram_addr_t) (dout->mram_base + (pageno * LOCAL_RESULTS_PAGE_SIZE));
 }
 
-#endif //INTEGRATION_DOUT_H
+#endif /* __INTEGRATION_DOUT_H__ */

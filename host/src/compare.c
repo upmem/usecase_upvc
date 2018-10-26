@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "compare.h"
@@ -12,25 +16,6 @@
 static int min(int a, int b)
 {
         return a < b ? a : b;
-}
-
-void display_DPD_matrix(int **Matrix, reads_info_t *reads_info)
-{
-        int size_neighbour = reads_info->size_neighbour_in_32bits_words;
-
-        for (int i = 0; i < size_neighbour / 2; i++) {
-                for (int j = 0; j < size_neighbour / 2; j++) {
-                        printf("%3d ", Matrix[i][j]);
-                }
-                printf("\n");
-        }
-        printf("---\n");
-        for (int i = size_neighbour / 2; i < size_neighbour + 1; i++) {
-                for (int j = size_neighbour / 2; j < size_neighbour + 1; j++) {
-                        printf("%3d ", Matrix[i][j]);
-                }
-                printf("\n");
-        }
 }
 
 static void DPD_compute(int s1,
@@ -157,8 +142,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, reads_info_t *reads_info
                         } else if (path[i][j] == PATH_DELETION){
                                 i--;
                         } else {
-                                fprintf(stderr, "Error during deletion of indels\n");
-                                exit(255);
+                                ERROR_EXIT(1, "Error during deletion of indels");
                         }
                 }
 
@@ -188,8 +172,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, reads_info_t *reads_info
                                         backtrack[align_distance].jx = j;
                                         align_distance++;
                                 } else {
-                                        fprintf(stderr, "Error during DPD compute\n");
-                                        exit(255);
+                                        ERROR_EXIT(2, "Error during DPD compute");
                                 }
                         }
                 }

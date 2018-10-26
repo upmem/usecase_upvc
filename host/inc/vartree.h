@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ */
+
 #ifndef __VARTREE_H__
 #define __VARTREE_H__
 
@@ -20,9 +24,19 @@ typedef struct variant_tree {
         int height;
 } variant_tree_t;
 
+/**
+ * @brief Insert a variant in the list (tree) of variant.
+ *
+ * @param variant_list  List (tree) of result variant.
+ * @param var           Variant to be added in the list.
+ */
 void insert_variants(variant_tree_t **variant_list, variant_t* var);
-// TODO: if not used at the end, remove this function
-void visu_variants(variant_tree_t **variant_list);
+
+/**
+ * @brief Free all the variant in the list.
+ *
+ * @param variant_list  List of variant to be freed.
+ */
 void free_variant_tree(variant_tree_t *variant_list);
 
 #endif /* __VARTREE_H__ */

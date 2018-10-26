@@ -1,6 +1,10 @@
+//
+// Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+//
+
 #include <sysdefs.s>
 
-#define NR_DIAGS        15
+#define NB_DIAGS        15
 #define COST_SUB        10
 #define COST_GAPO       11
 #define COST_GAPE       1
@@ -59,8 +63,8 @@ save_registers:
 get_tasklet_matrix:
     move    t0      +24                                     // local matrix line size
     add     t1      len     +1                              // local matrix depth
-    mul_ul_ul   t0      t0      t1                              // local matrix size
-    mul_ul_ul   t0      t0      me                              // local matrix offset ATTENTION OVERFLOW
+    mul_ul_ul   t0      t0      t1                          // local matrix size
+    mul_ul_ul   t0      t0      me                          // local matrix offset ATTENTION OVERFLOW
     lw      matrix  %zero   __M                             // global matrix address
     add     matrix  matrix  t0                              // local matrix pointer
 
@@ -68,7 +72,7 @@ init_matrix:
     move    cost    0                                       // Initialization value
     move    v99     COST_INIT                               // Initialization value
     move    mpp     matrix                                  // Matrix line (index j)
-    move    t1      ${(NR_DIAGS/2+1)*6}                     // Loop counter
+    move    t1      ${(NB_DIAGS/2+1)*6}                     // Loop counter
 init_matrix_loop:
     sw      @mpp    +p0off  v99                             // Set P(0, j)
     sw      @mpp    +q0off  v99                             // Set Q(0, j)
@@ -98,7 +102,7 @@ phase1_v1:
     lsr     v1      t1      t0                              //
 
     move    j       0                                       // Initialization value
-    add     i       i       +${NR_DIAGS/2}                  // j loop bound
+    add     i       i       +${NB_DIAGS/2}                  // j loop bound
     lw      t0      @mpp    +d0off                          // Get first D(pp, j-1)
 phase1_jloop:
     add     t0      t0      +COST_GAPO                      //
@@ -154,7 +158,7 @@ phase1_earlyexit:
 
 phase1_inext:
     add     cost    cost    +COST_SUB                       // Loop increment
-    add     i       i       ${1-NR_DIAGS/2}                 // Loop increment
+    add     i       i       ${1-NB_DIAGS/2}                 // Loop increment
     and     mpp     i       1       ?z @phase1_odd          //
     add     mpp     matrix  +4                              // Switch vector
     add     mlp     matrix  +0      ?true @phase1_itest     // Switch vector
@@ -162,7 +166,7 @@ phase1_odd:
     add     mpp     matrix  +0                              // Switch vector
     add     mlp     matrix  +4                              // Switch vector
 phase1_itest:
-    sub     t0     i ${NR_DIAGS/2+1}   ?ltu @phase1_iloop   // Next iteration
+    sub     t0     i ${NB_DIAGS/2+1}   ?ltu @phase1_iloop   // Next iteration
 
 phase2:
 phase2_iloop:
@@ -178,8 +182,8 @@ phase2_v1:
     lsr     t0      t0      29                              //
     lsr     v1      t1      t0                              //
 
-    add     j       i       ${-NR_DIAGS/2-1}                // Initialization value
-    add     i       i       +${NR_DIAGS/2}                  // j loop bound
+    add     j       i       ${-NB_DIAGS/2-1}                // Initialization value
+    add     i       i       +${NB_DIAGS/2}                  // j loop bound
     lw      t0      @mpp    +d0off                          // Get first D(pp, j-1)
 phase2_jloop:
     add     t0      t0      +COST_GAPO                      //
@@ -234,12 +238,12 @@ phase2_earlyexit:
     jltu    mxScore mnScore @restore_registers              // Early exit
 
 phase2_inext:
-    add     mpp     mpp     ${-24*2*(NR_DIAGS/2)}           // Loop increment
-    add     mlp     mlp     ${-24*2*(NR_DIAGS/2)}           // Loop increment
+    add     mpp     mpp     ${-24*2*(NB_DIAGS/2)}           // Loop increment
+    add     mlp     mlp     ${-24*2*(NB_DIAGS/2)}           // Loop increment
     xor     mpp     mpp     4                               // Switch vector
     xor     mlp     mlp     4                               // Switch vector
-    add     i       i       ${1-NR_DIAGS/2}                 // Loop increment
-    add     t0      len     ${-(NR_DIAGS/2)}                // Loop bound (to be optimized)
+    add     i       i       ${1-NB_DIAGS/2}                 // Loop increment
+    add     t0      len     ${-(NB_DIAGS/2)}                // Loop bound (to be optimized)
     jleu    i       t0      @phase2_iloop                   // Next iteration
 
 phase3:
@@ -258,7 +262,7 @@ phase3_v1:
     lsr     t0      t0      29                              //
     lsr     v1      t1      t0                              //
 
-    add     j       i       ${-NR_DIAGS/2-1}                // Initialization value
+    add     j       i       ${-NB_DIAGS/2-1}                // Initialization value
     lw      t0      @mpp    +d0off                          // Get first D(pp, j-1)
 phase3_jloop:
     add     t0      t0      +COST_GAPO                      //
@@ -319,7 +323,7 @@ phase3_inext:
 
 phase4:
     xor     mpp     mpp     4                               // Switch vector
-    add     j       len     ${-(NR_DIAGS/2)}                // Initialization value
+    add     j       len     ${-(NB_DIAGS/2)}                // Initialization value
 phase4_jloop:
     lw      t0      @mpp    +d0off                          // Get D(pp,j)
     jltu    mnScore t0      @phase4_jnext                   // Min is mnScore
