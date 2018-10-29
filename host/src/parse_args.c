@@ -2,12 +2,15 @@
  * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
  */
 
+#define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <errno.h>
+
 #include "upvc.h"
 #include "parse_args.h"
 
