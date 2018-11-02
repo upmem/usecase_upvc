@@ -57,14 +57,15 @@ devices_t dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
                 ERROR_EXIT(3, "*** could not allocate structure for devices - aborting");
         }
         devices->nb_dpus = nb_dpus;
-        if (dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank)) != DPU_API_SUCCESS) {
-                ERROR_EXIT("*** could not guess the number of DPUs per rank - aborting");
-        }
+        devices->nb_dpus_per_rank = nb_dpus;
+        /* if (dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank)) != DPU_API_SUCCESS) { */
+        /*         ERROR_EXIT("*** could not guess the number of DPUs per rank - aborting"); */
+        /* } */
         devices->dpus = (dpu_t *) calloc(nb_dpus, sizeof(dpu_t));
         if (devices->dpus == NULL) {
                 ERROR_EXIT(4, "*** could not allocate array of DPUs - aborting");
         }
-        unsigned int nb_ranks = (nb_dpus + devices->nb_dpus_per_rank - 1) / devices->nb_dpus_per_rank;
+        unsigned int nb_ranks = 1; /* (nb_dpus + devices->nb_dpus_per_rank - 1) / devices->nb_dpus_per_rank; */
         devices->nb_ranks = nb_ranks;
         devices->ranks = (dpu_rank_t *) calloc(nb_ranks, sizeof(dpu_rank_t));
         if (devices->ranks == NULL) {
