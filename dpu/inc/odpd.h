@@ -15,11 +15,6 @@
  */
 
 /**
- * @brief Maximum score allowed.
- */
-#define MAX_SCORE        40
-
-/**
  * @brief Sets up an operating environment for the comparator to run on several tasklets in parallel.
  *
  * @param nb_tasklets  How many tasklets will work.

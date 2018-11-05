@@ -23,6 +23,11 @@
 #define MUTEX_MISCELLANEOUS 2
 
 /**
+ * @brief Maximum score allowed.
+ */
+#define MAX_SCORE (40)
+
+/**
  * See mdpu.h. Notice that the host ensures that every area is aligned on 64 bits.
  */
 typedef struct {

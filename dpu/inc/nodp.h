@@ -13,11 +13,6 @@
  * This version is a fast comparison of two sequences.
  */
 
-/**
- * @brief Maximum score allowed.
- */
-#define MAX_SCORE (40)
-
 #define COST_SUB (10)
 
 static const int TT[256] = {0, 10, 10, 10, 10, 20, 20, 20, 10, 20, 20, 20, 10, 20, 20, 20,

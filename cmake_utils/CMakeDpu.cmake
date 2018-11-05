@@ -27,7 +27,7 @@ macro(dpu_generate_configuration output script)
     )
 endmacro()
 
-macro(dpu_build target output configuration dpucc_opt sources)
+macro(dpu_build target output configuration dpucc_opt sources includes)
     INCLUDE_DIRECTORIES(SYSTEM ${UPMEM_HOME}/usr/share/upmem/include/stdlib ${UPMEM_HOME}/usr/share/upmem/include/syslib)
     add_custom_target(${target} DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${output} SOURCES ${sources})
     get_property(incs TARGET ${target} PROPERTY INCLUDE_DIRECTORIES)
@@ -43,7 +43,7 @@ macro(dpu_build target output configuration dpucc_opt sources)
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${output}
             COMMAND ${DPU_CC} -b -C ${CMAKE_CURRENT_BINARY_DIR}/${configuration} ${dpucc_opt} -o ${CMAKE_CURRENT_BINARY_DIR}/${output} ${__${target}_include_directories} ${sources}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/${DPU_DIRECTORY}
-            DEPENDS ${configuration} ${sources}
+            DEPENDS ${configuration} ${sources} ${includes}
             VERBATIM
     )
 endmacro()
