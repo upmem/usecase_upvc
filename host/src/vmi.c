@@ -72,15 +72,15 @@ bool vmi_push(vmi_t *vmi, const void *buffer, size_t nb_bytes)
 
 bool vmi_write(vmi_t *vmi, long offs, const void *buffer, size_t nb_bytes)
 {
-        FILE *file = fopen(vmi->file_name, "a+");
-        if (file == NULL) {
+        int handle = open(vmi->file_name, O_WRONLY | O_CREAT, 644);
+        if (handle == -1) {
                 ERROR("VMI: write failed: could not re-open file");
                 return false;
         }
 
-        fseek(file, offs, SEEK_SET);
-        fwrite(buffer, sizeof(char), nb_bytes, file);
-        fclose(file);
+        lseek(handle, offs, SEEK_SET);
+        write(handle, buffer, nb_bytes);
+        close(handle);
         vmi->mem_size += nb_bytes;
 
         return true;
