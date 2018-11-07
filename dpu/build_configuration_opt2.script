@@ -6,4 +6,4 @@ tasklet add 0..15 256 main 16
 //  - 1: result pool
 //  - 2: miscellaneous
 mutex 3
-barrier add 0 15
+barrier add 0 16
