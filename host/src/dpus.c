@@ -220,6 +220,9 @@ void dpu_try_log(unsigned int dpu_id, devices_t devices, uint64_t t0)
 dpu_result_out_t *dpu_try_get_results(unsigned int dpu_id, devices_t devices)
 {
         dpu_result_out_t *result_buffer = (dpu_result_out_t *) malloc(RESULT_AREA_LEN);
+        if (result_buffer == NULL) {
+                ERROR_EXIT(29, "error during malloc of result buffer\n");
+        }
         dpu_copy_from_individual(devices->dpus[dpu_id],
                                  (mram_addr_t) MRAM_INPUT_SIZE,
                                  (uint8_t *) result_buffer,
