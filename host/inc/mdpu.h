@@ -30,7 +30,7 @@
  * @brief Total size of the input area, in bytes: the whole MRAM minus the result area MINUS the swap area used
  * by the DPU internally.
  */
-#define MRAM_INPUT_SIZE (MRAM_SIZE - RESULT_AREA_LEN - (16 * 1024 * 16))
+#define MRAM_INPUT_SIZE (MRAM_SIZE - RESULT_AREA_LEN) // - (16 * 1024 * 16))
 
 /**
  * @brief A snapshot of the MRAM.
