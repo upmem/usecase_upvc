@@ -239,12 +239,13 @@ static void result_pool_write(const dout_t *results, dpu_tasklet_stats_t *stats)
         mutex_lock(result_pool.mutex);
         unsigned int i;
         unsigned int pageno;
-        static result_out_t end_of_results = {
-                                              .num = (unsigned int) -1,
-                                              .score = (unsigned int) -1,
-                                              .seq_nr = 0,
-                                              .seed_nr = 0
-        };
+        __attribute__((aligned(8))) static const result_out_t end_of_results =
+                {
+                 .num = (unsigned int) -1,
+                 .score = (unsigned int) -1,
+                 .seq_nr = 0,
+                 .seed_nr = 0
+                };
         /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
          * has a num equal to -1.
          */
@@ -284,7 +285,7 @@ static void result_pool_write(const dout_t *results, dpu_tasklet_stats_t *stats)
         /* Mark the end of result data, do not increment the indexes, so that the next one restarts from this
          * point.
          */
-        mram_write16(&end_of_results, result_pool.cur_write);
+        mram_write16((void*)&end_of_results, result_pool.cur_write);
         result_pool.stats_write += 16;
         mutex_unlock(result_pool.mutex);
 }
