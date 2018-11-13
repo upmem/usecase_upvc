@@ -30,6 +30,7 @@ static void run_dpu_simulation(unsigned int nb_dpu,
         double t1, t2;
         pthread_t thread_id[nb_dpu];
         align_on_dpu_arg_t thread_args[nb_dpu];
+        unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
 
         t1 = my_clock();
 
@@ -43,6 +44,20 @@ static void run_dpu_simulation(unsigned int nb_dpu,
         }
         for (numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 pthread_join(thread_id[numdpu], NULL);
+        }
+
+        for (unsigned int first_dpu = 0; first_dpu < nb_dpu; first_dpu += nb_dpus_per_run) {
+                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
+                        unsigned int this_dpu = first_dpu + each_dpu;
+                        printf("LOG DPU=%u\n", this_dpu);
+                        int k = 0;
+                        int num_read = read_out_num(this_dpu, k);
+                        while (num_read != -1) {
+                                printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k));
+                                k++;
+                                num_read = read_out_num(this_dpu, k);
+                        }
+                }
         }
 
         t2 = my_clock();

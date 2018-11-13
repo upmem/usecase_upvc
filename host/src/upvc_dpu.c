@@ -44,6 +44,7 @@ typedef struct {
         long *out_coord;
 } MEM_DPU;
 
+/* static void print_neighbour(uint8_t *nbr, FILE *out, reads_info_t *reads_info); */
 static MEM_DPU *MDPU;
 
 static int min (int a, int b)
@@ -246,17 +247,24 @@ void *align_on_dpu(void *arg)
         int size_neighbour = reads_info->size_neighbour_in_bytes;
         MEM_DPU M = MDPU[numdpu];
         int current_read = 0;
+        /* int debug_nb = -1; */
 
         M.out_num[nb_map] = -1;
         while (M.num[current_read] != -1) {
                 int offset = M.offset[current_read]; /* address of the first neighbour */
                 int min = MAX_SCORE;
                 int nb_map_start = nb_map;
+                /* print_neighbour((uint8_t*)&M.neighbour_read[current_read*size_neighbour], stdout, reads_info); */
+                /* debug_nb++; */
+                /* if (toto++ > 5) */
+                /*         exit(0); */
                 for (int nb_neighbour = 0; nb_neighbour < M.count[current_read]; nb_neighbour++) {
+                        /* print_neighbour((uint8_t*)&M.neighbour_idx[(offset+nb_neighbour)*size_neighbour], stdout, reads_info); */
                         int score_noDP =noDP(&M.neighbour_read[current_read*size_neighbour],
                                              &M.neighbour_idx[(offset+nb_neighbour)*size_neighbour],
                                              min,
                                              reads_info);
+                        /* printf("noDP score = %i\n", score_noDP); */
                         int score = score_noDP;
                         if (score_noDP == -1) {
                                 int score_ODPD = ODPD(&M.neighbour_read[current_read*size_neighbour],
@@ -264,13 +272,21 @@ void *align_on_dpu(void *arg)
                                                       min,
                                                       reads_info);
                                 score = score_ODPD;
+                                /* printf("ODPD score = %i\n", score_ODPD); */
                         }
                         if (score <= min) {
                                 if (score <  min) {
+                                        /* printf("mini\n"); */
                                         min = score;
                                         nb_map = nb_map_start;
                                 }
                                 if (nb_map < MAX_ALIGN-1) {
+                                        /* printf("[0] nr=%u ix=%u num=%u ", debug_nb, nb_neighbour, M.num[current_read]); */
+                                        /* printf("offset=%u seed=%li seq=%li score=%i\n", */
+                                        /*        offset, */
+                                        /*        M.coordinate[offset+nb_neighbour] &0xffffffff, */
+                                        /*        (M.coordinate[offset+nb_neighbour]>>32) &0xffffffff, */
+                                        /*        score); */
                                         M.out_num[nb_map] = M.num[current_read];
                                         M.out_coord[nb_map] = M.coordinate[offset+nb_neighbour];
                                         M.out_score[nb_map] = score;
@@ -410,6 +426,21 @@ void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *r
         }
         fprintf(out, "\n");
 }
+
+/* static void print_neighbour(uint8_t *nbr, FILE *out, reads_info_t *reads_info) */
+/* { */
+/*         unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes; */
+/*         fprintf(out, "\t"); */
+/*         unsigned int i; */
+/*         for (i = 0; i < size_neighbour_in_bytes; i++) { */
+/*                 uint8_t this_byte = (uint8_t) nbr[i]; */
+/*                 print_byte_to_sym(this_byte, 0, out); */
+/*                 print_byte_to_sym(this_byte, 2, out); */
+/*                 print_byte_to_sym(this_byte, 4, out); */
+/*                 print_byte_to_sym(this_byte, 6, out); */
+/*         } */
+/*         fprintf(out, "\n"); */
+/* } */
 
 void print_coordinates(int d, int offs, int l, FILE *out)
 {
