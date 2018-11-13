@@ -263,6 +263,9 @@ static void result_pool_write(const dout_t *results, dpu_tasklet_stats_t *stats)
                         result_pool.wridx += MAX_LOCAL_RESULTS_PER_READ;
                         result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
                         result_pool.stats_write += LOCAL_RESULTS_PAGE_SIZE;
+                } else {
+                        printf("WARNING! too many result in DPU!\n");
+                        halt();
                 }
         }
 
