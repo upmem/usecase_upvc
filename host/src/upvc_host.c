@@ -151,7 +151,7 @@ static void run_on_dpu(dispatch_t dispatch,
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
                                 dpu_try_log(each_dpu, devices, t0s[each_dpu]);
-                                dpu_result_out_t *results = dpu_try_get_results(this_dpu, devices);
+                                dpu_result_out_t *results = dpu_try_get_results(each_dpu, devices);
                                 int i;
                                 for (i = 0; results[i].num != -1; i++) {
                                         if (i == MAX_DPU_RESULTS) {
