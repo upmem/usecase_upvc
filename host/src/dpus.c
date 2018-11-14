@@ -58,7 +58,7 @@ devices_t dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
         }
         devices->nb_dpus = nb_dpus;
         if (dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank)) != DPU_API_SUCCESS) {
-                ERROR_EXIT("*** could not guess the number of DPUs per rank - aborting");
+                ERROR_EXIT(30, "*** could not guess the number of DPUs per rank - aborting");
         }
         devices->dpus = (dpu_t *) calloc(nb_dpus, sizeof(dpu_t));
         if (devices->dpus == NULL) {
