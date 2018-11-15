@@ -120,17 +120,19 @@ static void run_on_dpu(dispatch_t dispatch,
                                 mask_ok |= (1 << each_dpu);
                         }
                 }
-                /* int debug_count = 0, debug_iter_count = 0; */
+                int debug_count = 0, debug_iter_count = 0;
                 do {
-                        /* debug_count++; */
-                        /* if (debug_count == (512 << 20)) { */
-                        /*         debug_iter_count++; */
-                        /*         if (debug_iter_count == 10) { */
-                        /*                 fprintf(stderr, "no answer from DPU! aborting simulation\n"); */
-                        /*                 exit(22); */
-                        /*         } */
-                        /*         debug_count = 0; */
-                        /* } */
+                        if (get_target_type() == target_type_fpga) {
+                                debug_count++;
+                                if (debug_count == (512 << 20)) {
+                                        debug_iter_count++;
+                                        if (debug_iter_count == 10) {
+                                                fprintf(stderr, "no answer from DPU! aborting simulation\n");
+                                                exit(22);
+                                        }
+                                        debug_count = 0;
+                                }
+                        }
 
                         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                                 uint32_t mask = (uint32_t) (1 << each_dpu);
