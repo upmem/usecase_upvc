@@ -23,8 +23,8 @@
 
 .text
 
-.section    .text.odpdx,"ax",@progbits
-.global     $odpdx
+.section    .text.odpd,"ax",@progbits
+.global     $odpd
 .global     $__M
 
 // odpd is called from a C program, providing the arguments as follows:
@@ -34,7 +34,7 @@
 //  - r3 = unsigned int nbr_sym_len
 //  - r4 = tasklet id
 
-odpdx[                      \
+odpd[                      \
     s1      = %r0         |\
     s2      = %r1         |\
     mxScore = %r2         |\

@@ -37,6 +37,7 @@ void odpd_init(unsigned int nb_tasklets, unsigned int nbr_sym_len);
  */
 int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len, unsigned int tid);
 
-/* Assembler version */
-int odpdx(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len, unsigned int tid);
+#define NB_ITEMS_PER_MATRIX(nbr_sym_len) ((nbr_sym_len + 1) << 1)
+#define SIZEOF_MATRIX(nbr_sym_len) (NB_ITEMS_PER_MATRIX(nbr_sym_len) << 2)
+
 #endif /* __INTEGRATION_ODPD_H__ */

@@ -86,7 +86,7 @@ bool vmi_write(vmi_t *vmi, long offs, const void *buffer, size_t nb_bytes)
         return true;
 }
 
-size_t vmi_read(vmi_t *vmi, long offs, void *buffer, size_t nb_bytes)
+size_t vmi_read(vmi_t *vmi, void *buffer, size_t nb_bytes)
 {
         size_t result;
         FILE *file = fopen(vmi->file_name, "r");
@@ -94,8 +94,6 @@ size_t vmi_read(vmi_t *vmi, long offs, void *buffer, size_t nb_bytes)
                 ERROR("VMI: failed to open the file for reading");
                 return 0L;
         }
-
-        fseek(file, offs, SEEK_SET);
 
         result = fread(buffer, 1, nb_bytes, file);
         fclose(file);

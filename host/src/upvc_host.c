@@ -70,6 +70,30 @@ static void run_dpu_simulation(unsigned int nb_dpu,
         times_ctx->tot_map_read += t2 - t1;
 }
 
+static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, reads_info_t *reads_info)
+{
+        printf("\t                  addr       size\n");
+        printf("\tmram_info         0x%.8x 0x%.8x\n", MRAM_INFO_ADDR, (unsigned int)sizeof(mram_info_t));
+        printf("\tinputs (ref nbrs) 0x%.8x 0x%.8x\n", (unsigned int)DPU_INPUTS_ADDR, mram_info->total_nbr_size);
+        printf("\trequest_info      0x%.8x 0x%.8x\n",
+               (unsigned int)DPU_REQUEST_INFO_ADDR(mram_info),
+               (unsigned int)sizeof(request_info_t));
+        printf("\trequest           0x%.8x 0x%.8x (0x%.8x)\n",
+               (unsigned int)DPU_REQUEST_ADDR(mram_info),
+               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * nb_reads,
+               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
+        printf("\tresult swap area  0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE);
+        printf("\tresult area       0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE);
+
+        assert((MRAM_INFO_ADDR + sizeof(mram_info_t)) <= DPU_INPUTS_ADDR);
+        assert((DPU_INPUTS_ADDR + mram_info->total_nbr_size) <= DPU_REQUEST_INFO_ADDR(mram_info));
+        assert((DPU_REQUEST_INFO_ADDR(mram_info) + sizeof(request_info_t)) <= DPU_REQUEST_ADDR(mram_info));
+        assert((DPU_REQUEST_ADDR(mram_info) + nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes))
+               <= DPU_SWAP_RESULT_ADDR);
+        assert((DPU_SWAP_RESULT_ADDR + DPU_SWAP_RESULT_SIZE) <= DPU_RESULT_ADDR);
+        assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);
+}
+
 static void run_on_dpu(dispatch_t dispatch,
                        const char *dpu_binary,
                        unsigned int nb_dpu,
@@ -92,11 +116,14 @@ static void run_on_dpu(dispatch_t dispatch,
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
+                                mram_info_t *mram;
                                 printf("() write MRAM #%d %u reads\n", this_dpu, dispatch[this_dpu].nb_reads);
-                                dpu_try_load_mram_number(this_dpu, each_dpu, devices, reads_info);
+                                dpu_try_load_mram_number(this_dpu, each_dpu, devices, &mram, reads_info);
+                                print_memory_layout(mram, dispatch[this_dpu].nb_reads, reads_info);
                                 dpu_try_write_dispatch_into_mram(each_dpu, devices,
                                                                  dispatch[this_dpu].nb_reads,
                                                                  dispatch[this_dpu].reads_area,
+                                                                 mram,
                                                                  reads_info);
                         }
                 }
@@ -324,7 +351,8 @@ static index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info)
                 mram_reset(mram, reads_info);
                 mram_load(mram, each_dpu);
                 malloc_neighbour_idx(each_dpu, mram->nb_nbr, reads_info);
-                write_neighbours_and_coordinates(each_dpu, mram->nb_nbr, mram_neighbours_area(mram), reads_info);
+                long *mram_neighbours_area = (long *) (((uintptr_t) mram) + ALIGN_DPU((uintptr_t)sizeof(mram_info_t)));
+                write_neighbours_and_coordinates(each_dpu, mram->nb_nbr, mram_neighbours_area, reads_info);
         }
 
         index_seed = load_index_seeds();

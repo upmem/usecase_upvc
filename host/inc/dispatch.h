@@ -10,22 +10,7 @@
 #include "index.h"
 #include "upvc.h"
 
-/**
- * @brief Structure representing one request to a DPU, resulting from the dispatching of reads.
- *
- * Such a request basically contains all the information for one read.
- *
- * @var offset  The 1st neighbour address.
- * @var count   The number of neighbours.
- * @var num     A reference number to the original request.
- * @var nbr     The neighbours part of this read, actual size of this field is variable.
- */
-typedef struct {
-        uint32_t offset;
-        uint32_t count;
-        uint32_t num;
-        uint32_t nbr;
-} dispatch_read_t;
+#include "common.h"
 
 /**
  * @brief List of reads dispatched to a DPU.
@@ -73,14 +58,5 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
  * @param nb_dpu    The number of DPUs to use to compute.
  */
 void dispatch_free(dispatch_t dispatch, unsigned int nb_dpu);
-
-/**
- * @brief Get the exact size, in bytes, of a read with this execution context.
- *
- * @param reads_info  Information on the size of the seed and the neighbour.
- *
- * @return The size of a read.
- */
-unsigned int dispatch_read_len(reads_info_t *reads_info);
 
 #endif /* __DISPATCH_H__ */

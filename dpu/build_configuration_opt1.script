@@ -1,6 +1,6 @@
 // Every declared tasklet may contribute to the process (see debug.h).
 // The output mailbox can store statistical reports, as defined by dpu_tasklet_stats_t
-tasklet add 0..15 512 main 16
+tasklet add 0..15 512 main 8
 // Mutexes:
 //  - 0: request pool
 //  - 1: result pool

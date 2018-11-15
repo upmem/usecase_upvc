@@ -11,32 +11,13 @@
 #define COST_GAPO        11
 #define COST_GAPE        1
 
+extern int *__M;
+
 static inline int min(int a, int b) { if (a < b) return a; else return b; }
-
-static inline unsigned int nb_items_per_matrix(unsigned int nbr_sym_len)
-{
-        /* One matrix is ...[2][nbr_sym_len + 1] */
-        return (nbr_sym_len + 1) << 1;
-}
-
-static inline unsigned int sizeof_matrix(unsigned int nbr_sym_len)
-{
-        /* Each matrix contains ints = 4 bytes */
-        return nb_items_per_matrix(nbr_sym_len) << 2;
-}
-
-/* Need big space to store one triplet of matrices per tasklet */
-int *__M = 0;
-
-void odpd_init(unsigned int nb_tasklets, unsigned int nbr_sym_len)
-{
-        unsigned int toto = 3 * sizeof_matrix(nbr_sym_len) * nb_tasklets;
-        __M = mem_alloc(3 * sizeof_matrix(nbr_sym_len) * nb_tasklets);
-}
 
 static inline int *get_matrix_for_tasklet(unsigned int tid, unsigned int nbr_sym_len)
 {
-        return (int *) ((uint8_t *) __M + ( 3 * sizeof_matrix(nbr_sym_len) ) * tid);
+        return (int *) ((uint8_t *) __M + ( 3 * SIZEOF_MATRIX(nbr_sym_len) ) * tid);
 }
 
 #define d0off 0
@@ -160,9 +141,6 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
         for (j = nbr_sym_len - NB_DIAGS / 2; j < nbr_sym_len + 1; j++, _Mpp+=6) {
                 if (_Mpp[d0off] < min_score) min_score = _Mpp[d0off];
         }
-#ifdef DEBUG_ODPD
-        ktrace("odpd 3 => %u\n", min_score);
-#endif
 
         return min_score;
 }

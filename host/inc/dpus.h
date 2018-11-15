@@ -10,11 +10,7 @@
 #include "parse_args.h"
 #include "upvc.h"
 
-/**
- * @brief Bumber of tasklets handled by each DPU.
- */
-#define NB_TASKLET_PER_DPU_LOG2 4
-#define NB_TASKLET_PER_DPU (1 << NB_TASKLET_PER_DPU_LOG2)
+#include "common.h"
 
 /**
  * @brief General structure describing the DPUs involved in a run.
@@ -26,30 +22,6 @@ typedef struct devices {
         unsigned int nb_dpus;
         dpu_t *dpus;
 } *devices_t;
-
-/**
- * @brief Results returned by DPUs.
- */
-typedef struct {
-        int num;
-        uint32_t seq_nr;
-        uint32_t seed_nr;
-        unsigned int score;
-} dpu_result_out_t;
-
-/**
- * @brief Statistics reported by individual tasklets.
- */
-typedef struct {
-        uint32_t nb_reqs;
-        uint32_t nb_nodp_calls;
-        uint32_t nb_odpd_calls;
-        uint32_t nb_results;
-        uint32_t mram_data_load;
-        uint32_t mram_result_store;
-        uint32_t mram_load;
-        uint32_t mram_store;
-} dpu_tasklet_stats_t;
 
 /**
  * @brief Get the number of DPUs to be run per run.
@@ -85,7 +57,11 @@ devices_t dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program);
  * @param devices      Available devices.
  * @param reads_info   Information on the size of the seed and the neighbour.
  */
-void dpu_try_load_mram_number(unsigned int mram_number, dpu_t dpu_id, devices_t devices, reads_info_t *reads_info);
+void dpu_try_load_mram_number(unsigned int mram_number,
+                              dpu_t dpu_id,
+                              devices_t devices,
+                              mram_info_t **mram,
+                              reads_info_t *reads_info);
 
 /**
  * @brief Frees the allocated DPUs.
@@ -130,6 +106,7 @@ void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
                                       devices_t devices,
                                       unsigned int nb_reads,
                                       int8_t *reads,
+                                      mram_info_t *mram,
                                       reads_info_t *reads_info);
 
 /**

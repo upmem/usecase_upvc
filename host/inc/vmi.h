@@ -81,12 +81,11 @@ bool vmi_write(vmi_t *vmi, long offs, const void *buffer, size_t nb_bytes);
  * @brief Reads the contents of a VMI.
  *
  * @param vmi       The virtual memory.
- * @param offs      Where to start reading.
  * @param buffer    Target buffer.
  * @param nb_bytes  The buffer size, in bytes.
  *
  * @return The number of bytes actually read.
  */
-size_t vmi_read(vmi_t *vmi, long offs, void *buffer, size_t nb_bytes);
+size_t vmi_read(vmi_t *vmi, void *buffer, size_t nb_bytes);
 
 #endif /* __VMI_H__ */

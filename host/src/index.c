@@ -16,6 +16,8 @@
 #include "upvc.h"
 #include "vmi.h"
 
+#include "common.h"
+
 #define MAX_SIZE_IDX_SEED (1000)
 #define SEED_FILE ("seeds.txt")
 
@@ -58,11 +60,11 @@ static void free_vmis(vmi_t *vmis, unsigned int nb_dpu)
 static void write_vmi(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, long coords, reads_info_t *reads_info)
 {
         unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-        unsigned int out_len = (sizeof(long) + size_neighbour_in_bytes + 7) & ~7;
+        unsigned int out_len = ALIGN_DPU(sizeof(long) + size_neighbour_in_bytes);
         uint8_t *temp_buff = (uint8_t *) malloc(out_len);
         memset(temp_buff, 0, out_len);
         ((long *) temp_buff)[0] = coords;
-        memcpy(temp_buff + 8, nbr, (size_t) size_neighbour_in_bytes);
+        memcpy(temp_buff + sizeof(long), nbr, (size_t) size_neighbour_in_bytes);
         vmi_write(vmis + dpuno, k * out_len, temp_buff, out_len);
         free(temp_buff);
 }
@@ -161,6 +163,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         memset(&dpu_offset_in_memory, 0, nb_dpu * sizeof(int));
 
         /* Initialize the seed_counter table */
+        printf("\tInitialize the seed_counter table\n");
         seed_counter  = (seed_counter_t *)malloc(NB_SEED * sizeof(seed_counter_t));
         for (int i = 0; i < NB_SEED; i++) {
                 seed_counter[i].nb_seed = 0;
@@ -179,6 +182,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         }
 
         /* Create and initialize and link together all the seed */
+        printf("\tCreate and initialize and link together all the seed\n");
         for (int i = 0; i < NB_SEED; i++) {
                 int nb_index_needed = (seed_counter[i].nb_seed / MAX_SIZE_IDX_SEED) + 1;
                 int nb_neighbour_per_index = (seed_counter[i].nb_seed / nb_index_needed) + 1;
@@ -197,6 +201,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
 
         /* Distribute indexs between DPUs */
         /* Sort the seeds from the most to the least used. */
+        printf("\tDistribute indexs between DPUs\n");
         qsort(seed_counter, NB_SEED, sizeof(seed_counter_t), cmp_seed_counter);
         {
                 int current_dpu = 0;
@@ -227,6 +232,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         }
 
         /* Compute offset in the DPUs memories */
+        printf("\tCompute offset in the DPUs memories\n");
         for (int i = 0; i < NB_SEED; i++) {
                 index_seed_t *seed = index_seed[i];
                 while (seed != NULL) {
@@ -245,6 +251,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         memset(nb_neighbours, 0, nb_dpu * sizeof(unsigned int));
 
         /* Writing data in DPUs memories */
+        printf("\tWriting data in DPUs memories\n");
         memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
         for (int seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
                 int sequence_start_idx = ref_genome->pt_seq[seq_number];
@@ -272,6 +279,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                         code_neighbour(&ref_genome->data[sequence_start_idx+sequence_idx+SIZE_SEED],
                                        buf_code_neighbour,
                                        reads_info);
+                        printf("\r\t%i/%i %i/%i", sequence_idx, ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1, seq_number, ref_genome->nb_seq);
                         if (simulation_mode) {
                                 write_neighbour_idx(seed->num_dpu, align_idx, buf_code_neighbour, reads_info);
                                 write_coordinate(seed->num_dpu, align_idx, ( ((long)seq_number) << 32) + sequence_idx);
@@ -288,6 +296,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                         seed_counter[seed_code].nb_seed++;
                 }
         }
+        printf("\n");
 
         if (!simulation_mode) {
                 dump_mdpu_images_into_mram_files(vmis, nb_neighbours, nb_dpu, reads_info);

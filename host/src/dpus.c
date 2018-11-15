@@ -91,12 +91,14 @@ devices_t dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
         return devices;
 }
 
-void dpu_try_load_mram_number(unsigned int mram_number, dpu_t dpu_id, devices_t devices, reads_info_t *reads_info)
+void dpu_try_load_mram_number(unsigned int mram_number, dpu_t dpu_id, devices_t devices, mram_info_t **mram, reads_info_t *reads_info)
 {
-        mram_info_t *mram = mram_create(reads_info);
-        mram_load(mram, mram_number);
-        dpu_copy_to_individual(devices->dpus[dpu_id], (uint8_t *) mram, 0, mram->usage);
-        mram_free(mram);
+        *mram = mram_create(reads_info);
+        mram_load(*mram, mram_number);
+        dpu_copy_to_individual(devices->dpus[dpu_id],
+                               (uint8_t *) *mram,
+                               MRAM_INFO_ADDR,
+                               sizeof(mram_info_t) + (*mram)->total_nbr_size);
 }
 
 void dpu_try_free(devices_t devices)
@@ -153,35 +155,38 @@ void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
                                       devices_t devices,
                                       unsigned int nb_reads,
                                       int8_t *reads,
+                                      mram_info_t *mram,
                                       reads_info_t *reads_info)
 {
         unsigned int io_len;
         uint8_t *reset_buffer;
-        mram_info_t mram;
-        /* Prepend the list of reads with information required by the DPU to properly align (see request_pool_init). */
-        struct {
-                uint32_t nb_reads;
-                uint32_t magic;
-        } io_header = {
-                       .nb_reads = nb_reads,
-                       .magic = 0xcdefabcd
-        };
+        request_info_t io_header =
+                {
+                 .nb_reads = nb_reads,
+                 .magic = 0xcdefabcd
+                };
 
-        dpu_copy_from_individual(devices->dpus[dpu_id], (mram_addr_t) 0, (uint8_t *) &mram, sizeof(mram));
-        io_len = nb_reads * dispatch_read_len(reads_info);
+        io_len = nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes);
 
-        if (mram.io_offs + sizeof(io_header) + io_len >= MRAM_INPUT_SIZE) {
+        if ((DPU_REQUEST_ADDR(mram) - DPU_INPUTS_ADDR + io_len) > DPU_INPUTS_SIZE) {
                 ERROR_EXIT(12, "*** will exceed MRAM limit if writing reads on DPU number %u - aborting!", dpu_id);
         }
 
-        dpu_copy_to_individual(devices->dpus[dpu_id], (uint8_t *) &io_header, (mram_addr_t) (mram.io_offs), sizeof(io_header));
-        dpu_copy_to_individual(devices->dpus[dpu_id], (uint8_t *) reads, (mram_addr_t) (mram.io_offs + sizeof(io_header)), io_len);
+        dpu_copy_to_individual(devices->dpus[dpu_id],
+                               (uint8_t *) &io_header,
+                               (mram_addr_t) DPU_REQUEST_INFO_ADDR(mram),
+                               sizeof(request_info_t));
+        dpu_copy_to_individual(devices->dpus[dpu_id],
+                               (uint8_t *) reads,
+                               (mram_addr_t) DPU_REQUEST_ADDR(mram),
+                               io_len);
 
         /* Clear the output area */
-        reset_buffer = malloc(RESULT_AREA_LEN);
-        memset(reset_buffer, -1, RESULT_AREA_LEN);
-        dpu_copy_to_individual(devices->dpus[dpu_id], reset_buffer, (mram_addr_t) MRAM_INPUT_SIZE, RESULT_AREA_LEN);
+        reset_buffer = malloc(DPU_RESULT_SIZE);
+        memset(reset_buffer, -1, DPU_RESULT_SIZE);
+        dpu_copy_to_individual(devices->dpus[dpu_id], reset_buffer, (mram_addr_t) DPU_RESULT_ADDR, DPU_RESULT_SIZE);
         free(reset_buffer);
+        mram_free(mram);
 }
 
 void dpu_try_log(unsigned int dpu_id, devices_t devices, uint64_t t0)
@@ -218,14 +223,14 @@ void dpu_try_log(unsigned int dpu_id, devices_t devices, uint64_t t0)
 
 dpu_result_out_t *dpu_try_get_results(unsigned int dpu_id, devices_t devices)
 {
-        dpu_result_out_t *result_buffer = (dpu_result_out_t *) malloc(RESULT_AREA_LEN);
+        dpu_result_out_t *result_buffer = (dpu_result_out_t *) malloc(DPU_RESULT_SIZE);
         if (result_buffer == NULL) {
                 ERROR_EXIT(29, "error during malloc of result buffer\n");
         }
         dpu_copy_from_individual(devices->dpus[dpu_id],
-                                 (mram_addr_t) MRAM_INPUT_SIZE,
+                                 (mram_addr_t) DPU_RESULT_ADDR,
                                  (uint8_t *) result_buffer,
-                                 RESULT_AREA_LEN);
+                                 DPU_RESULT_SIZE);
         return result_buffer;
 }
 

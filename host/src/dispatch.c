@@ -38,17 +38,6 @@ static dispatch_request_t *dispatch_create(unsigned int nb_dpu)
         return result;
 }
 
-static unsigned int the_size_of_one_read_request(reads_info_t *reads_info)
-{
-        /* Ensure that every read request is aligned on a 64 bits address
-         * Remember that the dispatch_read_t structure contains the nbr field, representing the
-         * 4 first bytes of the neighbourhood. This length must be removed from the size of neighbour in bytes.
-         */
-        unsigned int unaligned_length =
-                sizeof(dispatch_read_t) + (reads_info->size_neighbour_in_bytes - sizeof(uint32_t));
-        return (unaligned_length + 7) & ~7;
-}
-
 static void dispatch_request_add(dispatch_request_t *reads,
                                  unsigned int offset,
                                  unsigned int count,
@@ -57,7 +46,7 @@ static void dispatch_request_add(dispatch_request_t *reads,
                                  reads_info_t *reads_info)
 {
         unsigned int new_read_list_size_in_bytes;
-        dispatch_read_t *new_read;
+        dpu_request_t *new_read;
         unsigned int read_index = reads->nb_reads;
         reads->nb_reads++;
 
@@ -65,15 +54,15 @@ static void dispatch_request_add(dispatch_request_t *reads,
                 ERROR_EXIT(27, "*** buffer full - cannot register more reads on one DPU - aborting");
         }
 
-        new_read_list_size_in_bytes = reads->nb_reads * the_size_of_one_read_request(reads_info);
+        new_read_list_size_in_bytes = reads->nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes);
         reads->reads_area = realloc(reads->reads_area, new_read_list_size_in_bytes);
 
-        new_read = (dispatch_read_t *) (reads->reads_area + read_index * the_size_of_one_read_request(reads_info));
+        new_read = (dpu_request_t *) (reads->reads_area + read_index * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
         new_read->offset = offset;
         new_read->count = count;
         new_read->num = num;
 
-        memcpy(&(new_read->nbr), nbr, (size_t) reads_info->size_neighbour_in_bytes);
+        memcpy(((uint8_t *)new_read) + sizeof(dpu_request_t), nbr, (size_t) reads_info->size_neighbour_in_bytes);
 }
 
 static void add_seed_to_requests(dispatch_request_t *requests,
@@ -174,9 +163,4 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
         times_ctx->tot_dispatch_read += t2 - t1;
 
         return requests;
-}
-
-unsigned int dispatch_read_len(reads_info_t *reads_info)
-{
-        return the_size_of_one_read_request(reads_info);
 }

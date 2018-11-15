@@ -87,9 +87,6 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
                 Q(pp, j) = 99;
                 D(pp, j) = 99;
                 if (min_score > max_score) {
-#ifdef DEBUG_ODPD
-                        printf("odpd 1 => %u\n", min_score);
-#endif // DEBUG_ODPD
                         return min_score;
                 }
         }
@@ -116,9 +113,6 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
                 Q(pp, j) = 99;
                 D(pp, j) = 99;
                 if (min_score > max_score) {
-#ifdef DEBUG_ODPD
-                        printf("odpd 2 => %u\n", min_score);
-#endif
                         return min_score;
                 }
         }
@@ -151,8 +145,5 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
                         min_score = D(pp, j);
                 }
         }
-#ifdef DEBUG_ODPD
-        printf("odpd 3 => %u\n", min_score);
-#endif
         return min_score;
 }
