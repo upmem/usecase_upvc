@@ -11,7 +11,7 @@
 #include <string.h>
 #include <mbox.h>
 
-#define NB_BYTES_TO_SYMS(len) ((len) << 2)
+#define NB_BYTES_TO_SYMS(len, delta) (((len) - (delta)) << 2)
 
 #include "debug.h"
 #include "odpd.h"
@@ -126,15 +126,15 @@ static void run_align()
                         DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len);
                         DEBUG_STATS_INC_NB_REFS;
 
-                        score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mini);
+                        score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, mini);
                         tasklet_stats.nb_nodp_calls++;
 
                         if (score_nodp == -1) {
                                 score_odpd = score = odpd(current_read_nbr,
-                                                              ref_nbr,
-                                                              mini,
-                                                              NB_BYTES_TO_SYMS(mram_info.nbr_len),
-                                                              me());
+                                                          ref_nbr,
+                                                          mini,
+                                                          NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta),
+                                                          me());
 
                                 tasklet_stats.nb_odpd_calls++;
                                 DEBUG_STATS_INC_NB_ODPD_CALLS;
@@ -200,12 +200,12 @@ int main()
                 request_pool_init(&mram_info);
                 result_pool_init();
 
-                if (((NB_BYTES_TO_SYMS(mram_info.nbr_len) + 1) * 24) >= 4096) {
+                if (((NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta) + 1) * 24) >= 4096) {
                         printf("cannot run code: symbol length is larger than mulub operation\n");
                         halt();
                 }
 
-                odpd_init(NB_RUNNING_TASKLETS, NB_BYTES_TO_SYMS(mram_info.nbr_len));
+                odpd_init(NB_RUNNING_TASKLETS, NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta));
         }
         barrier_wait(barrier);
         /* For debugging purpose, one may reduce the number of operating tasklets. */

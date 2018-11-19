@@ -95,6 +95,7 @@ void dpu_try_load_mram_number(unsigned int mram_number, dpu_t dpu_id, devices_t 
 {
         *mram = mram_create(reads_info);
         mram_load(*mram, mram_number);
+        (*mram)->delta = reads_info->delta_neighbour_in_bytes;
         dpu_copy_to_individual(devices->dpus[dpu_id],
                                (uint8_t *) *mram,
                                MRAM_INFO_ADDR,

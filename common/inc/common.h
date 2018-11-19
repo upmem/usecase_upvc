@@ -40,13 +40,13 @@
  * @var total_nbr_size  Size of all the reads of the reference genome.
  * @var nb_nbr          Total number of neighbours stored in this MRAM.
  * @var nbr_len         Length of a neighbour, in bytes.
- * @var magic           Magic number, for debugging purpose.
+ * @var delta           Delta to apply to nodp and odpd comparison depending on the round.
  */
 typedef struct {
         uint32_t total_nbr_size;
         uint32_t nb_nbr;
         uint32_t nbr_len;
-        uint32_t magic;
+        uint32_t delta;
 } mram_info_t;
 
 #define MRAM_INFO_ADDR ((mram_addr_t)0)

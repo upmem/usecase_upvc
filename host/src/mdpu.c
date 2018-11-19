@@ -29,7 +29,7 @@ void mram_free(mram_info_t *mram)
 
 void mram_reset(mram_info_t *mram, reads_info_t *reads_info)
 {
-        mram->magic = 0x42424242;
+        mram->delta = 0;
         mram->total_nbr_size = 0;
         mram->nb_nbr = 0;
         mram->nbr_len = (uint32_t) reads_info->size_neighbour_in_bytes;
