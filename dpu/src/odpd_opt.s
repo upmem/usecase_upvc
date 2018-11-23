@@ -10,16 +10,17 @@
 #define COST_GAPE       1
 #define COST_INIT       99
 
-#define LINE_SIZE       ${6*4}
+#define LINE_SIZE_VAL   (6*4)
+#define LINE_SIZE       ${LINE_SIZE_VAL}
 
-#define d0off           ${ 0*4 }
-#define p0off           ${ 2*4 }
-#define q0off           ${ 4*4 }
-#define p0off1          ${ 2*4 + 4 }
-#define q0off1          ${ 4*4 + 4 }
-#define d1off           ${ 0*4 + 6*4 }
-#define p1off           ${ 2*4 + 6*4 }
-#define q1off           ${ 4*4 + 6*4 }
+#define d0off           ${  0*4 }
+#define p0off           ${  2*4 }
+#define p0off1          ${  3*4 }
+#define q0off           ${  4*4 }
+#define q0off1          ${  5*4 }
+#define d1off           ${  6*4 }
+#define p1off           ${  8*4 }
+#define q1off           ${ 10*4 }
 
 .text
 
@@ -60,23 +61,24 @@ save_registers:
     sd      %r22    +24     %d8
     sd      %r22    +32     %d10
 
-get_tasklet_matrix:
-    move    t0      +24                                     // local matrix line size
-    add     t1      len     +1                              // local matrix depth
-    mul_ul_ul   t0      t0      t1                          // local matrix size
-    mul_ul_ul   t0      t0      me                          // local matrix offset ATTENTION OVERFLOW
-    lw      matrix  %zero   __M                             // global matrix address
-    add     matrix  matrix  t0                              // local matrix pointer
+get_tasklet_matrix:                                         // matrix = __M + 8 * tid * 3 * (len + 1)
+    move    t0      +3                                      // Number of buffers (P, Q & D) = 3
+    add     t1      len     +1                              // local matrix depth (len + 1)
+    mul_ul_ul   t0      t0      me                          // 3 * tid
+    mul_ul_ul   t0      t0      t1                          // 3 * tid * (len + 1)
+    lsl     t0      t0      +3                              // 3 * tid * (len + 1) * 8
+    lw      matrix  %zero   __M                             // load __M
+    add     matrix  matrix  t0                              // matrix = __M + 3 * tid * (len + 1) * 8
 
 init_matrix:
     move    cost    0                                       // Initialization value
     move    v99     COST_INIT                               // Initialization value
     move    mpp     matrix                                  // Matrix line (index j)
-    move    t1      ${(NB_DIAGS/2+1)*6}                     // Loop counter
+    move    t1      ${(NB_DIAGS/2+1)}                       // Loop counter
 init_matrix_loop:
+    sw      @mpp    +d0off  cost                            // Set D(0, j)
     sw      @mpp    +p0off  v99                             // Set P(0, j)
     sw      @mpp    +q0off  v99                             // Set Q(0, j)
-    sw      @mpp    +d0off  cost                            // Set D(0, j)
     add     cost    cost    +COST_SUB                       //
     add     mpp     mpp     +LINE_SIZE                      //
     add     t1      t1      -1:8   ?nz @init_matrix_loop    //
@@ -238,8 +240,8 @@ phase2_earlyexit:
     jltu    mxScore mnScore @restore_registers              // Early exit
 
 phase2_inext:
-    add     mpp     mpp     ${-24*2*(NB_DIAGS/2)}           // Loop increment
-    add     mlp     mlp     ${-24*2*(NB_DIAGS/2)}           // Loop increment
+    add     mpp     mpp     ${-LINE_SIZE_VAL*2*(NB_DIAGS/2)}           // Loop increment
+    add     mlp     mlp     ${-LINE_SIZE_VAL*2*(NB_DIAGS/2)}           // Loop increment
     xor     mpp     mpp     4                               // Switch vector
     xor     mlp     mlp     4                               // Switch vector
     add     i       i       ${1-NB_DIAGS/2}                 // Loop increment
