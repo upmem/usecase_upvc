@@ -246,7 +246,7 @@ phase2_inext:
     xor     mlp     mlp     4                               // Switch vector
     add     i       i       ${1-NB_DIAGS/2}                 // Loop increment
     add     t0      len     ${-(NB_DIAGS/2)}                // Loop bound (to be optimized)
-    jleu    i       t0      @phase2_iloop                   // Next iteration
+    jltu    i       t0      @phase2_iloop                   // Next iteration
 
 phase3:
     move    mnScore v99                                     // Initialization value
