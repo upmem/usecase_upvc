@@ -58,6 +58,11 @@ nb_dpu_t get_nb_dpu();
 bool get_simulation_mode();
 
 /**
+ * @brief Get the number of DPUs to be use simultaneously per run.
+ */
+unsigned int get_nb_dpus_per_run();
+
+/**
  * @brief Parse and validate the argument of the application.
  */
 void validate_args(int argc, char **argv);

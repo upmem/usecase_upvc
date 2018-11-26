@@ -14,8 +14,6 @@
 #include "dispatch.h"
 #include "parse_args.h"
 
-static unsigned int nb_dpus_per_run;
-
 /* #define LOG_DPUS */
 #ifdef LOG_DPUS
 static dpu_logging_config_t logging_config = {
@@ -41,11 +39,9 @@ void setup_dpus_for_target_type(target_type_t target_type)
         switch (target_type) {
         case target_type_fpga:
                 param.type = HW;
-                nb_dpus_per_run = 8;
                 break;
         default:
                 param.type = FUNCTIONAL_SIMULATOR;
-                nb_dpus_per_run = 1;
                 break;
         }
 }
@@ -249,5 +245,3 @@ void dpu_try_backup_mram(unsigned int tid, devices_t devices, const char *file_n
                 WARNING("failed to backup DPU %u MRAM into '%s'\n", tid, file_name);
         }
 }
-
-unsigned int get_nb_dpus_per_run() { return nb_dpus_per_run;}

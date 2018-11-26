@@ -24,30 +24,33 @@ static bool simulation_mode = false;
 static target_type_t target_type = target_type_unknown;
 static goal_t goal = goal_unknown;
 static nb_dpu_t nb_dpu = nb_dpu_unknown;
+static unsigned int nb_dpus_per_run = 0;
 
 /**************************************************************************************/
 /**************************************************************************************/
 static void usage()
 {
-        ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> [-s | -t <type> -g <goal> -b <dpu_binary>]\n"
+        ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> -n <nb_dpus_per_run> [-s | -t <type> -g <goal> -b <dpu_binary> ] \n"
                    "options:\n"
                    "\t-i\tInput prefix that will be used to find the inputs files\n"
                    "\t-d\tNumber of DPUs to use - value=128|256\n"
                    "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
                    "\t-t\tTarget type - values=hsim|fpga\n"
                    "\t-g\tGoal of the run - values=index|check|map\n"
-                   "\t-b\tDPU binary to use"
+                   "\t-b\tDPU binary to use\n"
+                   "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for hsim, 8 for fpga)"
                    ,
                    prog_name);
 }
 
 static void check_args()
 {
-        if (prog_name == NULL
+        if (prog_name      == NULL
             || input_path  == NULL
             || input_fasta == NULL
             || input_pe1   == NULL
             || input_pe2   == NULL
+            || nb_dpus_per_run == 0
             || nb_dpu      == nb_dpu_unknown) {
                 ERROR("missing option");
                 usage();
@@ -57,9 +60,9 @@ static void check_args()
                 ERROR("simulation mode is not compatible with -t -g and -b option");
                 usage();
         } else if (!simulation_mode
-                   && (dpu_binary     == NULL
-                       || target_type == target_type_unknown
-                       || goal        == goal_unknown)) {
+                   && (dpu_binary         == NULL
+                       || target_type     == target_type_unknown
+                       || goal            == goal_unknown)) {
                 ERROR("missing option");
                 usage();
         }
@@ -163,6 +166,20 @@ goal_t get_goal() { return goal;}
 
 /**************************************************************************************/
 /**************************************************************************************/
+static void validate_nb_dpus_per_run(const char *nb_dpus_per_run_str)
+{
+        if (nb_dpus_per_run != 0) {
+                ERROR("number of DPUs per run option has been entered more than once");
+                usage();
+        }
+        nb_dpus_per_run = (unsigned int)atoi(nb_dpus_per_run_str);
+}
+
+
+unsigned int get_nb_dpus_per_run() { return nb_dpus_per_run;}
+
+/**************************************************************************************/
+/**************************************************************************************/
 static void validate_nb_dpu(const char *nb_dpu_str)
 {
         if (nb_dpu != nb_dpu_unknown) {
@@ -202,7 +219,7 @@ void validate_args(int argc, char **argv)
         extern char *optarg;
 
         prog_name = strdup(argv[0]);
-        while ((opt = getopt(argc, argv, "si:t:g:d:b:")) != -1) {
+        while ((opt = getopt(argc, argv, "si:t:g:d:b:n:")) != -1) {
                 switch (opt) {
                 case 'i':
                         validate_inputs(optarg);
@@ -221,6 +238,9 @@ void validate_args(int argc, char **argv)
                         break;
                 case 's':
                         validate_simulation_mode();
+                        break;
+                case 'n':
+                        validate_nb_dpus_per_run(optarg);
                         break;
                 default:
                         ERROR("unknown option");

@@ -24,13 +24,6 @@ typedef struct devices {
 } *devices_t;
 
 /**
- * @brief Get the number of DPUs to be run per run.
- *
- * @return The number of DPUs to be run per run.
- */
-unsigned int get_nb_dpus_per_run();
-
-/**
  * @brief Preliminary setup operation that defines the profile of allocated DPUs according to the target type.
  *
  * @param target_type  The type of targeted DPUs (hsim or fpga).
