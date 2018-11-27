@@ -6,220 +6,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <unistd.h>
 
 #include "parse_args.h"
-#include "dpus.h"
 #include "dispatch.h"
 #include "getread.h"
 #include "index.h"
-#include "upvc_dpu.h"
 #include "processread.h"
 #include "vartree.h"
 #include "vcf.h"
 #include "genome.h"
+#include "upvc_dpu.h"
 #include "upvc.h"
-#include "mdpu.h"
-
-#define DEBUG_ROUND (-1)
-#define DEBUG_PASS (-1)
-#define DEBUG_NB_RUN (-1)
-#define DEBUG_FIRST_RUN (-1)
-
-static void run_dpu_simulation(unsigned int nb_dpu,
-                               times_ctx_t *times_ctx,
-                               reads_info_t *reads_info)
-{
-        double t1, t2;
-        pthread_t thread_id[nb_dpu];
-        align_on_dpu_arg_t thread_args[nb_dpu];
-        unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-        unsigned int first_dpu = ((DEBUG_FIRST_RUN != -1) ? (DEBUG_FIRST_RUN * nb_dpus_per_run) : 0);
-
-        t1 = my_clock();
-
-        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
-                thread_args[numdpu].reads_info = *reads_info;
-                thread_args[numdpu].numdpu = numdpu;
-        }
-
-        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
-                pthread_create(&thread_id[numdpu], NULL, align_on_dpu, &thread_args[numdpu]);
-        }
-        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
-                pthread_join(thread_id[numdpu], NULL);
-        }
-
-        for (; first_dpu < nb_dpu; first_dpu += nb_dpus_per_run) {
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                        unsigned int this_dpu = first_dpu + each_dpu;
-                        printf("LOG DPU=%u\n", this_dpu);
-                        int k = 0;
-                        int num_read = read_out_num(this_dpu, k);
-                        while (num_read != -1) {
-                                printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k));
-                                k++;
-                                num_read = read_out_num(this_dpu, k);
-                        }
-                }
-        }
-
-        t2 = my_clock();
-        times_ctx->map_read = t2 - t1;
-        times_ctx->tot_map_read += t2 - t1;
-}
-
-static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, reads_info_t *reads_info)
-{
-        printf("\t                  addr       size\n");
-        printf("\tmram_info         0x%.8x 0x%.8x\n", MRAM_INFO_ADDR, (unsigned int)sizeof(mram_info_t));
-        printf("\tinputs (ref nbrs) 0x%.8x 0x%.8x\n", (unsigned int)DPU_INPUTS_ADDR, mram_info->total_nbr_size);
-        printf("\trequest_info      0x%.8x 0x%.8x\n",
-               (unsigned int)DPU_REQUEST_INFO_ADDR(mram_info),
-               (unsigned int)sizeof(request_info_t));
-        printf("\trequest           0x%.8x 0x%.8x (0x%.8x)\n",
-               (unsigned int)DPU_REQUEST_ADDR(mram_info),
-               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * nb_reads,
-               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
-        printf("\tresult swap area  0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE);
-        printf("\tresult area       0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE);
-
-        assert((MRAM_INFO_ADDR + sizeof(mram_info_t)) <= DPU_INPUTS_ADDR);
-        assert((DPU_INPUTS_ADDR + mram_info->total_nbr_size) <= DPU_REQUEST_INFO_ADDR(mram_info));
-        assert((DPU_REQUEST_INFO_ADDR(mram_info) + sizeof(request_info_t)) <= DPU_REQUEST_ADDR(mram_info));
-        assert((DPU_REQUEST_ADDR(mram_info) + nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes))
-               <= DPU_SWAP_RESULT_ADDR);
-        assert((DPU_SWAP_RESULT_ADDR + DPU_SWAP_RESULT_SIZE) <= DPU_RESULT_ADDR);
-        assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);
-}
-
-static void run_on_dpu(dispatch_t dispatch,
-                       const char *dpu_binary,
-                       unsigned int nb_dpu,
-                       times_ctx_t *times_ctx,
-                       reads_info_t *reads_info)
-{
-        double t1, t2;
-        unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-        uint64_t t0s[nb_dpus_per_run];
-
-        t1 = my_clock();
-        for (unsigned int first_dpu = ((DEBUG_FIRST_RUN != -1) ? (DEBUG_FIRST_RUN * nb_dpus_per_run) : 0);
-             first_dpu < nb_dpu;
-             first_dpu += nb_dpus_per_run) {
-                devices_t devices = dpu_try_alloc_for(nb_dpus_per_run, dpu_binary);
-                if (devices == NULL) {
-                        ERROR("Unable to alloc devices!");
-                }
-
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                        unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nb_reads != 0) {
-                                mram_info_t *mram;
-                                printf("() write MRAM #%d %u reads\n", this_dpu, dispatch[this_dpu].nb_reads);
-                                dpu_try_load_mram_number(this_dpu, each_dpu, devices, &mram, reads_info);
-                                print_memory_layout(mram, dispatch[this_dpu].nb_reads, reads_info);
-                                dpu_try_write_dispatch_into_mram(each_dpu, devices,
-                                                                 dispatch[this_dpu].nb_reads,
-                                                                 dispatch[this_dpu].reads_area,
-                                                                 mram,
-                                                                 reads_info);
-                        }
-                }
-
-                unsigned int nb_booted_dpus = 0;
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                        unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nb_reads != 0) {
-                                printf("() boot DPU #%d\n", this_dpu);
-                                t0s[each_dpu] = dpu_try_run(each_dpu, devices);
-                                nb_booted_dpus++;
-                        }
-                }
-
-                /* Wait for DPUs to complete: use a bitfield to mark every DPU stopped. */
-                uint32_t cmask = 0, mask_ok = 0;
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                        unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nb_reads != 0) {
-                                mask_ok |= (1 << each_dpu);
-                        }
-                }
-                int debug_count = 0, debug_iter_count = 0;
-                do {
-                        if (get_target_type() == target_type_fpga) {
-                                debug_count++;
-                                if (debug_count == (512 << 20)) {
-                                        debug_iter_count++;
-                                        if (debug_iter_count == 10) {
-                                                fprintf(stderr, "no answer from DPU! aborting simulation\n");
-                                                exit(22);
-                                        }
-                                        debug_count = 0;
-                                }
-                        }
-
-                        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                                uint32_t mask = (uint32_t) (1 << each_dpu);
-                                unsigned int this_dpu = first_dpu + each_dpu;
-                                if (!(cmask & mask)) {
-                                        if (dispatch[this_dpu].nb_reads != 0) {
-                                                if (dpu_try_check_status(each_dpu, devices)) {
-                                                        cmask |= mask;
-                                                        printf("DPU #%u completed\n", this_dpu);
-                                                }
-                                        }
-                                }
-                        }
-                } while (mask_ok != cmask);
-
-                /* Gather results and free DPUs */
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                        unsigned int this_dpu = first_dpu + each_dpu;
-                        if (dispatch[this_dpu].nb_reads != 0) {
-                                dpu_try_log(each_dpu, devices, t0s[each_dpu]);
-                                dpu_result_out_t *results = dpu_try_get_results(each_dpu, devices);
-                                int i;
-                                for (i = 0; results[i].num != -1; i++) {
-                                        if (i == MAX_DPU_RESULTS) {
-                                                ERROR_EXIT(22, "BUG! no EOR marker found when parsing DPU results!\n");
-                                        }
-
-                                        long coords = ((long) results[i].seed_nr) |
-                                                (((long) (results[i].seq_nr)) << 32);
-                                        write_result(this_dpu, i, results[i].num, coords, results[i].score);
-                                }
-                                write_result(this_dpu, i, (unsigned int) -1, -1L, (unsigned int) -1);
-
-                                free(results);
-                        }
-                }
-
-                dpu_try_free(devices);
-        }
-
-        t2 = my_clock();
-        times_ctx->map_read = t2 - t1;
-        times_ctx->tot_map_read += t2 - t1;
-}
-
-static void run_dpu(dispatch_t dispatch,
-                    char *dpu_binary,
-                    unsigned int nb_dpu,
-                    times_ctx_t *times_ctx,
-                    reads_info_t *reads_info,
-                    bool simulation_mode)
-{
-        if (simulation_mode) {
-                run_dpu_simulation(nb_dpu, times_ctx, reads_info);
-        } else {
-                run_on_dpu(dispatch, dpu_binary, nb_dpu, times_ctx, reads_info);
-        }
-}
+#include "mram_dpu.h"
+#include "backends_functions.h"
+#include "simu_backend.h"
+#include "dpu_backend.h"
 
 static int map_var_call(char *filename_prefix,
                         int round,
+                        devices_t devices,
                         genome_t *ref_genome,
                         index_seed_t **index_seed,
                         variant_tree_t **variant_list,
@@ -227,7 +33,7 @@ static int map_var_call(char *filename_prefix,
                         int8_t *mapping_coverage,
                         reads_info_t *reads_info,
                         times_ctx_t *times_ctx,
-                        bool simulation_mode)
+                        backends_functions_t *backends_functions)
 {
         char filename[1024];
         FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
@@ -291,17 +97,16 @@ static int map_var_call(char *filename_prefix,
                                          nb_dpu,
                                          times_ctx,
                                          reads_info,
-                                         simulation_mode);
+                                         backends_functions);
                 printf(" - time to dispatch reads : %7.2lf sec. / %7.2lf sec.\n",
                        times_ctx->dispatch_read,
                        times_ctx->tot_dispatch_read);
 
-                run_dpu(dispatch,
-                        get_dpu_binary(),
-                        (DEBUG_NB_RUN != -1) ? ((DEBUG_NB_RUN + DEBUG_FIRST_RUN) * get_nb_dpus_per_run()) : nb_dpu,
-                        times_ctx,
-                        reads_info,
-                        simulation_mode);
+                backends_functions->run_dpu(dispatch,
+                                            devices,
+                                            (DEBUG_NB_RUN != -1) ? ((DEBUG_NB_RUN + DEBUG_FIRST_RUN) * get_nb_dpus_per_run()) : nb_dpu,
+                                            times_ctx,
+                                            reads_info);
                 printf(" - time to map reads      : %7.2lf sec. / %7.2lf sec.\n",
                        times_ctx->map_read,
                        times_ctx->tot_map_read);
@@ -340,28 +145,6 @@ static int map_var_call(char *filename_prefix,
         return nb_read_map;
 }
 
-static index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info)
-{
-        index_seed_t **index_seed;
-        mram_info_t *mram = mram_create(reads_info);
-        unsigned int nb_dpus = get_nb_dpu();
-        /* Will unwrap the MRAM contents into the MDPU's PMEM. */
-
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpus; each_dpu++) {
-                mram_reset(mram, reads_info);
-                mram_load(mram, each_dpu);
-                malloc_neighbour_idx(each_dpu, mram->nb_nbr, reads_info);
-                long *mram_neighbours_area = (long *) (((uintptr_t) mram) + ALIGN_DPU((uintptr_t)sizeof(mram_info_t)));
-                write_neighbours_and_coordinates(each_dpu, mram->nb_nbr, mram_neighbours_area, reads_info);
-        }
-
-        index_seed = load_index_seeds();
-
-        mram_free(mram);
-
-        return index_seed;
-}
-
 static void reload_and_verify_mram_images(reads_info_t *reads_info)
 {
         index_seed_t **index_seed;
@@ -378,22 +161,23 @@ static void reload_and_verify_mram_images(reads_info_t *reads_info)
         free_dpu(nb_dpu);
 }
 
-static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_ctx)
+static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_ctx, backends_functions_t *backends_functions)
 {
         genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
         index_seed_t **index_seed = index_genome(ref_genome,
                                                  get_nb_dpu(),
                                                  times_ctx,
                                                  reads_info,
-                                                 get_simulation_mode());
+                                                 backends_functions);
         save_index_seeds(index_seed);
 
         free_genome(ref_genome);
         free_index(index_seed);
 }
 
-static void do_mapping(bool simulation_mode, reads_info_t *reads_info, times_ctx_t *times_ctx)
+static void do_mapping(backends_functions_t *backends_functions, reads_info_t *reads_info, times_ctx_t *times_ctx)
 {
+        index_seed_t **index_seed;
         char *input_prefix = get_input_path();
         unsigned int nb_dpu = get_nb_dpu();
         variant_tree_t *variant_list = NULL;
@@ -402,27 +186,25 @@ static void do_mapping(bool simulation_mode, reads_info_t *reads_info, times_ctx
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
 
-        index_seed_t **index_seed;
-        if (simulation_mode) {
-                index_seed = index_genome(ref_genome, nb_dpu, times_ctx, reads_info, simulation_mode);
-        } else {
-                malloc_dpu(reads_info, nb_dpu);
-                index_seed = reload_mram_images_and_seeds(reads_info);
-        }
+        index_seed = backends_functions->get_index_seed(nb_dpu, ref_genome, reads_info, times_ctx, backends_functions);
 
         if ((DEBUG_NB_RUN != -1 && DEBUG_FIRST_RUN == -1)
             || (DEBUG_NB_RUN == 0)) {
                 ERROR_EXIT(42, "DEBUG MACRO has not been well configured!");
         }
 
+        devices_t devices = backends_functions->init_devices(get_nb_dpus_per_run(), get_dpu_binary());
+
         for (int round = 0; round < 3; round++) {
                 if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {
                         continue;
                 }
-                map_var_call(input_prefix, round, ref_genome, index_seed,
+                map_var_call(input_prefix, round, devices, ref_genome, index_seed,
                              &variant_list, substitution_list, mapping_coverage,
-                             reads_info, times_ctx, simulation_mode);
+                             reads_info, times_ctx, backends_functions);
         }
+
+        backends_functions->free_devices(devices);
 
         create_vcf(input_prefix, ref_genome, &variant_list, substitution_list, mapping_coverage, times_ctx);
 
@@ -438,6 +220,7 @@ int main(int argc, char *argv[])
 {
         reads_info_t reads_info;
         times_ctx_t times_ctx;
+        backends_functions_t backends_functions;
 
         memset(&times_ctx, 0, sizeof(times_ctx_t));
 
@@ -452,15 +235,35 @@ int main(int argc, char *argv[])
 
         setup_dpus_for_target_type(get_target_type());
 
+        if (get_simulation_mode()) {
+                backends_functions.init_devices = init_devices_simulation;
+                backends_functions.free_devices = free_devices_simulation;
+                backends_functions.run_dpu = run_dpu_simulation;
+                backends_functions.add_seed_to_requests = add_seed_to_simulation_requests;
+                backends_functions.get_index_seed = get_index_seed_simulation;
+                backends_functions.init_vmis = init_vmis_simulation;
+                backends_functions.free_vmis = free_vmis_simulation;
+                backends_functions.write_vmi = write_vmi_simulation;
+        } else {
+                backends_functions.init_devices = dpu_try_alloc_for;
+                backends_functions.free_devices = dpu_try_free;
+                backends_functions.run_dpu = run_on_dpu;
+                backends_functions.add_seed_to_requests = add_seed_to_dpu_requests;
+                backends_functions.get_index_seed = get_index_seed_dpu;
+                backends_functions.init_vmis = init_vmis_dpu;
+                backends_functions.free_vmis = free_vmis_dpu;
+                backends_functions.write_vmi = write_vmi_dpu;
+        }
+
         switch(get_goal()) {
         case goal_index:
-                load_index_save_genome(&reads_info, &times_ctx);
+                load_index_save_genome(&reads_info, &times_ctx, &backends_functions);
                 break;
         case goal_check:
                 reload_and_verify_mram_images(&reads_info);
                 break;
         case goal_map:
-                do_mapping(get_simulation_mode(), &reads_info, &times_ctx);
+                do_mapping(&backends_functions, &reads_info, &times_ctx);
                 break;
         case goal_unknown:
         default:

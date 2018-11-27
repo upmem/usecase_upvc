@@ -10,12 +10,11 @@
  *
  * Defines the structures representing the DPU MRAMs on both the host and DPU side.
  */
-#include <stdint.h>
 #include <stdbool.h>
 
-#include "dpus.h"
 #include "vmi.h"
 #include "upvc.h"
+#include "index.h"
 
 #include "common.h"
 
@@ -76,5 +75,10 @@ bool mram_save(mram_info_t *mram, unsigned int dpu_id);
  * @param dpu_id index of the DPU
  */
 void mram_load(mram_info_t *mram, unsigned int dpu_id);
+
+/**
+ * @brief Read mram files, and reproduce the index seed.
+ */
+index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info);
 
 #endif /* __INTEGRATION_MDPU_H__ */

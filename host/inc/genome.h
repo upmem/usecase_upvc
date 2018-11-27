@@ -6,7 +6,6 @@
 #define __GENOME_H__
 
 #include <stdint.h>
-#include "upvc.h"
 
 #define MAX_SEQ_GEN (1000)
 
@@ -30,6 +29,8 @@ typedef struct {
         char *seq_name[MAX_SEQ_GEN];
         char *fasta_file_name;
 } genome_t;
+
+#include "upvc.h"
 
 /**
  * @brief Function that create the structure holding the information on the reference genome.

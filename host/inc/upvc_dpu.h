@@ -5,22 +5,42 @@
 #ifndef __UPVC_DPU_H__
 #define __UPVC_DPU_H__
 
+#include <stdio.h>
 #include <stdint.h>
 #include "upvc.h"
-#include "vmi.h"
 
 /**
- * @brief Arguments needed for the thread that will be offload onto a DPU.
+ * @brief DPU memory layout
+ *
+ * @var neighbour_idx        datas : table of the neighbours of the seed from the reference genome in the DPU
+ * @var coordinate           datas : [sequence id, offset in sequence] of each seed in the DPU
+ * @var neighbour_idx_len    Size of neighbour_idx, in bytes
+ * @var coordinate_len       Size of coordinate, in bytes
+ * @var neighbour_read       datas : table of neighbours
+ * @var offset               datas : address of the first neighbour
+ * @var count                datas : number of neighbour for each read
+ * @var num                  datas : reads id
+ * @var out_score            output : score
+ * @var out_num              output : number of the read that matched
+ * @var out_coord            output : coordinate on the genome where the read matched
  */
-typedef struct align_on_dpu_arg {
-        reads_info_t reads_info;
-        int numdpu;
-} align_on_dpu_arg_t;
+typedef struct {
+        int8_t *neighbour_idx;
+        long *coordinate;
+        unsigned int neighbour_idx_len;
+        unsigned int coordinate_len;
 
-/**
- * @DPUs main function.
- */
-void *align_on_dpu(void *arg);
+        int8_t *neighbour_read;
+        int *offset;
+        int *count;
+        int *num;
+
+        int *out_score;
+        int *out_num;
+        long *out_coord;
+} mem_dpu_t;
+
+mem_dpu_t *get_mem_dpu(unsigned int dpu_number);
 
 /**
  * @brief Allocate structure to store information of DPU memory.
@@ -68,11 +88,6 @@ long read_out_coord       (int num_dpu, int align_idx);
  */
 void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *reads_info);
 void print_coordinates(int d, int offs, int l, FILE *out);
-
-/**
- * @brief Save the DPUs memory into files.
- */
-void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, unsigned int nb_dpu, reads_info_t *reads_info);
 
 /**
  * @brief Print a result for a DPU at a index.

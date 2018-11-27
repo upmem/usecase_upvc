@@ -5,12 +5,7 @@
 #ifndef __DISPATCH_H__
 #define __DISPATCH_H__
 
-#include <stdbool.h>
 #include <stdint.h>
-#include "index.h"
-#include "upvc.h"
-
-#include "common.h"
 
 /**
  * @brief List of reads dispatched to a DPU.
@@ -29,6 +24,12 @@ typedef struct {
  * A table of requests, indexed by target DPU.
  */
 typedef dispatch_request_t *dispatch_t;
+
+#include "upvc.h"
+#include "vmi.h"
+#include "index.h"
+#include "dpus_mgmt.h"
+#include "backends_functions.h"
 
 /**
  * @brief Dispatch reads amongst the list of DPUs, to create requests.
@@ -49,7 +50,7 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
                          int nb_dpu,
                          times_ctx_t *times_ctx,
                          reads_info_t *reads_info,
-                         bool simulation_mode);
+                         backends_functions_t *backends_functions);
 
 /**
  * @brief Frees the requests produced by dispatch_read.

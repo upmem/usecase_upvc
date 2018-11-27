@@ -5,10 +5,6 @@
 #ifndef __INDEX_H__
 #define __INDEX_H__
 
-#include <stdbool.h>
-#include "genome.h"
-#include "upvc.h"
-
 #define NB_SEED (16777216)
 
 #define SEED_FILE_LOG ("seeds.log")
@@ -42,6 +38,13 @@ void save_index_seeds(index_seed_t **index_seed);
  */
 index_seed_t **load_index_seeds();
 
+#include "upvc.h"
+#include "genome.h"
+#include "dispatch.h"
+#include "dpus_mgmt.h"
+#include "vmi.h"
+#include "backends_functions.h"
+
 /**
  * @brief Create the linked-list of index, and write them into the DPUs memories.
  *
@@ -56,7 +59,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                             int nb_dpu,
                             times_ctx_t *times_ctx,
                             reads_info_t *reads_info,
-                            bool simulation_mode);
+                            backends_functions_t *backends_functions);
 
 /**
  * @brief Free the table of linked-list of index.

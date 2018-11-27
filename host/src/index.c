@@ -37,38 +37,6 @@ static int cmp_seed_counter(void const *a, void const *b)
         }
 }
 
-static vmi_t *init_vmis(unsigned int nb_dpu)
-{
-        vmi_t *vmis = (vmi_t *) calloc(nb_dpu, sizeof(vmi_t));
-        char *vmi_name = (char *) malloc(strlen("0000."));
-        for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-                (void) sprintf(vmi_name, "%04u", dpuno);
-                vmi_create(vmi_name, vmis + dpuno);
-        }
-        free(vmi_name);
-        return vmis;
-}
-
-static void free_vmis(vmi_t *vmis, unsigned int nb_dpu)
-{
-        for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-                vmi_delete(vmis + dpuno);
-        }
-        free(vmis);
-}
-
-static void write_vmi(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, long coords, reads_info_t *reads_info)
-{
-        unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-        unsigned int out_len = ALIGN_DPU(sizeof(long) + size_neighbour_in_bytes);
-        uint8_t *temp_buff = (uint8_t *) malloc(out_len);
-        memset(temp_buff, 0, out_len);
-        ((long *) temp_buff)[0] = coords;
-        memcpy(temp_buff + sizeof(long), nbr, (size_t) size_neighbour_in_bytes);
-        vmi_write(vmis + dpuno, k * out_len, temp_buff, out_len);
-        free(temp_buff);
-}
-
 index_seed_t **load_index_seeds()
 {
     FILE *f = fopen(SEED_FILE, "r");
@@ -139,7 +107,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                             int nb_dpu,
                             times_ctx_t *times_ctx,
                             reads_info_t *reads_info,
-                            bool simulation_mode)
+                            backends_functions_t *backends_functions)
 {
         double t1,t2;
         int size_neighbour = reads_info->size_neighbour_in_bytes;
@@ -154,9 +122,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         printf("Index genome\n");
         t1 = my_clock();
 
-        if (!simulation_mode) {
-                vmis = init_vmis(nb_dpu);
-        }
+        vmis = backends_functions->init_vmis(nb_dpu);
 
         memset(&dpu_workload, 0, nb_dpu * sizeof(long));
         memset(&dpu_index_size, 0, nb_dpu * sizeof(int));
@@ -279,29 +245,25 @@ index_seed_t **index_genome(genome_t *ref_genome,
                         code_neighbour(&ref_genome->data[sequence_start_idx+sequence_idx+SIZE_SEED],
                                        buf_code_neighbour,
                                        reads_info);
-                        printf("\r\t%i/%i %i/%i", sequence_idx, ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1, seq_number, ref_genome->nb_seq);
-                        if (simulation_mode) {
-                                write_neighbour_idx(seed->num_dpu, align_idx, buf_code_neighbour, reads_info);
-                                write_coordinate(seed->num_dpu, align_idx, ( ((long)seq_number) << 32) + sequence_idx);
-                        } else {
-                                write_vmi(vmis,
-                                          seed->num_dpu,
-                                          align_idx,
-                                          buf_code_neighbour,
-                                          ( ((long)seq_number) << 32) + sequence_idx,
-                                          reads_info);
-                                nb_neighbours[seed->num_dpu]++;
-                        }
+                        printf("\r\t%i/%i %i/%i",
+                               sequence_idx,
+                               ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1,
+                               seq_number,
+                               ref_genome->nb_seq);
+                        backends_functions->write_vmi(vmis,
+                                                      seed->num_dpu,
+                                                      align_idx,
+                                                      buf_code_neighbour,
+                                                      ( ((long)seq_number) << 32) + sequence_idx,
+                                                      reads_info);
+                        nb_neighbours[seed->num_dpu]++;
 
                         seed_counter[seed_code].nb_seed++;
                 }
         }
         printf("\n");
 
-        if (!simulation_mode) {
-                dump_mdpu_images_into_mram_files(vmis, nb_neighbours, nb_dpu, reads_info);
-                free_vmis(vmis, nb_dpu);
-        }
+        backends_functions->free_vmis(vmis, nb_dpu, nb_neighbours, reads_info);
         free(seed_counter);
 
         t2 = my_clock();

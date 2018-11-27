@@ -4,10 +4,11 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-#include "mdpu.h"
+#include "upvc_dpu.h"
+#include "mram_dpu.h"
 #include "vmi.h"
-#include "mdpu.h"
 #include "upvc.h"
 
 #define MRAM_FILE_NAME_SIZE (24)
@@ -87,4 +88,26 @@ void mram_load(mram_info_t *mram, unsigned int dpu_id)
         fread(mram, sizeof(uint8_t), MRAM_SIZE, f);
 
         fclose(f);
+}
+
+index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info)
+{
+        index_seed_t **index_seed;
+        mram_info_t *mram = mram_create(reads_info);
+        unsigned int nb_dpus = get_nb_dpu();
+        /* Will unwrap the MRAM contents into the MDPU's PMEM. */
+
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus; each_dpu++) {
+                mram_reset(mram, reads_info);
+                mram_load(mram, each_dpu);
+                malloc_neighbour_idx(each_dpu, mram->nb_nbr, reads_info);
+                long *mram_neighbours_area = (long *) (((uintptr_t) mram) + ALIGN_DPU((uintptr_t)sizeof(mram_info_t)));
+                write_neighbours_and_coordinates(each_dpu, mram->nb_nbr, mram_neighbours_area, reads_info);
+        }
+
+        index_seed = load_index_seeds();
+
+        mram_free(mram);
+
+        return index_seed;
 }

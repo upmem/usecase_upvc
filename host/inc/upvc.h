@@ -5,6 +5,11 @@
 #ifndef __UPVC_H__
 #define __UPVC_H__
 
+#define DEBUG_ROUND (-1)
+#define DEBUG_PASS (-1)
+#define DEBUG_NB_RUN (-1)
+#define DEBUG_FIRST_RUN (-1)
+
 #define VERSION           "VERSION 1.5"
 #define SIZE_SEED         12
 #define MAX_NB_DPU_READ   16384      /* Maximum number of read by DPU by round */
