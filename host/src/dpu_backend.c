@@ -141,6 +141,21 @@ static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, r
         assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);
 }
 
+static void timeout_dpu(int *debug_count, int *debug_iter_count)
+{
+        if (get_target_type() == target_type_fpga) {
+                *debug_count = *debug_count + 1;
+                if (*debug_count == (512 << 20)) {
+                        *debug_iter_count = *debug_iter_count + 1;
+                        if (*debug_iter_count == 10) {
+                                fprintf(stderr, "no answer from DPU! aborting simulation\n");
+                                exit(22);
+                        }
+                        *debug_count = 0;
+                }
+        }
+}
+
 void run_on_dpu(dispatch_t dispatch,
                 devices_t devices,
                 unsigned int nb_dpu,
@@ -184,41 +199,16 @@ void run_on_dpu(dispatch_t dispatch,
                         }
                 }
 
-                /* Wait for DPUs to complete: use a bitfield to mark every DPU stopped. */
-                uint32_t cmask = 0, mask_ok = 0;
+                int debug_count = 0, debug_iter_count = 0;
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
-                                mask_ok |= (1 << each_dpu);
+                                while (!dpu_try_check_status(each_dpu, devices)) {
+                                        timeout_dpu(&debug_count, &debug_iter_count);
+                                }
+                                printf("DPU #%u completed\n", this_dpu);
                         }
                 }
-                int debug_count = 0, debug_iter_count = 0;
-                do {
-                        if (get_target_type() == target_type_fpga) {
-                                debug_count++;
-                                if (debug_count == (512 << 20)) {
-                                        debug_iter_count++;
-                                        if (debug_iter_count == 10) {
-                                                fprintf(stderr, "no answer from DPU! aborting simulation\n");
-                                                exit(22);
-                                        }
-                                        debug_count = 0;
-                                }
-                        }
-
-                        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                                uint32_t mask = (uint32_t) (1 << each_dpu);
-                                unsigned int this_dpu = first_dpu + each_dpu;
-                                if (!(cmask & mask)) {
-                                        if (dispatch[this_dpu].nb_reads != 0) {
-                                                if (dpu_try_check_status(each_dpu, devices)) {
-                                                        cmask |= mask;
-                                                        printf("DPU #%u completed\n", this_dpu);
-                                                }
-                                        }
-                                }
-                        }
-                } while (mask_ok != cmask);
 
                 /* Gather results and free DPUs */
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
