@@ -25,6 +25,9 @@
  * | DPU_REQUEST_ADDR
  * | request_info.nb_reads * DPU_REQUEST_SIZE
  * |
+ * | DPU_TASKLET_STATS_ADDR
+ * | DPU_TASKLET_STATS_SIZE
+ * |
  * | DPU_SWAP_RESULT_ADDR
  * | DPU_SWAP_RESULT_SIZE
  * |
@@ -73,8 +76,29 @@ _Static_assert(sizeof(dpu_result_out_t) == 16, "dpu_result_out_t size changed (m
 #define DPU_SWAP_RESULT_SIZE (NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ * sizeof(dpu_result_out_t))
 #define DPU_SWAP_RESULT_ADDR (DPU_RESULT_ADDR - DPU_SWAP_RESULT_SIZE)
 
+/**
+ * @brief stats reported by every tasklet
+ */
+typedef struct {
+        uint32_t nb_reqs;
+        uint32_t nb_nodp_calls;
+        uint32_t nb_odpd_calls;
+        uint32_t nb_results;
+        uint32_t mram_data_load;
+        uint32_t mram_result_store;
+        uint32_t mram_load;
+        uint32_t mram_store;
+} dpu_tasklet_stats_t;
+
+#define DPU_TASKLET_STATS_SIZE (sizeof(dpu_tasklet_stats_t) * NB_TASKLET_PER_DPU)
+#define DPU_TASKLET_STATS_ADDR (DPU_SWAP_RESULT_ADDR - DPU_TASKLET_STATS_SIZE)
+#define DPU_TASKLET_STATS_WRITE(res, addr) do { mram_write32(res, addr); } while(0)
+_Static_assert(sizeof(dpu_tasklet_stats_t) == 32,
+               "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
+
+
 #define DPU_INPUTS_ADDR (ALIGN_DPU(MRAM_INFO_ADDR + sizeof(mram_info_t)))
-#define DPU_INPUTS_SIZE (DPU_SWAP_RESULT_ADDR - DPU_INPUTS_ADDR)
+#define DPU_INPUTS_SIZE (DPU_TASKLET_STATS_ADDR - DPU_INPUTS_ADDR)
 
 /**
  * @brief Information on the requests reads to a DPU.
@@ -106,21 +130,5 @@ typedef struct {
 
 #define DPU_REQUEST_ADDR(mram_info) (ALIGN_DPU(ALIGN_DPU(DPU_INPUTS_ADDR + (mram_info)->total_nbr_size) + sizeof(request_info_t)))
 #define DPU_REQUEST_SIZE(size_nbr) (ALIGN_DPU(sizeof(dpu_request_t) + (size_nbr)))
-
-/**
- * @brief stats reported by every tasklet
- */
-typedef struct {
-        uint32_t nb_reqs;
-        uint32_t nb_nodp_calls;
-        uint32_t nb_odpd_calls;
-        uint32_t nb_results;
-        uint32_t mram_data_load;
-        uint32_t mram_result_store;
-        uint32_t mram_load;
-        uint32_t mram_store;
-} dpu_tasklet_stats_t;
-_Static_assert(sizeof(dpu_tasklet_stats_t) == (8*4),
-               "dpu_tasklet_stats_t size changed (make sure that mailbox sizes in build_configuration*.script changed as well)");
 
 #endif /* __COMMON_H__ */

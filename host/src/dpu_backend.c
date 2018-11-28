@@ -127,6 +127,7 @@ static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, r
                (unsigned int)DPU_REQUEST_ADDR(mram_info),
                (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * nb_reads,
                (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
+        printf("\ttasklet stats     0x%.8x 0x%.8x\n", (unsigned int)DPU_TASKLET_STATS_ADDR,(unsigned int)DPU_TASKLET_STATS_SIZE);
         printf("\tresult swap area  0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE);
         printf("\tresult area       0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE);
 
@@ -134,7 +135,8 @@ static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, r
         assert((DPU_INPUTS_ADDR + mram_info->total_nbr_size) <= DPU_REQUEST_INFO_ADDR(mram_info));
         assert((DPU_REQUEST_INFO_ADDR(mram_info) + sizeof(request_info_t)) <= DPU_REQUEST_ADDR(mram_info));
         assert((DPU_REQUEST_ADDR(mram_info) + nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes))
-               <= DPU_SWAP_RESULT_ADDR);
+               <= DPU_TASKLET_STATS_ADDR);
+        assert((DPU_TASKLET_STATS_ADDR + DPU_TASKLET_STATS_SIZE) <= DPU_SWAP_RESULT_ADDR);
         assert((DPU_SWAP_RESULT_ADDR + DPU_SWAP_RESULT_SIZE) <= DPU_RESULT_ADDR);
         assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);
 }

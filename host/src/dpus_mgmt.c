@@ -197,17 +197,12 @@ void dpu_try_log(unsigned int dpu_id, devices_t devices, uint64_t t0)
         /* Collect stats */
         for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
                 dpu_tasklet_stats_t tasklet_stats;
-                dpu_api_status_t status;
-                status = dpu_tasklet_receive_individual(devices->dpus[dpu_id], (sysname_t) each_tasklet, 0,
-                                                        (uint32_t *) &tasklet_stats,
-                                                        sizeof(tasklet_stats));
-                if (status != DPU_API_SUCCESS) {
-                        ERROR_EXIT(13,
-                                   "*** could not read mailbox for DPU number %u tasklet %u (status=0x%x)",
-                                   dpu_id,
-                                   each_tasklet,
-                                   status);
-                }
+
+                dpu_copy_from_individual(devices->dpus[dpu_id],
+                                         (mram_addr_t) (DPU_TASKLET_STATS_ADDR + each_tasklet * sizeof(dpu_tasklet_stats_t)),
+                                         (uint8_t *) (&tasklet_stats),
+                                         sizeof(dpu_tasklet_stats_t));
+
                 /* TODO: show logs */
                 printf("LOG DPU=%u TID=%u REQ=%u\n", dpu_id, each_tasklet, tasklet_stats.nb_reqs);
                 printf("LOG DPU=%u TID=%u NODP=%u\n", dpu_id, each_tasklet, tasklet_stats.nb_nodp_calls);

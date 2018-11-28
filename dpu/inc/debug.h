@@ -5,6 +5,8 @@
 #ifndef __INTEGRATION_DEBUG_H__
 #define __INTEGRATION_DEBUG_H__
 
+#include "common.h"
+
 /* Define DEBUG to get plain-text traces */
 /* #define DEBUG */
 
@@ -47,7 +49,7 @@
 
 
 #ifndef NB_RUNNING_TASKLETS
-#define NB_RUNNING_TASKLETS 16
+#define NB_RUNNING_TASKLETS NB_TASKLET_PER_DPU
 #endif /* NB_RUNNING_TASKLETS */
 
 

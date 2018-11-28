@@ -74,15 +74,15 @@ static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
  */
 static void run_align()
 {
-        dpu_tasklet_stats_t tasklet_stats = {
-                                             .nb_reqs = 0,
-                                             .nb_nodp_calls = 0,
-                                             .nb_odpd_calls = 0,
-                                             .nb_results = 0,
-                                             .mram_data_load = 0,
-                                             .mram_result_store = 0,
-                                             .mram_load = 0,
-                                             .mram_store = 0
+        __attribute__((aligned(8))) dpu_tasklet_stats_t tasklet_stats = {
+                                                                         .nb_reqs = 0,
+                                                                         .nb_nodp_calls = 0,
+                                                                         .nb_odpd_calls = 0,
+                                                                         .nb_results = 0,
+                                                                         .mram_data_load = 0,
+                                                                         .mram_result_store = 0,
+                                                                         .mram_load = 0,
+                                                                         .mram_store = 0
         };
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
         dout_t dout;
@@ -182,7 +182,7 @@ static void run_align()
         DEBUG_STATS_PRINT;
         DEBUG_STATS_MRAM_PRINT(request_pool_get_stats_load(), result_pool_get_stats_write(), mutex_miscellaneous);
 
-        mbox_send(&tasklet_stats, sizeof(tasklet_stats));
+        DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + me() * sizeof(dpu_tasklet_stats_t));
 }
 
 /**
