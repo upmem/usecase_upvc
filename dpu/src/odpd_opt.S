@@ -57,14 +57,14 @@ save_registers:
     sd         %r22,    +24,     %d8
     sd         %r22,    +32,     %d10
 
-get_tasklet_matrix:                                                 // matrix = __M + 8 * tid * 3 * (len + 1)
+get_tasklet_matrix:                                                 // matrix = __M + 8 * tid * 3 * (len + 2)
     move       t0,      +3                                          // Number of buffers (P, Q & D) = 3
-    add        t1,      len,     +1                                 // local matrix depth (len + 1)
+    add        t1,      len,     +2                                 // local matrix depth (len + 2)
     mul_ul_ul  t0,      t0,      me                                 // 3 * tid
-    mul_ul_ul  t0,      t0,      t1                                 // 3 * tid * (len + 1)
-    lsl        t0,      t0,      +3                                 // 3 * tid * (len + 1) * 8
+    mul_ul_ul  t0,      t0,      t1                                 // 3 * tid * (len + 2)
+    lsl        t0,      t0,      +3                                 // 3 * tid * (len + 2) * 8
     lw         matrix,  %zero,   __M                                // load __M
-    add        matrix,  matrix,  t0                                 // matrix = __M + 3 * tid * (len + 1) * 8
+    add        matrix,  matrix,  t0                                 // matrix = __M + 3 * tid * (len + 2) * 8
 
 init_matrix:
     move       cost,    0                                           // Initialization value

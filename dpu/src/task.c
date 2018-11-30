@@ -200,7 +200,7 @@ int main()
                 request_pool_init(&mram_info);
                 result_pool_init();
 
-                if (((NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta) + 1) * 24) >= 4096) {
+                if (((NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta) + 2) * 3 * 16) >= 0x10000) {
                         printf("cannot run code: symbol length is larger than mulub operation\n");
                         halt();
                 }
