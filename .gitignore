@@ -1,8 +1,4 @@
 build
 cmake-build-debug/
 *.log
-GPATH
-GRTAGS
-GTAGS
 .idea
-tests/
