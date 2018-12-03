@@ -10,6 +10,7 @@
 #include <alloc.h>
 #include <string.h>
 #include <mbox.h>
+#include <perfcounter.h>
 
 #define NB_BYTES_TO_SYMS(len, delta) (((len) - (delta)) << 2)
 
@@ -64,6 +65,15 @@ static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
         return cache + 8;
 }
 
+static void get_time_and_accumulate(dpu_tasklet_compute_time_t *accumulate_time, perfcounter_t *last_time)
+{
+        perfcounter_t current_time = perfcounter_get();
+        if (current_time < *last_time) {
+                *accumulate_time = *accumulate_time + 0x1000000000;
+        }
+        *last_time = current_time;
+}
+
 /**
  * @brief Executes the mapping/align procedure.
  *
@@ -72,7 +82,7 @@ static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
  *
  * @return zero.
  */
-static void run_align()
+static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumulate_time, perfcounter_t *current_time)
 {
         __attribute__((aligned(8))) dpu_tasklet_stats_t tasklet_stats = {
                                                                          .nb_reqs = 0,
@@ -96,7 +106,7 @@ static void run_align()
         DEBUG_PROCESS_PROFILE(mram_info.nbr_len);
         DEBUG_STATS_CLEAR;
 
-        dout_init(me(), &dout);
+        dout_init(tasklet_id, &dout);
 
         uint8_t *current_read_nbr = mem_alloc(nbr_len_aligned);
         memset(current_read_nbr, 0, nbr_len_aligned);
@@ -108,6 +118,10 @@ static void run_align()
         memset(cached_coords_and_nbr, 0, nbr_len_aligned + 2 * sizeof(uint32_t) + 16);
 
         while (request_pool_next(&request, current_read_nbr, &tasklet_stats, &mram_info)) {
+
+                if (tasklet_id == 0) {
+                        get_time_and_accumulate(accumulate_time, current_time);
+                }
 
                 DEBUG_REQUESTS_PRINT(request, mram_info.nbr_len);
                 DEBUG_RESULTS_INCR;
@@ -134,7 +148,7 @@ static void run_align()
                                                           ref_nbr,
                                                           mini,
                                                           NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta),
-                                                          me());
+                                                          tasklet_id);
 
                                 tasklet_stats.nb_odpd_calls++;
                                 DEBUG_STATS_INC_NB_ODPD_CALLS;
@@ -159,7 +173,7 @@ static void run_align()
                                                  ((uint32_t *) cached_coords_and_nbr)[1],
                                                  &tasklet_stats
                                                  );
-                                        DEBUG_RESULTS_PRINT(me(),
+                                        DEBUG_RESULTS_PRINT(tasklet_id,
                                                             idx,
                                                             request.num,
                                                             request.offset,
@@ -182,7 +196,7 @@ static void run_align()
         DEBUG_STATS_PRINT;
         DEBUG_STATS_MRAM_PRINT(request_pool_get_stats_load(), result_pool_get_stats_write(), mutex_miscellaneous);
 
-        DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + me() * sizeof(dpu_tasklet_stats_t));
+        DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + tasklet_id * sizeof(dpu_tasklet_stats_t));
 }
 
 /**
@@ -192,8 +206,16 @@ static void run_align()
  */
 int main()
 {
+        sysname_t tasklet_id = me();
         barrier_t barrier = barrier_get(0);
-        if (me() == 0) {
+        perfcounter_t start_time, current_time;
+        dpu_tasklet_compute_time_t accumulate_time;
+
+        if (tasklet_id == 0) {
+                accumulate_time = 0ULL;
+                perfcounter_config(COUNT_CYCLES, true);
+                current_time = start_time = perfcounter_get();
+
                 MRAM_INFO_READ(MRAM_INFO_ADDR, &mram_info);
                 DEBUG_MRAM_INFO_PRINT(&mram_info);
 
@@ -207,10 +229,21 @@ int main()
 
                 odpd_init(NB_RUNNING_TASKLETS, NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta));
         }
+
         barrier_wait(barrier);
+
         /* For debugging purpose, one may reduce the number of operating tasklets. */
-        if (me() < NB_RUNNING_TASKLETS) {
-                run_align();
+        if (tasklet_id < NB_RUNNING_TASKLETS) {
+                run_align(tasklet_id, &accumulate_time, &current_time);
+        }
+
+        barrier_wait(barrier);
+
+        if (tasklet_id == 0) {
+                get_time_and_accumulate(&accumulate_time, &current_time);
+                accumulate_time = (accumulate_time + current_time) - start_time;
+                DPU_TASKLET_COMPUTE_TIME_WRITE(&accumulate_time,
+                                               DPU_TASKLET_COMPUTE_TIME_ADDR);
         }
 
         return 0;

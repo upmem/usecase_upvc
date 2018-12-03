@@ -13,7 +13,7 @@
 #include "dispatch.h"
 #include "parse_args.h"
 
-#define LOG_DPUS
+/* #define LOG_DPUS */
 #ifdef LOG_DPUS
 static dpu_logging_config_t logging_config = {
                                               .source = KTRACE,
@@ -114,16 +114,12 @@ void dpu_try_free(devices_t devices)
         devices->nb_ranks = devices->nb_dpus = devices->nb_dpus_per_rank = 0;
 }
 
-uint64_t dpu_try_run(unsigned int dpu_id, devices_t devices)
+void dpu_try_run(unsigned int dpu_id, devices_t devices)
 {
-        /* TODO: measure time */
-        uint64_t t0 = 0L; /* dpu_time(dpu); */
         if (dpu_boot_individual(devices->dpus[dpu_id], ASYNCHRONOUS) != DPU_API_SUCCESS) {
                 log_dpu(devices->dpus[dpu_id], stdout);
                 ERROR_EXIT(8, "*** run failed on DPU number %u - aborting!", dpu_id);
         }
-
-        return t0;
 }
 
 bool dpu_try_check_status(unsigned int dpu_id, devices_t devices)
@@ -185,13 +181,16 @@ void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
         mram_free(mram);
 }
 
-void dpu_try_log(unsigned int dpu_id, devices_t devices, uint64_t t0)
+#define CLOCK_PER_SEC (600000000.0)
+void dpu_try_log(unsigned int dpu_id, devices_t devices)
 {
-        /* TODO: get time */
-        uint64_t t1 = 0L; /* dpu_time(dpu); */
+        dpu_tasklet_compute_time_t compute_time;
+        dpu_copy_from_individual(devices->dpus[dpu_id],
+                                 (mram_addr_t) (DPU_TASKLET_COMPUTE_TIME_ADDR),
+                                 (uint8_t *) (&compute_time),
+                                 sizeof(dpu_tasklet_compute_time_t));
 
-        double delta_in_secs = ((double) (t1 - t0)) / 750000000;
-        printf("LOG DPU=%u TIME=%ld SEC=%.3f\n", dpu_id, t1 - t0, delta_in_secs);
+        printf("LOG DPU=%u TIME=%llu SEC=%.3f\n", dpu_id, (unsigned long long)compute_time, (float)compute_time / CLOCK_PER_SEC);
         fflush(stdout);
 
         /* Collect stats */

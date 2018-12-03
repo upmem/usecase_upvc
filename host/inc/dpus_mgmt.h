@@ -71,10 +71,8 @@ void dpu_try_free(devices_t devices);
  *
  * @param dpu_id   The DPU number.
  * @param devices  Available devices.
- *
- * @return DPU time, before booting.
  */
-uint64_t dpu_try_run(unsigned int dpu_id, devices_t devices);
+void dpu_try_run(unsigned int dpu_id, devices_t devices);
 
 /**
  * @brief Checks the status of a DPU.
@@ -117,9 +115,8 @@ dpu_result_out_t *dpu_try_get_results(unsigned int dpu_id, devices_t devices);
  *
  * @param dpu_id   The DPU number.
  * @param devices  Available devices.
- * @param t0       The initial DPU time, reported by dpu_try_run.
  */
-void dpu_try_log(unsigned int dpu_id, devices_t devices, uint64_t t0);
+void dpu_try_log(unsigned int dpu_id, devices_t devices);
 
 /**
  * @brief Makes a snapshot of an MRAM into a given file.

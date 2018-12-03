@@ -164,7 +164,6 @@ void run_on_dpu(dispatch_t dispatch,
 {
         double t1, t2;
         unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-        uint64_t t0s[nb_dpus_per_run];
 
         t1 = my_clock();
 
@@ -195,7 +194,7 @@ void run_on_dpu(dispatch_t dispatch,
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
                                 printf("() boot DPU #%d\n", this_dpu);
-                                t0s[each_dpu] = dpu_try_run(each_dpu, devices);
+                                dpu_try_run(each_dpu, devices);
                         }
                 }
 
@@ -214,7 +213,7 @@ void run_on_dpu(dispatch_t dispatch,
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
-                                dpu_try_log(each_dpu, devices, t0s[each_dpu]);
+                                dpu_try_log(each_dpu, devices);
                                 dpu_result_out_t *results = dpu_try_get_results(each_dpu, devices);
                                 int i;
                                 for (i = 0; results[i].num != -1; i++) {
