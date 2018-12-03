@@ -77,7 +77,7 @@ init_matrix_loop:
     sw         mpp,     +q0off,  v99                                // Set Q(0, j)
     add        cost,    cost,    +COST_SUB                          //
     add        mpp,     mpp,     +LINE_SIZE                         //
-    add        t1,      t1,      -1, ?nz, init_matrix_loop          //
+    add        t1,      t1,      -1, ?pl, init_matrix_loop          //
 init_matrix_tail:
     sw         matrix,  +p0off1, v99                                // Set P(1, 0)
     sw         matrix,  +q0off1, v99                                // Set Q(1, 0)
