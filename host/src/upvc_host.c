@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "parse_args.h"
 #include "dispatch.h"
@@ -216,6 +217,19 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         free_dpu(nb_dpu);
 }
 
+static void print_time()
+{
+        time_t timer;
+        char time_buf[26];
+        struct tm* tm_info;
+
+        time(&timer);
+        tm_info = localtime(&timer);
+
+        strftime(time_buf, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+        printf("upvc started at: %s\n", time_buf);
+}
+
 int main(int argc, char *argv[])
 {
         reads_info_t reads_info;
@@ -227,6 +241,7 @@ int main(int argc, char *argv[])
         validate_args(argc, argv);
 
         printf("%s\n", VERSION);
+        print_time();
 
         reads_info.size_read = get_read_size(get_input_pe1());
         reads_info.size_neighbour_in_bytes = (reads_info.size_read - SIZE_SEED) / 4;
