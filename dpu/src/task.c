@@ -107,9 +107,12 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                 };
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
         dout_t *dout = &global_dout[tasklet_id];
-        dpu_request_t request;
-        int mini;
         unsigned int nbr_len_aligned = ALIGN_DPU(mram_info.nbr_len);
+        uint8_t *cached_coords_and_nbr = mem_alloc_dma(nbr_len_aligned + 8);
+        uint8_t *request_buffer = mem_alloc_dma(sizeof(dpu_request_t) + nbr_len_aligned);
+        uint8_t *current_read_nbr = request_buffer + sizeof(dpu_request_t);
+        dpu_request_t *request = (dpu_request_t *)request_buffer;
+
         DEBUG_STATS_STRUCT;
         DEBUG_RESULTS_VAR;
         DEBUG_REQUESTS_VAR;
@@ -119,16 +122,8 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
 
         dout_init(tasklet_id, dout);
 
-        uint8_t *current_read_nbr = mem_alloc(nbr_len_aligned);
-        memset(current_read_nbr, 0, nbr_len_aligned);
-
-        /* Create a local cache to get the reference reads, with few more bytes for address
-         * alignment.
-         */
-        uint8_t *cached_coords_and_nbr = mem_alloc_dma(nbr_len_aligned + 2 * sizeof(uint32_t) + 16);
-        memset(cached_coords_and_nbr, 0, nbr_len_aligned + 2 * sizeof(uint32_t) + 16);
-
-        while (request_pool_next(&request, current_read_nbr, &tasklet_stats, &mram_info)) {
+        while (request_pool_next(request_buffer, &tasklet_stats)) {
+                int mini = MAX_SCORE;
 
                 if (tasklet_id == 0) {
                         get_time_and_accumulate(accumulate_time, current_time);
@@ -140,12 +135,11 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
 
                 STATS_INCR_NB_REQS(tasklet_stats);
 
-                mini = MAX_SCORE;
                 dout_clear(dout);
 
-                for (unsigned int idx = 0; idx < request.count; idx++) {
+                for (unsigned int idx = 0; idx < request->count; idx++) {
                         int score, score_nodp, score_odpd = -1;
-                        uint8_t *ref_nbr = load_reference_nbr_and_coords_at(request.offset, idx, cached_coords_and_nbr,
+                        uint8_t *ref_nbr = load_reference_nbr_and_coords_at(request->offset, idx, cached_coords_and_nbr,
                                                                             &tasklet_stats);
 
                         DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len);
@@ -179,15 +173,15 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                                         dout_clear(dout);
                                 }
                                 if (dout->nb_results < MAX_RESULTS_PER_READ) {
-                                        dout_add(dout, request.num, (unsigned int) score,
+                                        dout_add(dout, request->num, (unsigned int) score,
                                                  ((uint32_t *) cached_coords_and_nbr)[0],
                                                  ((uint32_t *) cached_coords_and_nbr)[1],
                                                  &tasklet_stats
                                                  );
                                         DEBUG_RESULTS_PRINT(tasklet_id,
                                                             idx,
-                                                            request.num,
-                                                            request.offset,
+                                                            request->num,
+                                                            request->offset,
                                                             ((uint32_t *) cached_coords_and_nbr)[0],
                                                             ((uint32_t *) cached_coords_and_nbr)[1],
                                                             score);

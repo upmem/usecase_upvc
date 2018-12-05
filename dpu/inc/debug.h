@@ -225,8 +225,8 @@ typedef struct stats {
         } while (0)
 #define DEBUG_REQUESTS_PRINT(request, nbr_len)                          \
         do {                                                            \
-                printf("request: offset %u count %u num %u\n", (request).offset, (request).count, (request).num); \
-                DEBUG_REQUESTS_DECODE((uint8_t *)(((uint8_t*)(&request))+sizeof(dpu_request_t)), nbr_len); \
+                printf("request: offset %u count %u num %u\n", (request)->offset, (request)->count, (request)->num); \
+                DEBUG_REQUESTS_DECODE((uint8_t *)(((uint8_t*)(request))+sizeof(dpu_request_t)), nbr_len); \
                 DEBUG_REQUESTS_PRINT_SYMS(nbr_len);                     \
         } while(0)
 #define DEBUG_REQUESTS_PRINT_REF(nbr, nbr_len)                          \
