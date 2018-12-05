@@ -5,6 +5,7 @@
 #ifndef __DOUT_H__
 #define __DOUT_H__
 
+#include "assert.h"
 #include "common.h"
 
 /**
@@ -25,6 +26,10 @@
 
 #define MAX_LOCAL_RESULTS_PER_READ 32
 #define LOCAL_RESULTS_PAGE_SIZE (MAX_LOCAL_RESULTS_PER_READ * sizeof(dpu_result_out_t))
+#define LOCAL_RESULTS_PAGE_READ(addr, val) do { mram_read512(addr, val); } while(0)
+#define LOCAL_RESULTS_PAGE_WRITE(res, addr) do { mram_write512(res, addr); } while(0)
+_Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
+               "LOCAL_RESULTS_PAGE_SIZE chaged (make sure that LOCAL_RESULTS_PAGE_READ/WRITE changed as well)");
 
 /**
  * @brief The results produces by one tasklet when processing one read.

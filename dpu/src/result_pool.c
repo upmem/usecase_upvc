@@ -61,13 +61,13 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         for (pageno = 0; pageno < results->nb_page_out; pageno++) {
                 mram_addr_t source_addr = dout_swap_page_addr(results, pageno);
                 ASSERT_DMA_ADDR(source_addr, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
-                mram_readX(source_addr, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
+                LOCAL_RESULTS_PAGE_READ(source_addr, result_pool.cache);
                 STATS_INCR_LOAD(stats, LOCAL_RESULTS_PAGE_SIZE);
                 if (result_pool.wridx + MAX_LOCAL_RESULTS_PER_READ < (MAX_DPU_RESULTS - 1)) {
                         ASSERT_DMA_ADDR(result_pool.cur_write, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
                         STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
                         STATS_INCR_STORE_RESULT(stats, LOCAL_RESULTS_PAGE_SIZE);
-                        mram_writeX(result_pool.cache, result_pool.cur_write, LOCAL_RESULTS_PAGE_SIZE);
+                        LOCAL_RESULTS_PAGE_WRITE(result_pool.cache, result_pool.cur_write);
                         result_pool.wridx += MAX_LOCAL_RESULTS_PER_READ;
                         result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
                 } else {

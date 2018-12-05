@@ -31,7 +31,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
                         halt();
                 }
                 swap_addr = dout_swap_page_addr(dout, dout->nb_page_out);
-                mram_writeX(dout->outs, swap_addr, LOCAL_RESULTS_PAGE_SIZE);
+                LOCAL_RESULTS_PAGE_WRITE(dout->outs, swap_addr);
                 STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
                 dout->nb_cached_out = 0;
                 dout->nb_page_out++;
