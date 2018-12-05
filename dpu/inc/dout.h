@@ -29,15 +29,15 @@
 /**
  * @brief The results produces by one tasklet when processing one read.
 
- * @var nb_results     Total number of results stored.
  * @var outs           A local cache of nb_results results.
+ * @var nb_results     Total number of results stored.
  * @var mram_base      Base address of the swap area assigned to this tasklet.
  * @var nb_cached_out  Number of results in the local cache.
  * @var nb_page_out    Number of pages of MAX_LOCAL_RESULTS_PER_READ put into the swap area.
  */
 typedef struct {
+        __attribute__((aligned(8))) dpu_result_out_t outs[MAX_LOCAL_RESULTS_PER_READ];
         unsigned int nb_results;
-        dpu_result_out_t *outs;
         mram_addr_t mram_base;
         unsigned int nb_cached_out;
         unsigned int nb_page_out;

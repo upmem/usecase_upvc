@@ -15,7 +15,6 @@ void dout_clear(dout_t *dout)
 void dout_init(unsigned int tid, dout_t *dout)
 {
         dout->mram_base = DPU_SWAP_RESULT_ADDR + (tid * MAX_RESULTS_PER_READ * sizeof(dpu_result_out_t));
-        dout->outs = mem_alloc_dma(LOCAL_RESULTS_PAGE_SIZE);
         dout_clear(dout);
 }
 
@@ -38,7 +37,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
                 dout->nb_page_out++;
         }
 
-        new_out = dout->outs + dout->nb_cached_out;
+        new_out = &dout->outs[dout->nb_cached_out];
         new_out->num = num;
         new_out->score = score;
         new_out->seed_nr = seed_nr;

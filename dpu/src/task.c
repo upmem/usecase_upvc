@@ -39,6 +39,15 @@
 __attribute__((aligned(8))) static mram_info_t mram_info;
 
 /**
+ * @brief Global table of dout_t structure.
+ *
+ * As the structure is quite big, let's have it in the heap and not in the stack.
+ * Each tasklet will use the dout_t at the index of its tasklet_id.
+ * It uses this structure to store temporary local results.
+ */
+__attribute__((aligned(8))) static dout_t global_dout[NB_TASKLET_PER_DPU];
+
+/**
  * @brief Fetches a neighbour from the neighbour area.
  *
  * @param base    Offset to the first neighbour of the requested pool within the neighbour area.
@@ -97,7 +106,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                  .mram_store = 0
                 };
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
-        dout_t dout;
+        dout_t *dout = &global_dout[tasklet_id];
         dpu_request_t request;
         int mini;
         unsigned int nbr_len_aligned = ALIGN_DPU(mram_info.nbr_len);
@@ -108,7 +117,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
         DEBUG_PROCESS_PROFILE(mram_info.nbr_len);
         DEBUG_STATS_CLEAR;
 
-        dout_init(tasklet_id, &dout);
+        dout_init(tasklet_id, dout);
 
         uint8_t *current_read_nbr = mem_alloc(nbr_len_aligned);
         memset(current_read_nbr, 0, nbr_len_aligned);
@@ -132,7 +141,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                 STATS_INCR_NB_REQS(tasklet_stats);
 
                 mini = MAX_SCORE;
-                dout_clear(&dout);
+                dout_clear(dout);
 
                 for (unsigned int idx = 0; idx < request.count; idx++) {
                         int score, score_nodp, score_odpd = -1;
@@ -167,10 +176,10 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                                 if (score < mini) {
                                         mini = score;
                                         /* Get rid of previous results, we found a better one */
-                                        dout_clear(&dout);
+                                        dout_clear(dout);
                                 }
-                                if (dout.nb_results < MAX_RESULTS_PER_READ) {
-                                        dout_add(&dout, request.num, (unsigned int) score,
+                                if (dout->nb_results < MAX_RESULTS_PER_READ) {
+                                        dout_add(dout, request.num, (unsigned int) score,
                                                  ((uint32_t *) cached_coords_and_nbr)[0],
                                                  ((uint32_t *) cached_coords_and_nbr)[1],
                                                  &tasklet_stats
@@ -189,9 +198,9 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                                 }
                         }
                 }
-                if (dout.nb_results != 0) {
-                        STATS_INCR_NB_RESULTS(tasklet_stats, dout.nb_results);
-                        result_pool_write(&dout, &tasklet_stats);
+                if (dout->nb_results != 0) {
+                        STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
+                        result_pool_write(dout, &tasklet_stats);
                 }
         }
 
