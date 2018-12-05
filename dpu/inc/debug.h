@@ -22,9 +22,6 @@
 /* To print the different calls and occurrences in the main loop */
 /* #define DEBUG_STATS */
 
-/* To print the load/store MRAM performed by each tasklet */
-/* #define DEBUG_STATS_MRAM */
-
 /* Define NB_RUNNING_TASKLETS to define the effective number of operating tasklets (1 to 16) */
 /* #define NB_RUNNING_TASKLETS 1 */
 
@@ -61,7 +58,7 @@
                 printf("MRAM total_nbr_size = %u\n", (mram_info)->total_nbr_size); \
                 printf("MRAM nb neigbors    = %u\n", (mram_info)->nb_nbr); \
                 printf("MRAM nbr len        = %u\n", (mram_info)->nbr_len); \
-                printf("MRAM magic          = 0x%x\n", (mram_info)->magic); \
+                printf("MRAM delta          = 0x%x\n", (mram_info)->delta); \
         } while(0)
 #else /* DEBUG_MRAM_INFO */
 #define DEBUG_MRAM_INFO_PRINT(mram_info)
@@ -139,43 +136,22 @@
 
 #ifdef DEBUG_STATS
 
- /**
- * @var nb_reads       Number of reads processed by this.
- * @var nb_refs        Number of references processed by this.
- * @var nb_odpd_calls  Number of calls to ODPD.
- */
-typedef struct stats {
-        unsigned int nb_reads;
-        unsigned int nb_refs;
-        unsigned int nb_odpd_calls;
-} *stats_t;
-
-#define DEBUG_STATS_INC_NB_READS do { stats.nb_reads++;} while(0)
-#define DEBUG_STATS_INC_NB_REFS do { stats.nb_refs++;} while(0)
-#define DEBUG_STATS_INC_NB_ODPD_CALLS  do {stats.nb_odpd_calls++;} while(0)
-#define DEBUG_STATS_PRINT                                               \
+#define DEBUG_STATS_PRINT(stats, lockit)                                \
         do {                                                            \
-                printf("STATS nb_reads=%u nb_refs=%u nb_odpd_calls=%u\n", \
-                       stats.nb_reads,                                  \
-                       stats.nb_refs,                                   \
-                       stats.nb_odpd_calls);                            \
+                mutex_lock(lockit);                                     \
+                printf("mem stats: reads=%u writes=%u",                 \
+                       (stats).mram_data_load,                          \
+                       (stats).mram_result_store);                      \
+                printf(" nb_reads=%u nb_nodp_calls=%u nb_odpd_calls=%u\n", \
+                       (stats).nb_reqs,                                 \
+                       (stats).nb_nodp_calls,                           \
+                       (stats).nb_odpd_calls);                          \
+                mutex_unlock(lockit);                                   \
         } while(0)
-#define DEBUG_STATS_CLEAR                       \
-        do {                                    \
-                stats.nb_reads = 0;             \
-                stats.nb_refs = 0;              \
-                stats.nb_odpd_calls = 0;        \
-        } while(0)
-#define DEBUG_STATS_STRUCT struct stats stats
 
 #else
 
-#define DEBUG_STATS_INC_NB_READS
-#define DEBUG_STATS_INC_NB_REFS
-#define DEBUG_STATS_INC_NB_ODPD_CALLS
-#define DEBUG_STATS_PRINT
-#define DEBUG_STATS_CLEAR
-#define DEBUG_STATS_STRUCT
+#define DEBUG_STATS_PRINT(stats, lockit)
 
 #endif /* DEBUG_STATS */
 
@@ -184,17 +160,17 @@ typedef struct stats {
 
 #ifdef DEBUG_REQUESTS
 
-#define DEBUG_REQUESTS_VAR \
-        uint8_t *debug_process_syms = mem_alloc_dma(NB_BYTES_TO_SYMS(ALIGN_DPU(mram_info.nbr_len)));
+#define DEBUG_REQUESTS_VAR                                              \
+        uint8_t *debug_process_syms = mem_alloc_dma(ALIGN_DPU(NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta)));
 #define DEBUG_REQUESTS_PRINT_POOL(request_pool)                         \
         do {                                                            \
                 printf("R> nb_reads = %u\n", (request_pool).nb_reads);  \
                 printf("R> rdidx    = %u\n", (request_pool).rdidx);     \
                 printf("R> cur_read = %x\n", (uint32_t) ((request_pool).cur_read)); \
         } while(0)
-#define DEBUG_REQUESTS_DECODE(bytes, nbr_len)                           \
+#define DEBUG_REQUESTS_DECODE(bytes, nbr_len, delta)                    \
         do {                                                            \
-                for (int i = 0; i < NB_BYTES_TO_SYMS(nbr_len); i += 4) { \
+                for (int i = 0; i < NB_BYTES_TO_SYMS(nbr_len, delta); i += 4) { \
                         uint8_t this_byte = (bytes)[i >> 2];            \
                         debug_process_syms[i] = (uint8_t) (this_byte & 3); \
                         debug_process_syms[i + 1] = (uint8_t) ((this_byte >> 2) & 3); \
@@ -202,10 +178,10 @@ typedef struct stats {
                         debug_process_syms[i + 3] = (uint8_t) ((this_byte >> 6) & 3); \
                 }                                                       \
         } while (0)
-#define DEBUG_REQUESTS_PRINT_SYMS(nbr_len)                              \
+#define DEBUG_REQUESTS_PRINT_SYMS(nbr_len, delta)                       \
         do {                                                            \
                 char as_char;                                           \
-                for (int i = 0; i < NB_BYTES_TO_SYMS(nbr_len); i++) {   \
+                for (int i = 0; i < NB_BYTES_TO_SYMS(nbr_len, delta); i++) { \
                         switch (debug_process_syms[i]) {                \
                         case 0:                                         \
                                 as_char = 'A';                          \
@@ -223,25 +199,25 @@ typedef struct stats {
                 }                                                       \
                 printf("\n");                                           \
         } while (0)
-#define DEBUG_REQUESTS_PRINT(request, nbr_len)                          \
+#define DEBUG_REQUESTS_PRINT(request, nbr_len, delta)                   \
         do {                                                            \
                 printf("request: offset %u count %u num %u\n", (request)->offset, (request)->count, (request)->num); \
-                DEBUG_REQUESTS_DECODE((uint8_t *)(((uint8_t*)(request))+sizeof(dpu_request_t)), nbr_len); \
-                DEBUG_REQUESTS_PRINT_SYMS(nbr_len);                     \
+                DEBUG_REQUESTS_DECODE((uint8_t *)(((uint8_t*)(request))+sizeof(dpu_request_t)), nbr_len, delta); \
+                DEBUG_REQUESTS_PRINT_SYMS(nbr_len, delta);              \
         } while(0)
-#define DEBUG_REQUESTS_PRINT_REF(nbr, nbr_len)                          \
-        do {                                                            \
-                printf("ref\n");                                        \
-                DEBUG_REQUESTS_DECODE(nbr, nbr_len);                    \
-                DEBUG_REQUESTS_PRINT_SYMS(nbr_len);                     \
+#define DEBUG_REQUESTS_PRINT_REF(nbr, nbr_len, delta)           \
+        do {                                                    \
+                printf("ref\n");                                \
+                DEBUG_REQUESTS_DECODE(nbr, nbr_len, delta);     \
+                DEBUG_REQUESTS_PRINT_SYMS(nbr_len, delta);      \
         } while(0)
 
 #else
 
 #define DEBUG_REQUESTS_VAR
 #define DEBUG_REQUESTS_PRINT_POOL(request_pool)
-#define DEBUG_REQUESTS_PRINT_REF(request, nbr_len)
-#define DEBUG_REQUESTS_PRINT(request, nbr_len)
+#define DEBUG_REQUESTS_PRINT_REF(request, nbr_len, delta)
+#define DEBUG_REQUESTS_PRINT(request, nbr_len, delta)
 
 #endif /* DEBUG_REQUESTS */
 
@@ -282,16 +258,5 @@ typedef struct stats {
 
 
 
-
-#ifdef DEBUG_STATS_MRAM
-#define DEBUG_STATS_MRAM_PRINT(stats_load, stats_store, lockit)         \
-        do {                                                            \
-                mutex_lock(lockit);                                     \
-                printf("mem stats: reads=%d writes=%d\n", (stats_load), (stats_store)); \
-                mutex_unlock(lockit);                                   \
-        } while(0)
-#else
-#define DEBUG_STATS_MRAM_PRINT(stats_load, stats_store, lockit)
-#endif /* DEBUG_STATS_MRAM */
 
 #endif /* __INTEGRATION_DEBUG_H__ */

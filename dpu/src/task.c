@@ -113,12 +113,10 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
         uint8_t *current_read_nbr = request_buffer + sizeof(dpu_request_t);
         dpu_request_t *request = (dpu_request_t *)request_buffer;
 
-        DEBUG_STATS_STRUCT;
         DEBUG_RESULTS_VAR;
         DEBUG_REQUESTS_VAR;
 
         DEBUG_PROCESS_PROFILE(mram_info.nbr_len);
-        DEBUG_STATS_CLEAR;
 
         dout_init(tasklet_id, dout);
 
@@ -129,9 +127,8 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                         get_time_and_accumulate(accumulate_time, current_time);
                 }
 
-                DEBUG_REQUESTS_PRINT(request, mram_info.nbr_len);
+                DEBUG_REQUESTS_PRINT(request, mram_info.nbr_len, mram_info.delta);
                 DEBUG_RESULTS_INCR;
-                DEBUG_STATS_INC_NB_READS;
 
                 STATS_INCR_NB_REQS(tasklet_stats);
 
@@ -142,8 +139,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                         uint8_t *ref_nbr = load_reference_nbr_and_coords_at(request->offset, idx, cached_coords_and_nbr,
                                                                             &tasklet_stats);
 
-                        DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len);
-                        DEBUG_STATS_INC_NB_REFS;
+                        DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len, mram_info.delta);
 
                         score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, mini);
                         STATS_INCR_NB_NODP_CALLS(tasklet_stats);
@@ -156,7 +152,6 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                                                           tasklet_id);
 
                                 STATS_INCR_NB_ODPD_CALLS(tasklet_stats);
-                                DEBUG_STATS_INC_NB_ODPD_CALLS;
                         }
                         DEBUG_PROCESS_SCORES(mram_info.nbr_len,
                                              current_read_nbr,
@@ -198,8 +193,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                 }
         }
 
-        DEBUG_STATS_PRINT;
-        DEBUG_STATS_MRAM_PRINT(tasklet_stats.mram_data_load, tasklet_stats.mram_result_store, mutex_miscellaneous);
+        DEBUG_STATS_PRINT(tasklet_stats, mutex_miscellaneous);
 
         DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + tasklet_id * sizeof(dpu_tasklet_stats_t));
 }
