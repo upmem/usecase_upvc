@@ -8,6 +8,7 @@
 #include "debug.h"
 #include "request_pool.h"
 #include "dout.h"
+#include "stats.h"
 
 #include "common.h"
 
@@ -31,7 +32,6 @@ typedef struct {
         mram_addr_t cur_read;
         unsigned int cache_size;
         uint8_t *cache;
-        unsigned int stats_load;
 } request_pool_t;
 
 /**
@@ -51,11 +51,10 @@ void request_pool_init(mram_info_t *mram_info)
         request_pool.cur_read = (mram_addr_t) DPU_REQUEST_ADDR(mram_info);
         request_pool.cache_size = DPU_REQUEST_SIZE(mram_info->nbr_len);
         request_pool.cache = (uint8_t *) mem_alloc_dma(request_pool.cache_size);
-        request_pool.stats_load = 0;
         DEBUG_REQUESTS_PRINT_POOL(request_pool);
 }
 
-bool request_pool_next(dpu_request_t *request, uint8_t *nbr, dpu_tasklet_stats_t *stats, mram_info_t *mram_info)
+bool request_pool_next(dpu_request_t *request, uint8_t *nbr, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats, mram_info_t *mram_info)
 {
         mutex_lock(request_pool.mutex);
         if (request_pool.rdidx == request_pool.nb_reads) {
@@ -66,10 +65,9 @@ bool request_pool_next(dpu_request_t *request, uint8_t *nbr, dpu_tasklet_stats_t
         /* Fetch next request into cache */
         ASSERT_DMA_ADDR(request_pool.cur_read, request_pool.cache, request_pool.cache_size);
         ASSERT_DMA_LEN(request_pool.cache_size);
+        STATS_INCR_LOAD(stats, request_pool.cache_size);
+        STATS_INCR_LOAD_DATA(stats, request_pool.cache_size);
         mram_readX(request_pool.cur_read, (void *) request_pool.cache, request_pool.cache_size);
-        stats->mram_load += request_pool.cache_size;
-        stats->mram_data_load += request_pool.cache_size;
-        request_pool.stats_load += request_pool.cache_size;
 
         memcpy(request, request_pool.cache, sizeof(dpu_request_t));
         memcpy(nbr, request_pool.cache + sizeof(dpu_request_t), mram_info->nbr_len);
@@ -80,9 +78,4 @@ bool request_pool_next(dpu_request_t *request, uint8_t *nbr, dpu_tasklet_stats_t
         mutex_unlock(request_pool.mutex);
 
         return true;
-}
-
-unsigned int request_pool_get_stats_load()
-{
-        return request_pool.stats_load;
 }

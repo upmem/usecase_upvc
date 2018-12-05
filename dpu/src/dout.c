@@ -3,6 +3,7 @@
 #include <defs.h>
 #include "debug.h"
 #include "dout.h"
+#include "stats.h"
 
 void dout_clear(dout_t *dout)
 {
@@ -32,7 +33,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
                 }
                 swap_addr = dout_swap_page_addr(dout, dout->nb_page_out);
                 mram_writeX(dout->outs, swap_addr, LOCAL_RESULTS_PAGE_SIZE);
-                stats->mram_store += LOCAL_RESULTS_PAGE_SIZE;
+                STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
                 dout->nb_cached_out = 0;
                 dout->nb_page_out++;
         }

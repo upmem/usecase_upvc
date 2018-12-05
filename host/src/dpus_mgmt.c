@@ -193,6 +193,7 @@ void dpu_try_log(unsigned int dpu_id, devices_t devices)
         printf("LOG DPU=%u TIME=%llu SEC=%.3f\n", dpu_id, (unsigned long long)compute_time, (float)compute_time / CLOCK_PER_SEC);
         fflush(stdout);
 
+#ifdef STATS_ON
         /* Collect stats */
         for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
                 dpu_tasklet_stats_t tasklet_stats;
@@ -213,6 +214,7 @@ void dpu_try_log(unsigned int dpu_id, devices_t devices)
                 printf("LOG DPU=%u TID=%u STORE=%u\n", dpu_id, each_tasklet, tasklet_stats.mram_store);
         }
         fflush(stdout);
+#endif
 
         log_dpu(devices->dpus[dpu_id], stdout);
 }

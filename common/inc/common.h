@@ -3,6 +3,8 @@
 
 #include "assert.h"
 
+#define STATS_ON
+
 #define MRAM_SIZE (64 << 20)
 
 #define NB_TASKLET_PER_DPU_LOG2 4

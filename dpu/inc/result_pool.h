@@ -17,11 +17,4 @@ void result_pool_write(const dout_t *results, dpu_tasklet_stats_t *stats);
  */
 void result_pool_init();
 
-/**
- * @brief Gets the number of write made to the mram for the ouputs.
- *
- * @return the number of writes made.
- */
-unsigned int result_pool_get_stats_write();
-
 #endif /* __RESULT_POOL_H__ */

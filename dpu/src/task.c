@@ -21,6 +21,7 @@
 #include "mutex_def.h"
 #include "request_pool.h"
 #include "result_pool.h"
+#include "stats.h"
 
 #include "common.h"
 
@@ -50,7 +51,7 @@ __attribute__((aligned(8))) static mram_info_t mram_info;
 static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
                                                   unsigned int idx,
                                                   uint8_t *cache,
-                                                  dpu_tasklet_stats_t *stats)
+                                                  STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
         /* The input starts with coordinates (8 bytes), followed by the neighbour. Structure is aligned
          * on 8 bytes boundary.
@@ -60,8 +61,8 @@ static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
         ASSERT_DMA_ADDR(coords_nbr_address, cache, coords_nbr_len);
         ASSERT_DMA_LEN(coords_nbr_len);
         mram_readX(coords_nbr_address, cache, coords_nbr_len);
-        stats->mram_data_load += coords_nbr_len;
-        stats->mram_load += coords_nbr_len;
+        STATS_INCR_LOAD(stats, coords_nbr_len);
+        STATS_INCR_LOAD_DATA(stats, coords_nbr_len);
         return cache + 8;
 }
 
@@ -84,16 +85,17 @@ static void get_time_and_accumulate(dpu_tasklet_compute_time_t *accumulate_time,
  */
 static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumulate_time, perfcounter_t *current_time)
 {
-        __attribute__((aligned(8))) dpu_tasklet_stats_t tasklet_stats = {
-                                                                         .nb_reqs = 0,
-                                                                         .nb_nodp_calls = 0,
-                                                                         .nb_odpd_calls = 0,
-                                                                         .nb_results = 0,
-                                                                         .mram_data_load = 0,
-                                                                         .mram_result_store = 0,
-                                                                         .mram_load = 0,
-                                                                         .mram_store = 0
-        };
+        STATS_ATTRIBUTE __attribute__((aligned(8))) dpu_tasklet_stats_t tasklet_stats =
+                {
+                 .nb_reqs = 0,
+                 .nb_nodp_calls = 0,
+                 .nb_odpd_calls = 0,
+                 .nb_results = 0,
+                 .mram_data_load = 0,
+                 .mram_result_store = 0,
+                 .mram_load = 0,
+                 .mram_store = 0
+                };
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
         dout_t dout;
         dpu_request_t request;
@@ -127,7 +129,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                 DEBUG_RESULTS_INCR;
                 DEBUG_STATS_INC_NB_READS;
 
-                tasklet_stats.nb_reqs++;
+                STATS_INCR_NB_REQS(tasklet_stats);
 
                 mini = MAX_SCORE;
                 dout_clear(&dout);
@@ -141,7 +143,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                         DEBUG_STATS_INC_NB_REFS;
 
                         score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, mini);
-                        tasklet_stats.nb_nodp_calls++;
+                        STATS_INCR_NB_NODP_CALLS(tasklet_stats);
 
                         if (score_nodp == -1) {
                                 score_odpd = score = odpd(current_read_nbr,
@@ -150,7 +152,7 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                                                           NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta),
                                                           tasklet_id);
 
-                                tasklet_stats.nb_odpd_calls++;
+                                STATS_INCR_NB_ODPD_CALLS(tasklet_stats);
                                 DEBUG_STATS_INC_NB_ODPD_CALLS;
                         }
                         DEBUG_PROCESS_SCORES(mram_info.nbr_len,
@@ -188,13 +190,13 @@ static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumula
                         }
                 }
                 if (dout.nb_results != 0) {
-                        tasklet_stats.nb_results += dout.nb_results;
+                        STATS_INCR_NB_RESULTS(tasklet_stats, dout.nb_results);
                         result_pool_write(&dout, &tasklet_stats);
                 }
         }
 
         DEBUG_STATS_PRINT;
-        DEBUG_STATS_MRAM_PRINT(request_pool_get_stats_load(), result_pool_get_stats_write(), mutex_miscellaneous);
+        DEBUG_STATS_MRAM_PRINT(tasklet_stats.mram_data_load, tasklet_stats.mram_result_store, mutex_miscellaneous);
 
         DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + tasklet_id * sizeof(dpu_tasklet_stats_t));
 }
