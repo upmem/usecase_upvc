@@ -16,30 +16,28 @@
  *
  * This output FIFO is shared by the tasklets to write back results to host, thus is protected by a critical section.
  *
+ * @var cache      Local cache to perform memory transfers.
  * @var mutex      Critical section that protects the pool.
  * @var wridx      Index of the current output in the FIFO.
  * @var cur_write  Where to write in MRAM.
- * @var cache      Local cache to perform memory transfers.
  */
 typedef struct {
+        uint8_t cache[LOCAL_RESULTS_PAGE_SIZE];
         mutex_t mutex;
         unsigned int wridx;
         mram_addr_t cur_write;
-        uint8_t *cache;
 } result_pool_t;
 
 /**
  * @brief The result pool shared by tasklets.
  */
-static result_pool_t result_pool;
+__attribute__((aligned(8))) static result_pool_t result_pool;
 
 void result_pool_init()
 {
         result_pool.mutex = mutex_get(MUTEX_RESULT_POOL);
         result_pool.wridx = 0;
         result_pool.cur_write = DPU_RESULT_ADDR;
-        /* Will write the results by pages */
-        result_pool.cache = (uint8_t *) mem_alloc_dma(LOCAL_RESULTS_PAGE_SIZE);
 }
 
 void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
@@ -79,12 +77,11 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         }
 
         for (i = 0; (result_pool.wridx < (MAX_DPU_RESULTS - 1)) && (i < results->nb_cached_out); i++) {
-                (void) memcpy(result_pool.cache, &(results->outs[i]), sizeof(dpu_result_out_t));
                 /* Ensure that the size of a result out structure is two longs. */
-                ASSERT_DMA_ADDR(result_pool.cur_write, result_pool.cache, sizeof(dpu_result_out_t));
+                ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[i]), sizeof(dpu_result_out_t));
                 STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
                 STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
-                DPU_RESULT_WRITE(result_pool.cache, result_pool.cur_write);
+                DPU_RESULT_WRITE((void *)&(results->outs[i]), result_pool.cur_write);
                 result_pool.wridx++;
                 result_pool.cur_write += sizeof(dpu_result_out_t);
         }
