@@ -12,6 +12,8 @@
 #include "parse_args.h"
 #include "backends_functions.h"
 
+#include "common.h"
+
 #define MAX_SCORE        40
 
 /**
@@ -253,7 +255,7 @@ static void *align_on_dpu(void *arg)
                                         min = score;
                                         nb_map = nb_map_start;
                                 }
-                                if (nb_map < MAX_ALIGN-1) {
+                                if (nb_map < MAX_DPU_RESULTS-1) {
                                         /* printf("[0] nr=%u ix=%u num=%u ", debug_nb, nb_neighbour, M->num[current_read]); */
                                         /* printf("offset=%u seed=%li seq=%li score=%i\n", */
                                         /*        offset, */
@@ -265,6 +267,9 @@ static void *align_on_dpu(void *arg)
                                         M->out_score[nb_map] = score;
                                         nb_map++;
                                         M->out_num[nb_map] = -1;
+                                } else {
+                                        fprintf(stderr, "MAX_DPU_RESULTS reached!\n");
+                                        exit(-42);
                                 }
                         }
                 }

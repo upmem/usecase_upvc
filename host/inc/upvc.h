@@ -14,7 +14,6 @@
 #define SIZE_SEED         12
 #define MAX_NB_DPU_READ   16384      /* Maximum number of read by DPU by round */
 #define MAX_READS_BUFFER  1048576    /* Maximum number of read by round        */
-#define MAX_ALIGN         65536
 
 #define COST_SUB         10
 #define COST_GAPO        11

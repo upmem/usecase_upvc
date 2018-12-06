@@ -12,6 +12,8 @@
 #include "genome.h"
 #include "upvc.h"
 
+#include "common.h"
+
 typedef struct {
         int num_read;
         int coord_seq;
@@ -277,14 +279,14 @@ int process_read(genome_t *ref_genome,
                  reads_info_t *reads_info)
 {
         double t1, t2;
-        align_t *align_tab = (align_t *) malloc(sizeof(align_t) * MAX_ALIGN * nb_dpu);
+        align_t *align_tab = (align_t *) malloc(sizeof(align_t) * MAX_DPU_RESULTS * nb_dpu);
         int nb_match = 0;
         char nucleotide[4] = {'A','C','T','G'};
         int nb_read_map = 0;
         int offset[4]; /* offset in align_tab of the first read  */
         int score[4];  /* min score                              */
         int nbread[4]; /* number of reads                        */
-        int *align_tab_tmp = (int *) malloc(sizeof(int) * MAX_ALIGN);
+        int *align_tab_tmp = (int *) malloc(sizeof(int) * MAX_DPU_RESULTS);
         int size_read = reads_info->size_read;
 
         t1 = my_clock();
@@ -344,7 +346,7 @@ int process_read(genome_t *ref_genome,
                 for (int pa = offset[0]; pa < offset[0] + nbread[0]; pa++) {
                         for (int pb = offset[3]; pb < offset[3] + nbread[3]; pb++) {
                                 if (check_pair(align_tab[pa], align_tab[pb], reads_info)) {
-                                        if (align_idx < MAX_ALIGN - 2) {
+                                        if (align_idx < MAX_DPU_RESULTS - 2) {
                                                 align_tab_tmp[align_idx++] = pa;
                                                 align_tab_tmp[align_idx++] = pb;
                                         }
@@ -355,7 +357,7 @@ int process_read(genome_t *ref_genome,
                 for (int pa = offset[1]; pa < offset[1] + nbread[1]; pa++) {
                         for (int pb = offset[2]; pb < offset[2] + nbread[2]; pb++) {
                                 if (check_pair(align_tab[pb], align_tab[pa], reads_info)) {
-                                        if (align_idx < MAX_ALIGN - 2) {
+                                        if (align_idx < MAX_DPU_RESULTS - 2) {
                                                 align_tab_tmp[align_idx++] = pa;
                                                 align_tab_tmp[align_idx++] = pb;
                                         }
