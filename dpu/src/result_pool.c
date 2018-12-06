@@ -42,7 +42,7 @@ void result_pool_init()
 
 void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
-        unsigned int i;
+        unsigned int ii = 0;
         unsigned int pageno;
         __attribute__((aligned(8))) static const dpu_result_out_t end_of_results =
                 {
@@ -60,30 +60,39 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         /* Read back and write the swapped results */
         for (pageno = 0; pageno < results->nb_page_out; pageno++) {
                 mram_addr_t source_addr = dout_swap_page_addr(results, pageno);
-                ASSERT_DMA_ADDR(source_addr, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
-                LOCAL_RESULTS_PAGE_READ(source_addr, result_pool.cache);
-                STATS_INCR_LOAD(stats, LOCAL_RESULTS_PAGE_SIZE);
-                if (result_pool.wridx + MAX_LOCAL_RESULTS_PER_READ < (MAX_DPU_RESULTS - 1)) {
-                        ASSERT_DMA_ADDR(result_pool.cur_write, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
-                        STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
-                        STATS_INCR_STORE_RESULT(stats, LOCAL_RESULTS_PAGE_SIZE);
-                        LOCAL_RESULTS_PAGE_WRITE(result_pool.cache, result_pool.cur_write);
-                        result_pool.wridx += MAX_LOCAL_RESULTS_PER_READ;
-                        result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
-                } else {
+
+                if (result_pool.wridx + MAX_LOCAL_RESULTS_PER_READ >= (MAX_DPU_RESULTS - 1)) {
                         printf("WARNING! too many result in DPU! (from swap)\n");
                         halt();
                 }
+
+                ASSERT_DMA_ADDR(source_addr, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
+                STATS_INCR_LOAD(stats, LOCAL_RESULTS_PAGE_SIZE);
+                LOCAL_RESULTS_PAGE_READ(source_addr, result_pool.cache);
+
+                ASSERT_DMA_ADDR(result_pool.cur_write, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
+                STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
+                STATS_INCR_STORE_RESULT(stats, LOCAL_RESULTS_PAGE_SIZE);
+                LOCAL_RESULTS_PAGE_WRITE(result_pool.cache, result_pool.cur_write);
+
+                result_pool.wridx += MAX_LOCAL_RESULTS_PER_READ;
+                result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
         }
 
-        for (i = 0; (result_pool.wridx < (MAX_DPU_RESULTS - 1)) && (i < results->nb_cached_out); i++) {
+        while ((ii < results->nb_cached_out) && (result_pool.wridx < (MAX_DPU_RESULTS - 1))) {
                 /* Ensure that the size of a result out structure is two longs. */
                 ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[i]), sizeof(dpu_result_out_t));
                 STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
                 STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
-                DPU_RESULT_WRITE((void *)&(results->outs[i]), result_pool.cur_write);
+                DPU_RESULT_WRITE((void *)&(results->outs[ii]), result_pool.cur_write);
+
                 result_pool.wridx++;
                 result_pool.cur_write += sizeof(dpu_result_out_t);
+                ii++;
+        }
+        if (result_pool.wridx >= (MAX_DPU_RESULTS - 1)) {
+                printf("WARNING! too many result in DPU! (from local)\n");
+                halt();
         }
 
         /* Mark the end of result data, do not increment the indexes, so that the next one restarts from this
