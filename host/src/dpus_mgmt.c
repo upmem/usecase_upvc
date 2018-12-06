@@ -184,11 +184,11 @@ void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
 #define CLOCK_PER_SEC (600000000.0)
 void dpu_try_log(unsigned int dpu_id, devices_t devices)
 {
-        dpu_tasklet_compute_time_t compute_time;
+        dpu_compute_time_t compute_time;
         dpu_copy_from_individual(devices->dpus[dpu_id],
-                                 (mram_addr_t) (DPU_TASKLET_COMPUTE_TIME_ADDR),
+                                 (mram_addr_t) (DPU_COMPUTE_TIME_ADDR),
                                  (uint8_t *) (&compute_time),
-                                 sizeof(dpu_tasklet_compute_time_t));
+                                 sizeof(dpu_compute_time_t));
 
         printf("LOG DPU=%u TIME=%llu SEC=%.3f\n", dpu_id, (unsigned long long)compute_time, (float)compute_time / CLOCK_PER_SEC);
         fflush(stdout);

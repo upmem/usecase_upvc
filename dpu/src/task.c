@@ -75,7 +75,7 @@ static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
         return cache + 8;
 }
 
-static void get_time_and_accumulate(dpu_tasklet_compute_time_t *accumulate_time, perfcounter_t *last_time)
+static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcounter_t *last_time)
 {
         perfcounter_t current_time = perfcounter_get();
         if (current_time < *last_time) {
@@ -92,7 +92,7 @@ static void get_time_and_accumulate(dpu_tasklet_compute_time_t *accumulate_time,
  *
  * @return zero.
  */
-static void run_align(sysname_t tasklet_id, dpu_tasklet_compute_time_t *accumulate_time, perfcounter_t *current_time)
+static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time, perfcounter_t *current_time)
 {
         STATS_ATTRIBUTE __attribute__((aligned(8))) dpu_tasklet_stats_t tasklet_stats =
                 {
@@ -208,7 +208,7 @@ int main()
         sysname_t tasklet_id = me();
         barrier_t barrier = barrier_get(0);
         perfcounter_t start_time, current_time;
-        dpu_tasklet_compute_time_t accumulate_time;
+        dpu_compute_time_t accumulate_time;
 
         if (tasklet_id == 0) {
                 accumulate_time = 0ULL;
@@ -241,8 +241,8 @@ int main()
         if (tasklet_id == 0) {
                 get_time_and_accumulate(&accumulate_time, &current_time);
                 accumulate_time = (accumulate_time + current_time) - start_time;
-                DPU_TASKLET_COMPUTE_TIME_WRITE(&accumulate_time,
-                                               DPU_TASKLET_COMPUTE_TIME_ADDR);
+                DPU_COMPUTE_TIME_WRITE(&accumulate_time,
+                                       DPU_COMPUTE_TIME_ADDR);
         }
 
         return 0;

@@ -101,15 +101,15 @@ typedef struct {
 _Static_assert(sizeof(dpu_tasklet_stats_t) == 32,
                "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
 
-typedef uint64_t dpu_tasklet_compute_time_t;
-#define DPU_TASKLET_COMPUTE_TIME_SIZE (sizeof(dpu_tasklet_compute_time_t))
-#define DPU_TASKLET_COMPUTE_TIME_ADDR (DPU_TASKLET_STATS_ADDR - DPU_TASKLET_COMPUTE_TIME_SIZE)
-#define DPU_TASKLET_COMPUTE_TIME_WRITE(res, addr) do { mram_write8(res, addr); } while(0)
-_Static_assert(sizeof(dpu_tasklet_compute_time_t) == 8,
-               "dpu_tasklet_compute_time_t size changed (make sure that DPU_TASKLET_COMPUTE_TIME_WRITE changed as well)");
+typedef uint64_t dpu_compute_time_t;
+#define DPU_COMPUTE_TIME_SIZE (sizeof(dpu_compute_time_t))
+#define DPU_COMPUTE_TIME_ADDR (DPU_TASKLET_STATS_ADDR - DPU_COMPUTE_TIME_SIZE)
+#define DPU_COMPUTE_TIME_WRITE(res, addr) do { mram_write8(res, addr); } while(0)
+_Static_assert(sizeof(dpu_compute_time_t) == 8,
+               "dpu_compute_time_t size changed (make sure that DPU_COMPUTE_TIME_WRITE changed as well)");
 
 #define DPU_INPUTS_ADDR (ALIGN_DPU(MRAM_INFO_ADDR + sizeof(mram_info_t)))
-#define DPU_INPUTS_SIZE (DPU_TASKLET_COMPUTE_TIME_ADDR - DPU_INPUTS_ADDR)
+#define DPU_INPUTS_SIZE (DPU_COMPUTE_TIME_ADDR - DPU_INPUTS_ADDR)
 
 /**
  * @brief Information on the requests reads to a DPU.
