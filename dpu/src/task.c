@@ -30,6 +30,9 @@
  */
 #define MAX_SCORE (40)
 
+#define COORDS_SIZE (8)
+#define NB_REF_PER_READ (8)
+
 /**
  * @brief The MRAM information, shared between the tasklets.
  *
@@ -54,25 +57,23 @@ __attribute__((aligned(8))) static dout_t global_dout[NB_TASKLET_PER_DPU];
  * @param idx     Index of this neighbour in the specified pool.
  * @param buffer  To contain the result, must be the size of a neighbour and coordinates, plus 64 bits alignment.
  * @param stats   To update statistical report.
- *
- * @return A pointer to the beginning of the loaded neighbour.
  */
-static uint8_t * load_reference_nbr_and_coords_at(unsigned int base,
-                                                  unsigned int idx,
-                                                  uint8_t *cache,
-                                                  STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
+static void load_reference_multiple_nbr_and_coords_at(unsigned int base,
+                                                      unsigned int idx,
+                                                      unsigned int coords_nbr_len,
+                                                      uint8_t *cache,
+                                                      STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
         /* The input starts with coordinates (8 bytes), followed by the neighbour. Structure is aligned
          * on 8 bytes boundary.
          */
-        unsigned int coords_nbr_len = 8 + ALIGN_DPU(mram_info.nbr_len);
         mram_addr_t coords_nbr_address = (mram_addr_t) (DPU_INPUTS_ADDR + (base + idx) * coords_nbr_len);
-        ASSERT_DMA_ADDR(coords_nbr_address, cache, coords_nbr_len);
-        ASSERT_DMA_LEN(coords_nbr_len);
-        mram_readX(coords_nbr_address, cache, coords_nbr_len);
-        STATS_INCR_LOAD(stats, coords_nbr_len);
-        STATS_INCR_LOAD_DATA(stats, coords_nbr_len);
-        return cache + 8;
+        unsigned int coords_nbr_len_total = coords_nbr_len * NB_REF_PER_READ;
+        ASSERT_DMA_ADDR(coords_nbr_address, cache, coords_nbr_len_total);
+        ASSERT_DMA_LEN(coords_nbr_len_total);
+        mram_readX(coords_nbr_address, cache, coords_nbr_len_total);
+        STATS_INCR_LOAD(stats, coords_nbr_len_total);
+        STATS_INCR_LOAD_DATA(stats, coords_nbr_len_total);
 }
 
 static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcounter_t *last_time)
@@ -82,6 +83,94 @@ static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcou
                 *accumulate_time = *accumulate_time + 0x1000000000;
         }
         *last_time = current_time;
+}
+
+static void compare_neighbours(sysname_t tasklet_id,
+                               int *mini,
+                               uint8_t *cached_coords_and_nbr,
+                               uint8_t *current_read_nbr,
+                               dpu_request_t *request,
+                               dout_t *dout,
+                               dpu_tasklet_stats_t *tasklet_stats,
+                               mutex_t *mutex_miscellaneous)
+{
+        int score, score_nodp, score_odpd = -1;
+        uint8_t *ref_nbr = cached_coords_and_nbr + COORDS_SIZE;
+        DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len, mram_info.delta);
+
+        score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, *mini);
+        STATS_INCR_NB_NODP_CALLS(*tasklet_stats);
+
+        if (score_nodp == -1) {
+                score_odpd = score = odpd(current_read_nbr,
+                                          ref_nbr,
+                                          *mini,
+                                          NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta),
+                                          tasklet_id);
+
+                STATS_INCR_NB_ODPD_CALLS(*tasklet_stats);
+        }
+        DEBUG_PROCESS_SCORES(mram_info.nbr_len,
+                             current_read_nbr,
+                             ref_nbr,
+                             *mini,
+                             score_nodp,
+                             score_odpd,
+                             *mutex_miscellaneous);
+
+        if (score <= *mini) {
+                if (score < *mini) {
+                        *mini = score;
+                        /* Get rid of previous results, we found a better one */
+                        dout_clear(dout);
+                }
+                if (dout->nb_results < MAX_RESULTS_PER_READ) {
+                        dout_add(dout, request->num, (unsigned int) score,
+                                 ((uint32_t *) cached_coords_and_nbr)[0],
+                                 ((uint32_t *) cached_coords_and_nbr)[1],
+                                 tasklet_stats);
+                        DEBUG_RESULTS_PRINT(tasklet_id,
+                                            idx,
+                                            request->num,
+                                            request->offset,
+                                            ((uint32_t *) cached_coords_and_nbr)[0],
+                                            ((uint32_t *) cached_coords_and_nbr)[1],
+                                            score);
+                } else {
+                        printf("WARNING! too many results for request!\n");
+                        /* Trigger a fault, since this should never happen. */
+                        halt();
+                }
+        }
+}
+
+static void compute_request(sysname_t tasklet_id,
+                            unsigned int coords_nbr_len,
+                            uint8_t *cached_coords_and_nbr,
+                            uint8_t *current_read_nbr,
+                            dpu_request_t *request,
+                            dout_t *dout,
+                            dpu_tasklet_stats_t *tasklet_stats,
+                            mutex_t *mutex_miscellaneous)
+{
+        int mini = MAX_SCORE;
+        for (unsigned int idx = 0; idx < request->count; idx += NB_REF_PER_READ) {
+                load_reference_multiple_nbr_and_coords_at(request->offset,
+                                                          idx,
+                                                          coords_nbr_len,
+                                                          cached_coords_and_nbr,
+                                                          tasklet_stats);
+                for (unsigned int ref_id = 0; ref_id < NB_REF_PER_READ && ((idx + ref_id) < request->count); ref_id++) {
+                        compare_neighbours(tasklet_id,
+                                           &mini,
+                                           cached_coords_and_nbr + (ref_id * coords_nbr_len),
+                                           current_read_nbr,
+                                           request,
+                                           dout,
+                                           tasklet_stats,
+                                           mutex_miscellaneous);
+                }
+        }
 }
 
 /**
@@ -108,7 +197,8 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
         dout_t *dout = &global_dout[tasklet_id];
         unsigned int nbr_len_aligned = ALIGN_DPU(mram_info.nbr_len);
-        uint8_t *cached_coords_and_nbr = mem_alloc_dma(nbr_len_aligned + 8);
+        unsigned int coords_nbr_len = COORDS_SIZE + nbr_len_aligned;
+        uint8_t *cached_coords_and_nbr = mem_alloc_dma(coords_nbr_len * NB_REF_PER_READ);
         uint8_t *request_buffer = mem_alloc_dma(sizeof(dpu_request_t) + nbr_len_aligned);
         uint8_t *current_read_nbr = request_buffer + sizeof(dpu_request_t);
         dpu_request_t *request = (dpu_request_t *)request_buffer;
@@ -121,8 +211,6 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
         dout_init(tasklet_id, dout);
 
         while (request_pool_next(request_buffer, &tasklet_stats)) {
-                int mini = MAX_SCORE;
-
                 if (tasklet_id == 0) {
                         get_time_and_accumulate(accumulate_time, current_time);
                 }
@@ -134,58 +222,15 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 
                 dout_clear(dout);
 
-                for (unsigned int idx = 0; idx < request->count; idx++) {
-                        int score, score_nodp, score_odpd = -1;
-                        uint8_t *ref_nbr = load_reference_nbr_and_coords_at(request->offset, idx, cached_coords_and_nbr,
-                                                                            &tasklet_stats);
+                compute_request(tasklet_id,
+                                coords_nbr_len,
+                                cached_coords_and_nbr,
+                                current_read_nbr,
+                                request,
+                                dout,
+                                &tasklet_stats,
+                                &mutex_miscellaneous);
 
-                        DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len, mram_info.delta);
-
-                        score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, mini);
-                        STATS_INCR_NB_NODP_CALLS(tasklet_stats);
-
-                        if (score_nodp == -1) {
-                                score_odpd = score = odpd(current_read_nbr,
-                                                          ref_nbr,
-                                                          mini,
-                                                          NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta),
-                                                          tasklet_id);
-
-                                STATS_INCR_NB_ODPD_CALLS(tasklet_stats);
-                        }
-                        DEBUG_PROCESS_SCORES(mram_info.nbr_len,
-                                             current_read_nbr,
-                                             ref_nbr,
-                                             mini,
-                                             score_nodp,
-                                             score_odpd,
-                                             mutex_miscellaneous);
-
-                        if (score <= mini) {
-                                if (score < mini) {
-                                        mini = score;
-                                        /* Get rid of previous results, we found a better one */
-                                        dout_clear(dout);
-                                }
-                                if (dout->nb_results < MAX_RESULTS_PER_READ) {
-                                        dout_add(dout, request->num, (unsigned int) score,
-                                                 ((uint32_t *) cached_coords_and_nbr)[0],
-                                                 ((uint32_t *) cached_coords_and_nbr)[1],
-                                                 &tasklet_stats);
-                                        DEBUG_RESULTS_PRINT(tasklet_id,
-                                                            idx,
-                                                            request->num,
-                                                            request->offset,
-                                                            ((uint32_t *) cached_coords_and_nbr)[0],
-                                                            ((uint32_t *) cached_coords_and_nbr)[1],
-                                                            score);
-                                } else {
-                                        printf("WARNING! too many results for request!\n");
-                                        /* Trigger a fault, since this should never happen. */
-                                        halt();
-                                }
-                        }
-                }
                 if (dout->nb_results != 0) {
                         STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
                         result_pool_write(dout, &tasklet_stats);
