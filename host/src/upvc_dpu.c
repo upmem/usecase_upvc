@@ -29,10 +29,10 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
                 MDPU[num_dpu].coordinate = NULL;
                 MDPU[num_dpu].coordinate_len = 0;
                 MDPU[num_dpu].neighbour_read =
-                        (int8_t *) malloc(sizeof(int8_t) * reads_info->size_neighbour_in_bytes * MAX_NB_DPU_READ);
-                MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_NB_DPU_READ);
-                MDPU[num_dpu].offset         = (int *)    malloc(sizeof(int) * MAX_NB_DPU_READ);
-                MDPU[num_dpu].num            = (int *)    malloc(sizeof(int) * MAX_NB_DPU_READ);
+                        (int8_t *) malloc(sizeof(int8_t) * reads_info->size_neighbour_in_bytes * MAX_DPU_REQUEST);
+                MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
+                MDPU[num_dpu].offset         = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
+                MDPU[num_dpu].num            = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].out_num        = (int *)    malloc(sizeof(int) * MAX_DPU_RESULTS);
                 MDPU[num_dpu].out_coord      = (long *)   malloc(sizeof(long) * MAX_DPU_RESULTS);
                 MDPU[num_dpu].out_score      = (int  *)   malloc(sizeof(long) * MAX_DPU_RESULTS);

@@ -12,7 +12,6 @@
 
 #define VERSION           "VERSION 1.5"
 #define SIZE_SEED         12
-#define MAX_NB_DPU_READ   16384      /* Maximum number of read by DPU by round */
 #define MAX_READS_BUFFER  1048576    /* Maximum number of read by round        */
 
 #define COST_SUB         10

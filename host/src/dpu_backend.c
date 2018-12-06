@@ -79,24 +79,14 @@ static void dispatch_request_add(dispatch_request_t *reads,
                                  int8_t *nbr,
                                  reads_info_t *reads_info)
 {
-        unsigned int new_read_list_size_in_bytes;
-        dpu_request_t *new_read;
-        unsigned int read_index = reads->nb_reads;
-        reads->nb_reads++;
-
-        if (reads->nb_reads >= MAX_NB_DPU_READ) {
-                ERROR_EXIT(27, "*** buffer full - cannot register more reads on one DPU - aborting");
-        }
-
-        new_read_list_size_in_bytes = reads->nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes);
-        reads->reads_area = realloc(reads->reads_area, new_read_list_size_in_bytes);
-
-        new_read = (dpu_request_t *) (reads->reads_area + read_index * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
+        dpu_request_t *new_read =
+                (dpu_request_t *) (reads->reads_area + reads->nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
         new_read->offset = offset;
         new_read->count = count;
         new_read->num = num;
 
         memcpy(((uint8_t *)new_read) + sizeof(dpu_request_t), nbr, (size_t) reads_info->size_neighbour_in_bytes);
+        reads->nb_reads++;
 }
 
 void add_seed_to_dpu_requests(dispatch_request_t *requests,
@@ -118,25 +108,37 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests,
 
 static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, reads_info_t *reads_info)
 {
-        printf("\t                  addr       size\n");
-        printf("\tmram_info         0x%.8x 0x%.8x\n", MRAM_INFO_ADDR, (unsigned int)sizeof(mram_info_t));
-        printf("\tinputs (ref nbrs) 0x%.8x 0x%.8x\n", (unsigned int)DPU_INPUTS_ADDR, mram_info->total_nbr_size);
-        printf("\trequest_info      0x%.8x 0x%.8x\n",
+        printf("\t                 addr       size\n");
+        printf("\tmram_info        0x%.8x 0x%.8x\n", MRAM_INFO_ADDR, (unsigned int)sizeof(mram_info_t));
+        printf("\tref inputs       0x%.8x 0x%.8x\n", (unsigned int)DPU_INPUTS_ADDR, mram_info->total_nbr_size);
+        printf("\trequest_info     0x%.8x 0x%.8x\n",
                (unsigned int)DPU_REQUEST_INFO_ADDR(mram_info),
                (unsigned int)sizeof(request_info_t));
-        printf("\trequest           0x%.8x 0x%.8x (0x%.8x)\n",
+        printf("\trequest          0x%.8x 0x%.8x\n"
+               "\t                 (used: 0x%.8x)\n"
+               "\t                 (one:  0x%.8x)\n",
                (unsigned int)DPU_REQUEST_ADDR(mram_info),
+               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST,
                (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * nb_reads,
                (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
-        printf("\ttasklet stats     0x%.8x 0x%.8x\n", (unsigned int)DPU_TASKLET_STATS_ADDR,(unsigned int)DPU_TASKLET_STATS_SIZE);
-        printf("\tresult swap area  0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE);
-        printf("\tresult area       0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE);
+        printf("\tempty space      0x%.8x 0x%.8x\n",
+               (unsigned int)(DPU_REQUEST_ADDR(mram_info)
+                              + DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST),
+               (unsigned int)(DPU_COMPUTE_TIME_ADDR
+                              - (DPU_REQUEST_ADDR(mram_info)
+                                 + DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST)));
+        printf("\tdpu time stats   0x%.8x 0x%.8x\n", (unsigned int)DPU_COMPUTE_TIME_ADDR,(unsigned int)DPU_COMPUTE_TIME_SIZE);
+        printf("\ttasklet stats    0x%.8x 0x%.8x\n", (unsigned int)DPU_TASKLET_STATS_ADDR,(unsigned int)DPU_TASKLET_STATS_SIZE);
+        printf("\tresult swap area 0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE);
+        printf("\tresult area      0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE);
 
         assert((MRAM_INFO_ADDR + sizeof(mram_info_t)) <= DPU_INPUTS_ADDR);
         assert((DPU_INPUTS_ADDR + mram_info->total_nbr_size) <= DPU_REQUEST_INFO_ADDR(mram_info));
         assert((DPU_REQUEST_INFO_ADDR(mram_info) + sizeof(request_info_t)) <= DPU_REQUEST_ADDR(mram_info));
-        assert((DPU_REQUEST_ADDR(mram_info) + nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes))
-               <= DPU_TASKLET_STATS_ADDR);
+        assert(nb_reads < MAX_DPU_REQUEST);
+        assert((DPU_REQUEST_ADDR(mram_info) + MAX_DPU_REQUEST * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes))
+               <= DPU_COMPUTE_TIME_ADDR);
+        assert((DPU_COMPUTE_TIME_ADDR + DPU_COMPUTE_TIME_SIZE) <= DPU_TASKLET_STATS_ADDR);
         assert((DPU_TASKLET_STATS_ADDR + DPU_TASKLET_STATS_SIZE) <= DPU_SWAP_RESULT_ADDR);
         assert((DPU_SWAP_RESULT_ADDR + DPU_SWAP_RESULT_SIZE) <= DPU_RESULT_ADDR);
         assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);

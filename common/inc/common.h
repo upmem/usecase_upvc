@@ -12,6 +12,10 @@
 
 #define ALIGN_DPU(val) (((val) + 7) & ~7)
 
+#define MAX_DPU_REQUEST      (1 << 14)
+#define MAX_DPU_RESULTS      (1 << 16)
+#define MAX_RESULTS_PER_READ (1 << 10)
+
 /**
  * DPU MRAM Memory Layout
  *
@@ -25,7 +29,9 @@
  * | sizeof(request_info_t)
  * |
  * | DPU_REQUEST_ADDR
- * | request_info.nb_reads * DPU_REQUEST_SIZE
+ * | MAX_DPU_REQUEST * DPU_REQUEST_SIZE
+ * |
+ * | EMPTY SPACE
  * |
  * | DPU_TASKLET_COMPUTE_TIME_ADDR
  * | DPU_TASKLET_COMPUTE_TIME_SIZE
@@ -71,13 +77,11 @@ typedef struct {
         uint32_t score;
 } dpu_result_out_t;
 
-#define MAX_DPU_RESULTS (1 << 16)
 #define DPU_RESULT_SIZE (MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
 #define DPU_RESULT_ADDR (MRAM_SIZE - DPU_RESULT_SIZE)
 #define DPU_RESULT_WRITE(res, addr) do { mram_write16(res, addr); } while(0)
 _Static_assert(sizeof(dpu_result_out_t) == 16, "dpu_result_out_t size changed (make sure that DPU_RESULT_WRITE changed as well)");
 
-#define MAX_RESULTS_PER_READ 1024
 #define DPU_SWAP_RESULT_SIZE (NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ * sizeof(dpu_result_out_t))
 #define DPU_SWAP_RESULT_ADDR (DPU_RESULT_ADDR - DPU_SWAP_RESULT_SIZE)
 

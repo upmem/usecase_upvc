@@ -171,8 +171,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
                                         dout_add(dout, request->num, (unsigned int) score,
                                                  ((uint32_t *) cached_coords_and_nbr)[0],
                                                  ((uint32_t *) cached_coords_and_nbr)[1],
-                                                 &tasklet_stats
-                                                 );
+                                                 &tasklet_stats);
                                         DEBUG_RESULTS_PRINT(tasklet_id,
                                                             idx,
                                                             request->num,

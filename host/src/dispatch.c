@@ -12,30 +12,17 @@
 #include "code.h"
 #include "upvc.h"
 
-static void dispatch_request_reset(dispatch_request_t *reads)
+static dispatch_request_t *dispatch_create(unsigned int nb_dpu, reads_info_t *reads_info)
 {
-        reads->nb_reads = 0;
-        if (reads->reads_area != NULL) {
-                free(reads->reads_area);
-        }
-}
-
-static void dispatch_request_free(dispatch_request_t *reads)
-{
-        dispatch_request_reset(reads);
-}
-
-static dispatch_request_t *dispatch_create(unsigned int nb_dpu)
-{
-        dispatch_request_t *result = (dispatch_request_t *) calloc(nb_dpu, sizeof(dispatch_request_t));
-        if (result == NULL) {
+        dispatch_request_t *request = (dispatch_request_t *) calloc(nb_dpu, sizeof(dispatch_request_t));
+        if (request == NULL) {
                 ERROR_EXIT(26, "*** could not allocate memory to store %u dispatch requests - aborting!", nb_dpu);
         }
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-                dispatch_request_reset(result + each_dpu);
+                request[each_dpu].reads_area = malloc(DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST);
         }
-        return result;
+        return request;
 }
 
 static void write_mem_DPU(index_seed_t *seed,
@@ -50,16 +37,15 @@ static void write_mem_DPU(index_seed_t *seed,
 
         while (seed != NULL) {
                 int nb_read_written = counted_read[seed->num_dpu];
+                if ((nb_read_written + 1) > MAX_DPU_REQUEST) {
+                        ERROR_EXIT(28, "\nBuffer full (DPU %d)", seed->num_dpu);
+                }
 
                 code_neighbour(&read[SIZE_SEED], buf, reads_info);
 
                 backends_functions->add_seed_to_requests(requests, seed->num_dpu, num_read, nb_read_written, seed, buf, reads_info);
 
                 counted_read[seed->num_dpu]++;
-
-                if (counted_read[seed->num_dpu] >= MAX_NB_DPU_READ - 1) {
-                        ERROR_EXIT(28, "\nBuffer full (DPU %d)", seed->num_dpu);
-                }
                 seed = seed->next;
         }
 }
@@ -67,7 +53,7 @@ static void write_mem_DPU(index_seed_t *seed,
 void dispatch_free(dispatch_t requests, unsigned int nb_dpu)
 {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-                dispatch_request_free(requests + each_dpu);
+                free(requests[each_dpu].reads_area);
         }
         free(requests);
 }
@@ -87,7 +73,7 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
 
         t1 = my_clock();
 
-        requests = dispatch_create(nb_dpu);
+        requests = dispatch_create(nb_dpu, reads_info);
 
         memset(&counted_read, 0, nb_dpu * sizeof(unsigned int));
 
