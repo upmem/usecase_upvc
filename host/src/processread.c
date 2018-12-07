@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "upvc_dpu.h"
 #include "compare.h"
@@ -19,15 +20,15 @@ typedef struct {
         int coord_seq;
         int coord_pos;
         int score;
-} align_t;
+} result_t;
 
 #define  SIZE_INSERT_MEAN (400)
 #define  SIZE_INSERT_STD (3 * 50)
 
-static int cmpalign(const void * a, const void * b)
+static int cmpresult(const void * a, const void * b)
 {
-        align_t *A = (align_t *) a;
-        align_t *B = (align_t *) b;
+        result_t *A = (result_t *) a;
+        result_t *B = (result_t *) b;
         if (A->num_read == B->num_read) {
                 if (A->score > B->score) {
                         return 1;
@@ -42,7 +43,7 @@ static int cmpalign(const void * a, const void * b)
         }
 }
 
-static int check_pair(align_t A1, align_t A2, reads_info_t *reads_info)
+static int check_pair(result_t A1, result_t A2, reads_info_t *reads_info)
 {
         int pos1, pos2;
         int size_insert_min = SIZE_INSERT_MEAN - SIZE_INSERT_STD;
@@ -151,7 +152,7 @@ static int code_alignment(int8_t *code, int score, int8_t *gen, int8_t *read, re
         return code_idx;
 }
 
-static void set_variant(align_t align_match,
+static void set_variant(result_t result_match,
                         genome_t *ref_genome,
                         int8_t *reads_buffer,
                         variant_tree_t **variant_list,
@@ -159,11 +160,11 @@ static void set_variant(align_t align_match,
                         int8_t *mapping_coverage,
                         reads_info_t *reads_info)
 {
-        int code_align_idx;
-        int8_t code_align_tab[256];
+        int code_result_idx;
+        int8_t code_result_tab[256];
         int8_t *read;
         char nucleotide[4] = {'A','C','T','G'};
-        int genome_pos = ref_genome->pt_seq[align_match.coord_seq] + align_match.coord_pos;
+        int genome_pos = ref_genome->pt_seq[result_match.coord_seq] + result_match.coord_pos;
         int size_read = reads_info->size_read;
 
         /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
@@ -172,35 +173,35 @@ static void set_variant(align_t align_match,
         }
 
         /* Get the differences betweend the read and the sequence of the reference genome that match */
-        read = &reads_buffer[align_match.num_read * size_read];
-        code_alignment(code_align_tab, align_match.score, &ref_genome->data[genome_pos], read, reads_info);
+        read = &reads_buffer[result_match.num_read * size_read];
+        code_alignment(code_result_tab, result_match.score, &ref_genome->data[genome_pos], read, reads_info);
 
-        code_align_idx = 0;
-        while (code_align_tab[code_align_idx] != CODE_END) {
-                int code_align = code_align_tab[code_align_idx];
-                int pos_variant_read = code_align_tab[code_align_idx + 1];
+        code_result_idx = 0;
+        while (code_result_tab[code_result_idx] != CODE_END) {
+                int code_result = code_result_tab[code_result_idx];
+                int pos_variant_read = code_result_tab[code_result_idx + 1];
                 int pos_variant_genome = genome_pos + pos_variant_read;
-                if (code_align == CODE_SUB) {
+                if (code_result == CODE_SUB) {
                         /* SNP = 0,1,2,3  (code A,C,T,G) */
-                        int snp = code_align_tab[code_align_idx + 2];
+                        int snp = code_result_tab[code_result_idx + 2];
 
                         /* substitution_list[pos_variant_genome] =  32 bits integer containning 4 counter of 8 bits */
                         substitution_list[pos_variant_genome] += 1 << (snp * 8);
 
-                        code_align_idx += 3;
-                } else if (code_align == CODE_INS) {
+                        code_result_idx += 3;
+                } else if (code_result == CODE_INS) {
                         int ps_var_genome = pos_variant_genome;
                         int ps_var_read = pos_variant_read;
                         variant_t *newvar = (variant_t*) malloc(sizeof(variant_t));
 
-                        newvar->offset = ref_genome->pt_seq[align_match.coord_seq];
-                        newvar->chr = ref_genome->seq_name[align_match.coord_seq];
+                        newvar->offset = ref_genome->pt_seq[result_match.coord_seq];
+                        newvar->chr = ref_genome->seq_name[result_match.coord_seq];
                         newvar->depth = 1;
-                        code_align_idx += 2;
+                        code_result_idx += 2;
 
-                        while (code_align_tab[code_align_idx] < 4) {
+                        while (code_result_tab[code_result_idx] < 4) {
                                 ps_var_read++;
-                                code_align_idx++;
+                                code_result_idx++;
                         }
 
                         while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
@@ -225,19 +226,19 @@ static void set_variant(align_t align_match,
                                 newvar->alt[k] = '\0';
                                 insert_variants(variant_list, newvar);
                         }
-                } else if (code_align == CODE_DEL) {
+                } else if (code_result == CODE_DEL) {
                         int ps_var_genome = pos_variant_genome;
                         int ps_var_read = pos_variant_read;
                         variant_t *newvar = (variant_t*) malloc(sizeof(variant_t));
 
-                        newvar->offset = ref_genome->pt_seq[align_match.coord_seq];
-                        newvar->chr = ref_genome->seq_name[align_match.coord_seq];
+                        newvar->offset = ref_genome->pt_seq[result_match.coord_seq];
+                        newvar->chr = ref_genome->seq_name[result_match.coord_seq];
                         newvar->depth = 1;
-                        code_align_idx += 2;
+                        code_result_idx += 2;
 
-                        while (code_align_tab[code_align_idx] < 4) {
+                        while (code_result_tab[code_result_idx] < 4) {
                                 ps_var_genome++;
-                                code_align_idx++;
+                                code_result_idx++;
                         }
 
                         while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
@@ -266,6 +267,65 @@ static void set_variant(align_t align_match,
         }
 }
 
+static void add_to_non_mapped_read(int numpair,
+                                   int round,
+                                   FILE *fpe1,
+                                   FILE *fpe2,
+                                   int8_t *reads_buffer,
+                                   reads_info_t *reads_info)
+{
+        char nucleotide[4] = {'A','C','T','G'};
+        int size_read = reads_info->size_read;
+        int8_t *read = &reads_buffer[numpair * size_read];
+        fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
+        for (int j = SIZE_SEED; j < size_read; j++) {
+                fprintf(fpe1, "%c", nucleotide[read[j]&3]);
+        }
+        for (int j = 0; j < SIZE_SEED; j++) {
+                fprintf(fpe1, "A");
+        }
+        fprintf(fpe1, "\n");
+        read = &reads_buffer[(numpair+2) * size_read];
+        fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
+        for (int j = SIZE_SEED; j < size_read; j++) {
+                fprintf(fpe2, "%c", nucleotide[read[j]&3]);
+        }
+        for (int j = 0; j < SIZE_SEED; j++) {
+                fprintf(fpe2, "A");
+        }
+        fprintf(fpe2, "\n");
+}
+
+static bool compute_read_pair(int type1,
+                              int type2,
+                              int *offset,
+                              int *nbread,
+                              result_t *result_tab,
+                              int *result_tab_tmp,
+                              int numpair,
+                              int round,
+                              FILE *fpe1,
+                              FILE *fpe2,
+                              int8_t *reads_buffer,
+                              bool *result_found,
+                              reads_info_t *reads_info)
+{
+        for (int pa = offset[type1]; pa < offset[type1] + nbread[type1]; pa++) {
+                for (int pb = offset[type2]; pb < offset[type2] + nbread[type2]; pb++) {
+                        if (check_pair(result_tab[pa], result_tab[pb], reads_info)) {
+                                if (*result_found) {
+                                        add_to_non_mapped_read(numpair, round, fpe1, fpe2, reads_buffer, reads_info);
+                                        return false;
+                                }
+                                result_tab_tmp[0] = pa;
+                                result_tab_tmp[1] = pb;
+                                *result_found = true;
+                        }
+                }
+        }
+        return true;
+}
+
 int process_read(genome_t *ref_genome,
                  int8_t *reads_buffer,
                  variant_tree_t **variant_list,
@@ -279,15 +339,13 @@ int process_read(genome_t *ref_genome,
                  reads_info_t *reads_info)
 {
         double t1, t2;
-        align_t *align_tab = (align_t *) malloc(sizeof(align_t) * MAX_DPU_RESULTS * nb_dpu);
+        result_t *result_tab = (result_t *) malloc(sizeof(result_t) * MAX_DPU_RESULTS * nb_dpu);
         int nb_match = 0;
-        char nucleotide[4] = {'A','C','T','G'};
         int nb_read_map = 0;
-        int offset[4]; /* offset in align_tab of the first read  */
-        int score[4];  /* min score                              */
+        int offset[4]; /* offset in result_tab of the first read  */
         int nbread[4]; /* number of reads                        */
-        int *align_tab_tmp = (int *) malloc(sizeof(int) * MAX_DPU_RESULTS);
-        int size_read = reads_info->size_read;
+        int score[4];
+        int result_tab_tmp[2];
 
         t1 = my_clock();
 
@@ -299,10 +357,10 @@ int process_read(genome_t *ref_genome,
                 while (num_read != -1) {
                         long coord = read_out_coord(numdpu, k);
 
-                        align_tab[nb_match].num_read = num_read;
-                        align_tab[nb_match].coord_seq = (int) (coord >> 32);
-                        align_tab[nb_match].coord_pos = (int) (coord & 0xFFFFFFFF);
-                        align_tab[nb_match].score = read_out_score(numdpu, k);
+                        result_tab[nb_match].num_read = num_read;
+                        result_tab[nb_match].coord_seq = (int) (coord >> 32);
+                        result_tab[nb_match].coord_pos = (int) (coord & 0xFFFFFFFF);
+                        result_tab[nb_match].score = read_out_score(numdpu, k);
                         nb_match++;
 
                         num_read = read_out_num(numdpu, ++k);
@@ -310,7 +368,7 @@ int process_read(genome_t *ref_genome,
         }
 
         /* Sort output data from DPUs */
-        qsort(align_tab, nb_match, sizeof(align_t), cmpalign);
+        qsort(result_tab, nb_match, sizeof(result_t), cmpresult);
 
         /*
          * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -324,55 +382,60 @@ int process_read(genome_t *ref_genome,
 
         int i = 0;
         while (i < nb_match) {
-                int align_idx = 0;
-                int numpair = align_tab[i].num_read / 4;
+                int numpair = result_tab[i].num_read / 4;
+                bool result_found = false;
                 for (int k = 0; k < 4; k++) {
                         score[k] = 1000;
                         offset[k] = -1;
                         nbread[k] = 0;
                 }
-                while ((i < nb_match) && (numpair == align_tab[i].num_read / 4)) {
-                        int type = align_tab[i].num_read % 4;
-                        if (align_tab[i].score < score[type]) {
-                                score[type] = align_tab[i].score;
+                while ((i < nb_match) && (numpair == result_tab[i].num_read / 4)) {
+                        int type = result_tab[i].num_read % 4;
+                        if (result_tab[i].score < score[type]) {
+                                score[type] = result_tab[i].score;
                                 offset[type] = i;
                                 nbread[type] = 1;
-                        } else {
-                                if (align_tab[i].score == score[type]) nbread[type]++;
+                        } else if (result_tab[i].score == score[type]) {
+                                nbread[type]++;
                         }
                         i++;
                 }
+
                 /* Compute a [0, 3] read pair */
-                for (int pa = offset[0]; pa < offset[0] + nbread[0]; pa++) {
-                        for (int pb = offset[3]; pb < offset[3] + nbread[3]; pb++) {
-                                if (check_pair(align_tab[pa], align_tab[pb], reads_info)) {
-                                        if (align_idx < MAX_DPU_RESULTS - 2) {
-                                                align_tab_tmp[align_idx++] = pa;
-                                                align_tab_tmp[align_idx++] = pb;
-                                        }
-                                }
-                        }
+                if (!compute_read_pair(0, 3,
+                                       offset, nbread,
+                                       result_tab,
+                                       result_tab_tmp,
+                                       numpair, round,
+                                       fpe1, fpe2,
+                                       reads_buffer,
+                                       &result_found,
+                                       reads_info)) {
+                        continue;
                 }
+
                 /* Compute a [1, 2] read pair */
-                for (int pa = offset[1]; pa < offset[1] + nbread[1]; pa++) {
-                        for (int pb = offset[2]; pb < offset[2] + nbread[2]; pb++) {
-                                if (check_pair(align_tab[pb], align_tab[pa], reads_info)) {
-                                        if (align_idx < MAX_DPU_RESULTS - 2) {
-                                                align_tab_tmp[align_idx++] = pa;
-                                                align_tab_tmp[align_idx++] = pb;
-                                        }
-                                }
-                        }
+                if (!compute_read_pair(2, 1,
+                                       offset, nbread,
+                                       result_tab,
+                                       result_tab_tmp,
+                                       numpair, round,
+                                       fpe1, fpe2,
+                                       reads_buffer,
+                                       &result_found,
+                                       reads_info)) {
+                        continue;
                 }
-                if (align_idx == 2) { /* Mapped reads*/
-                        set_variant(align_tab[align_tab_tmp[0]],
+
+                if (result_found) { /* Mapped reads*/
+                        set_variant(result_tab[result_tab_tmp[0]],
                                     ref_genome,
                                     reads_buffer,
                                     variant_list,
                                     substitution_list,
                                     mapping_coverage,
                                     reads_info);
-                        set_variant(align_tab[align_tab_tmp[1]],
+                        set_variant(result_tab[result_tab_tmp[1]],
                                     ref_genome,
                                     reads_buffer,
                                     variant_list,
@@ -380,33 +443,12 @@ int process_read(genome_t *ref_genome,
                                     mapping_coverage,
                                     reads_info);
                         nb_read_map += 2;
-                } else { /* Non-mapped reads.
-                          * Add same to the reads to look at during next round
-                          * (keep the already computed offset for next round).
-                          */
-                        int8_t *read = &reads_buffer[numpair * size_read];
-                        fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
-                        for (int j = SIZE_SEED; j < size_read; j++) {
-                                fprintf(fpe1, "%c", nucleotide[read[j]&3]);
-                        }
-                        for (int j = 0; j < SIZE_SEED; j++) {
-                                fprintf(fpe1, "A");
-                        }
-                        fprintf(fpe1, "\n");
-                        read = &reads_buffer[(numpair+2) * size_read];
-                        fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
-                        for (int j = SIZE_SEED; j < size_read; j++) {
-                                fprintf(fpe2, "%c", nucleotide[read[j]&3]);
-                        }
-                        for (int j = 0; j < SIZE_SEED; j++) {
-                                fprintf(fpe2, "A");
-                        }
-                        fprintf(fpe2, "\n");
+                } else {
+                        add_to_non_mapped_read(numpair, round, fpe1, fpe2, reads_buffer, reads_info);
                 }
         }
 
-        free(align_tab_tmp);
-        free(align_tab);
+        free(result_tab);
 
         t2 = my_clock();
         times_ctx->process_read = t2 - t1;
