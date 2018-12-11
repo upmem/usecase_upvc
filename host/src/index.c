@@ -245,6 +245,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                         code_neighbour(&ref_genome->data[sequence_start_idx+sequence_idx+SIZE_SEED],
                                        buf_code_neighbour,
                                        reads_info);
+                        if (sequence_idx % 1000 == 0)
                         printf("\r\t%i/%i %i/%i",
                                sequence_idx,
                                ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1,

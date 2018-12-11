@@ -178,6 +178,7 @@ void run_on_dpu(dispatch_t dispatch,
                         }
                 }
 
+                double start = my_clock();
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
@@ -193,6 +194,7 @@ void run_on_dpu(dispatch_t dispatch,
                                 printf("DPU #%u completed\n", this_dpu);
                         }
                 }
+                printf("time: %lf\n", my_clock() - start);
 
                 /* Gather results and free DPUs */
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
