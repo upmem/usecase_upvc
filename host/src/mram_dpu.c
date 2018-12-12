@@ -85,7 +85,7 @@ void mram_load(mram_info_t *mram, unsigned int dpu_id)
                 ERROR_EXIT(21, "could not load MRAM file '%s'", file_name);
         }
 
-        fread(mram, sizeof(uint8_t), MRAM_SIZE, f);
+        __attribute__((unused)) size_t read_size = fread(mram, sizeof(uint8_t), MRAM_SIZE, f);
 
         fclose(f);
 }

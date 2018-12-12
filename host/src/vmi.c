@@ -79,7 +79,7 @@ bool vmi_write(vmi_t *vmi, long offs, const void *buffer, size_t nb_bytes)
         }
 
         lseek(handle, offs, SEEK_SET);
-        write(handle, buffer, nb_bytes);
+        __attribute__((unused)) size_t write_size = write(handle, buffer, nb_bytes);
         close(handle);
         vmi->mem_size += nb_bytes;
 
