@@ -48,8 +48,8 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
                 {
                  .num = (unsigned int) -1,
                  .score = (unsigned int) -1,
-                 .seq_nr = 0,
-                 .seed_nr = 0
+                 .coord.seq_nr = 0,
+                 .coord.seed_nr = 0
                 };
         /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
          * has a num equal to -1.

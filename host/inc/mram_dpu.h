@@ -19,24 +19,6 @@
 #include "common.h"
 
 /**
- * @brief Creates a new MRAM image.
- *
- * The returned value represents one chunk of 64MBs to store an MRAM mapping.
- *
- * @param reads_info  Information on the size of the seed and the neighbour.
- *
- * @return The created image
- */
-mram_info_t *mram_create(reads_info_t *reads_info);
-
-/**
- * @brief Gets rid of an MRAM image.
- *
- * @param mram  The MRAM image, not usable anymore.
- */
-void mram_free(mram_info_t *mram);
-
-/**
  * @brief Initializes a mapping.
  *
  * @param mram        The target MRAM image, all fields will be reset.

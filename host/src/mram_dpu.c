@@ -13,27 +13,12 @@
 
 #define MRAM_FILE_NAME_SIZE (24)
 
-mram_info_t *mram_create(reads_info_t *reads_info)
-{
-        mram_info_t *result = (mram_info_t *) malloc(MRAM_SIZE);
-        if (result == NULL) {
-                ERROR_EXIT(17, "*** malloc failed to create a new MRAM image!");
-        }
-        mram_reset(result, reads_info);
-        return result;
-}
-
-void mram_free(mram_info_t *mram)
-{
-        free(mram);
-}
-
 void mram_reset(mram_info_t *mram, reads_info_t *reads_info)
 {
-        mram->delta = 0;
         mram->total_nbr_size = 0;
         mram->nb_nbr = 0;
         mram->nbr_len = (uint32_t) reads_info->size_neighbour_in_bytes;
+        mram->delta = reads_info->delta_neighbour_in_bytes;
 }
 
 bool mram_copy_vmi(mram_info_t *mram, vmi_t *vmi, unsigned int nb_nbr, reads_info_t *reads_info)
@@ -93,7 +78,7 @@ void mram_load(mram_info_t *mram, unsigned int dpu_id)
 index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info)
 {
         index_seed_t **index_seed;
-        mram_info_t *mram = mram_create(reads_info);
+        mram_info_t *mram = (mram_info_t *)malloc(MRAM_SIZE);
         unsigned int nb_dpus = get_nb_dpu();
         /* Will unwrap the MRAM contents into the MDPU's PMEM. */
 
@@ -107,7 +92,7 @@ index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info)
 
         index_seed = load_index_seeds();
 
-        mram_free(mram);
+        free(mram);
 
         return index_seed;
 }

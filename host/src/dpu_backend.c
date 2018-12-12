@@ -28,27 +28,25 @@ index_seed_t **get_index_seed_dpu(unsigned int nb_dpu,
 vmi_t *init_vmis_dpu(unsigned int nb_dpu)
 {
         vmi_t *vmis = (vmi_t *) calloc(nb_dpu, sizeof(vmi_t));
-        char *vmi_name = (char *) malloc(strlen("0000."));
+        char vmi_name[8];
         for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
                 (void) sprintf(vmi_name, "%04u", dpuno);
                 vmi_create(vmi_name, vmis + dpuno);
         }
-        free(vmi_name);
         return vmis;
 }
 
 static void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, unsigned int nb_dpu, reads_info_t *reads_info)
 {
-        mram_info_t *mram_image;
+        mram_info_t *mram_image = (mram_info_t *)malloc(MRAM_SIZE);
         printf("Creating MRAM images\n");
-        mram_image = mram_create(reads_info);
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
                 vmi_t *this_vmi = vmis + each_dpu;
                 mram_reset(mram_image, reads_info);
                 mram_copy_vmi(mram_image, this_vmi, nbr_counts[each_dpu], reads_info);
                 mram_save(mram_image, each_dpu);
         }
-        mram_free(mram_image);
+        free(mram_image);
 }
 
 void free_vmis_dpu(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbours, reads_info_t *reads_info)
@@ -60,16 +58,15 @@ void free_vmis_dpu(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbours
         free(vmis);
 }
 
-void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, long coords, reads_info_t *reads_info)
+void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, uint64_t coords, reads_info_t *reads_info)
 {
         unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-        unsigned int out_len = ALIGN_DPU(sizeof(long) + size_neighbour_in_bytes);
-        uint8_t *temp_buff = (uint8_t *) malloc(out_len);
+        unsigned int out_len = ALIGN_DPU(sizeof(uint64_t) + size_neighbour_in_bytes);
+        uint64_t temp_buff[out_len / sizeof(uint64_t)];
         memset(temp_buff, 0, out_len);
-        ((long *) temp_buff)[0] = coords;
-        memcpy(temp_buff + sizeof(long), nbr, (size_t) size_neighbour_in_bytes);
+        temp_buff[0] = coords;
+        memcpy(&temp_buff[1], nbr, (size_t) size_neighbour_in_bytes);
         vmi_write(vmis + dpuno, k * out_len, temp_buff, out_len);
-        free(temp_buff);
 }
 
 static void dispatch_request_add(dispatch_request_t *reads,
@@ -145,7 +142,7 @@ static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, r
 }
 
 void run_on_dpu(dispatch_t dispatch,
-                devices_t devices,
+                devices_t *devices,
                 unsigned int nb_dpu,
                 times_ctx_t *times_ctx,
                 reads_info_t *reads_info)
@@ -158,6 +155,10 @@ void run_on_dpu(dispatch_t dispatch,
         if (devices == NULL) {
                 ERROR("Unable to alloc devices!");
         }
+        mram_info_t *mram = (mram_info_t *)malloc(MRAM_SIZE);
+        if (mram == NULL) {
+                ERROR("Unable to alloc mram!\n");
+        }
 
         for (unsigned int first_dpu = ((DEBUG_FIRST_RUN != -1) ? (DEBUG_FIRST_RUN * nb_dpus_per_run) : 0);
              first_dpu < nb_dpu;
@@ -166,10 +167,11 @@ void run_on_dpu(dispatch_t dispatch,
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
-                                mram_info_t *mram;
                                 printf("() write MRAM #%d %u reads\n", this_dpu, dispatch[this_dpu].nb_reads);
-                                dpu_try_load_mram_number(this_dpu, each_dpu, devices, &mram, reads_info);
+                                mram_reset(mram, reads_info);
+                                mram_load(mram, this_dpu);
                                 print_memory_layout(mram, dispatch[this_dpu].nb_reads, reads_info);
+                                dpu_try_write_mram(each_dpu, devices, mram);
                                 dpu_try_write_dispatch_into_mram(each_dpu, devices,
                                                                  dispatch[this_dpu].nb_reads,
                                                                  dispatch[this_dpu].reads_area,
@@ -201,24 +203,21 @@ void run_on_dpu(dispatch_t dispatch,
                         unsigned int this_dpu = first_dpu + each_dpu;
                         if (dispatch[this_dpu].nb_reads != 0) {
                                 dpu_try_log(each_dpu, devices);
-                                dpu_result_out_t *results = dpu_try_get_results(each_dpu, devices);
-                                int i;
-                                for (i = 0; results[i].num != -1; i++) {
+                                dpu_result_out_t *results = get_mem_dpu_res(this_dpu);
+                                dpu_try_get_results(each_dpu, devices, results);
+
+                                for (int i = 0; results[i].num != -1; i++) {
                                         if (i == MAX_DPU_RESULTS) {
                                                 ERROR_EXIT(22, "BUG! no EOR marker found when parsing DPU results!\n");
                                         }
-
-                                        long coords = ((long) results[i].seed_nr) |
-                                                (((long) (results[i].seq_nr)) << 32);
-                                        write_result(this_dpu, i, results[i].num, coords, results[i].score);
+                                        printf("R: %u %u %lu\n", results[i].num, results[i].score, results[i].coord.coord);
                                 }
-                                write_result(this_dpu, i, (unsigned int) -1, -1L, (unsigned int) -1);
-
-                                free(results);
                         }
                 }
 
         }
+
+        free(mram);
 
         t2 = my_clock();
         times_ctx->map_read = t2 - t1;

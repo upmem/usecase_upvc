@@ -26,7 +26,7 @@
 
 static int map_var_call(char *filename_prefix,
                         int round,
-                        devices_t devices,
+                        devices_t *devices,
                         genome_t *ref_genome,
                         index_seed_t **index_seed,
                         variant_tree_t **variant_list,
@@ -194,7 +194,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                 ERROR_EXIT(42, "DEBUG MACRO has not been well configured!");
         }
 
-        devices_t devices = backends_functions->init_devices(get_nb_dpus_per_run(), get_dpu_binary());
+        devices_t *devices = backends_functions->init_devices(get_nb_dpus_per_run(), get_dpu_binary());
 
         for (int round = 0; round < 3; round++) {
                 if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {

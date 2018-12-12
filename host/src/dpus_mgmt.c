@@ -45,9 +45,9 @@ void setup_dpus_for_target_type(target_type_t target_type)
         }
 }
 
-devices_t dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
+devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
 {
-        devices_t devices = (devices_t) malloc(sizeof(struct devices));
+        devices_t *devices = (devices_t *) malloc(sizeof(devices_t));
         if (devices == NULL) {
                 ERROR_EXIT(3, "*** could not allocate structure for devices - aborting");
         }
@@ -86,35 +86,25 @@ devices_t dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
         return devices;
 }
 
-void dpu_try_load_mram_number(unsigned int mram_number, dpu_t dpu_id, devices_t devices, mram_info_t **mram, reads_info_t *reads_info)
+void dpu_try_write_mram(dpu_t dpu_id, devices_t *devices, mram_info_t *mram)
 {
-        *mram = mram_create(reads_info);
-        mram_load(*mram, mram_number);
-        (*mram)->delta = reads_info->delta_neighbour_in_bytes;
         dpu_copy_to_individual(devices->dpus[dpu_id],
-                               (uint8_t *) *mram,
+                               (uint8_t *) mram,
                                MRAM_INFO_ADDR,
-                               sizeof(mram_info_t) + (*mram)->total_nbr_size);
+                               sizeof(mram_info_t) + mram->total_nbr_size);
 }
 
-void dpu_try_free(devices_t devices)
+void dpu_try_free(devices_t *devices)
 {
-        if (devices->ranks != NULL) {
-                for (unsigned int each_rank = 0; each_rank < devices->nb_ranks; each_rank++) {
-                        dpu_free(devices->ranks[each_rank]);
-                }
-                free(devices->ranks);
-                devices->ranks = NULL;
+        for (unsigned int each_rank = 0; each_rank < devices->nb_ranks; each_rank++) {
+                dpu_free(devices->ranks[each_rank]);
         }
-        if (devices->dpus != NULL) {
-                free(devices->dpus);
-                devices->dpus = NULL;
-        }
-
-        devices->nb_ranks = devices->nb_dpus = devices->nb_dpus_per_rank = 0;
+        free(devices->ranks);
+        free(devices->dpus);
+        free(devices);
 }
 
-void dpu_try_run(unsigned int dpu_id, devices_t devices)
+void dpu_try_run(unsigned int dpu_id, devices_t *devices)
 {
         if (dpu_boot_individual(devices->dpus[dpu_id], ASYNCHRONOUS) != DPU_API_SUCCESS) {
                 log_dpu(devices->dpus[dpu_id], stdout);
@@ -122,7 +112,7 @@ void dpu_try_run(unsigned int dpu_id, devices_t devices)
         }
 }
 
-bool dpu_try_check_status(unsigned int dpu_id, devices_t devices)
+bool dpu_try_check_status(unsigned int dpu_id, devices_t *devices)
 {
         dpu_run_status_t run_status;
         if (dpu_get_individual_status(devices->dpus[dpu_id], &run_status) != DPU_API_SUCCESS) {
@@ -144,14 +134,13 @@ bool dpu_try_check_status(unsigned int dpu_id, devices_t devices)
 }
 
 void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
-                                      devices_t devices,
+                                      devices_t *devices,
                                       unsigned int nb_reads,
                                       int8_t *reads,
                                       mram_info_t *mram,
                                       reads_info_t *reads_info)
 {
         unsigned int io_len;
-        uint8_t *reset_buffer;
         request_info_t io_header =
                 {
                  .nb_reads = nb_reads,
@@ -172,17 +161,10 @@ void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
                                (uint8_t *) reads,
                                (mram_addr_t) DPU_REQUEST_ADDR(mram),
                                io_len);
-
-        /* Clear the output area */
-        reset_buffer = malloc(DPU_RESULT_SIZE);
-        memset(reset_buffer, -1, DPU_RESULT_SIZE);
-        dpu_copy_to_individual(devices->dpus[dpu_id], reset_buffer, (mram_addr_t) DPU_RESULT_ADDR, DPU_RESULT_SIZE);
-        free(reset_buffer);
-        mram_free(mram);
 }
 
 #define CLOCK_PER_SEC (600000000.0)
-void dpu_try_log(unsigned int dpu_id, devices_t devices)
+void dpu_try_log(unsigned int dpu_id, devices_t *devices)
 {
         dpu_compute_time_t compute_time;
         dpu_copy_from_individual(devices->dpus[dpu_id],
@@ -219,27 +201,22 @@ void dpu_try_log(unsigned int dpu_id, devices_t devices)
         log_dpu(devices->dpus[dpu_id], stdout);
 }
 
-dpu_result_out_t *dpu_try_get_results(unsigned int dpu_id, devices_t devices)
+void dpu_try_get_results(unsigned int dpu_id, devices_t *devices, dpu_result_out_t *result_buffer)
 {
-        dpu_result_out_t *result_buffer = (dpu_result_out_t *) malloc(DPU_RESULT_SIZE);
-        if (result_buffer == NULL) {
-                ERROR_EXIT(29, "error during malloc of result buffer\n");
-        }
         dpu_copy_from_individual(devices->dpus[dpu_id],
                                  (mram_addr_t) DPU_RESULT_ADDR,
                                  (uint8_t *) result_buffer,
                                  DPU_RESULT_SIZE);
-        return result_buffer;
 }
 
-void dpu_try_backup_mram(unsigned int tid, devices_t devices, const char *file_name)
+void dpu_try_backup_mram(unsigned int tid, devices_t *devices, const char *file_name)
 {
         FILE *f = fopen(file_name, "wb");
         printf("saving DPU %u MRAM into '%s'\n", tid, file_name);
         if (f != NULL) {
-                uint8_t *mram = (uint8_t *) malloc(1 << 26);
-                dpu_copy_from_individual(devices->dpus[tid], 0, mram, 1 << 26);
-                fwrite(mram, 1, 1 << 26, f);
+                uint8_t *mram = (uint8_t *) malloc(MRAM_SIZE);
+                dpu_copy_from_individual(devices->dpus[tid], 0, mram, MRAM_SIZE);
+                fwrite(mram, 1, MRAM_SIZE, f);
                 free(mram);
                 fclose(f);
         } else {

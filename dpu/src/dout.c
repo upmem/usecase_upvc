@@ -40,8 +40,8 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
         new_out = &dout->outs[dout->nb_cached_out];
         new_out->num = num;
         new_out->score = score;
-        new_out->seed_nr = seed_nr;
-        new_out->seq_nr = seq_nr;
+        new_out->coord.seed_nr = seed_nr;
+        new_out->coord.seq_nr = seq_nr;
 
         dout->nb_cached_out++;
         dout->nb_results++;

@@ -28,7 +28,7 @@ void write_vmi_simulation(__attribute__((unused)) vmi_t *vmis,
                           unsigned int dpuno,
                           unsigned int align_idx,
                           int8_t *nbr,
-                          long coords,
+                          uint64_t coords,
                           reads_info_t *reads_info);
 
 /**
@@ -55,7 +55,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
  * @brief Compute one pass in simulation mode
  */
 void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
-                        __attribute__((unused)) devices_t devices,
+                        __attribute__((unused)) devices_t *devices,
                         unsigned int nb_dpu,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info);
@@ -63,12 +63,12 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
 /**
  * @brief Does nothing in simulation
  */
-devices_t init_devices_simulation(unsigned int nb_dpu,
-                                  const char *dpu_binary);
+devices_t *init_devices_simulation(unsigned int nb_dpu,
+                                   const char *dpu_binary);
 
 /**
  * @brief Does nothing in simulation
  */
-void free_devices_simulation(devices_t devices);
+void free_devices_simulation(devices_t *devices);
 
 #endif /* __SIMU_BACKEND_H__ */

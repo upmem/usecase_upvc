@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include "upvc.h"
 
+#include "common.h"
+
 /**
  * @brief DPU memory layout
  *
@@ -20,9 +22,6 @@
  * @var offset               datas : address of the first neighbour
  * @var count                datas : number of neighbour for each read
  * @var num                  datas : reads id
- * @var out_score            output : score
- * @var out_num              output : number of the read that matched
- * @var out_coord            output : coordinate on the genome where the read matched
  */
 typedef struct {
         int8_t *neighbour_idx;
@@ -34,13 +33,10 @@ typedef struct {
         int *offset;
         int *count;
         int *num;
-
-        int *out_score;
-        int *out_num;
-        long *out_coord;
 } mem_dpu_t;
 
 mem_dpu_t *get_mem_dpu(unsigned int dpu_number);
+dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number);
 
 /**
  * @brief Allocate structure to store information of DPU memory.
@@ -81,17 +77,12 @@ void write_num            (int num_dpu, int read_idx, int value);
  */
 int read_out_num          (int num_dpu, int align_idx);
 int read_out_score        (int num_dpu, int align_idx);
-long read_out_coord       (int num_dpu, int align_idx);
+dpu_result_coord_t read_out_coord       (int num_dpu, int align_idx);
 
 /**
  * @brief Print information of the DPU memory.
  */
 void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *reads_info);
 void print_coordinates(int d, int offs, int l, FILE *out);
-
-/**
- * @brief Print a result for a DPU at a index.
- */
-void write_result(int d, int k, unsigned int num, long coords, unsigned int score);
 
 #endif /* __UPVC_DPU_H__ */

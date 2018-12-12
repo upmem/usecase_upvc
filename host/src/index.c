@@ -228,6 +228,11 @@ index_seed_t **index_genome(genome_t *ref_genome,
                         int total_nb_neighbour = 0;
                         int align_idx;
                         int seed_code = code_seed(&ref_genome->data[sequence_start_idx + sequence_idx]);
+                        dpu_result_coord_t coord_var =
+                                {
+                                 .seq_nr = seq_number,
+                                 .seed_nr = sequence_idx,
+                                };
 
                         if (seed_code < 0) {
                                 continue;
@@ -255,7 +260,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                                                       seed->num_dpu,
                                                       align_idx,
                                                       buf_code_neighbour,
-                                                      ( ((long)seq_number) << 32) + sequence_idx,
+                                                      coord_var.coord,
                                                       reads_info);
                         nb_neighbours[seed->num_dpu]++;
 

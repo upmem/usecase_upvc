@@ -221,10 +221,11 @@ static void *align_on_dpu(void *arg)
         reads_info_t *reads_info = &(dpu_arg->reads_info);
         int size_neighbour = reads_info->size_neighbour_in_bytes;
         mem_dpu_t *M = get_mem_dpu(numdpu);
+        dpu_result_out_t *M_res = get_mem_dpu_res(numdpu);
         int current_read = 0;
         /* int debug_nb = -1; */
 
-        M->out_num[nb_map] = -1;
+        M_res[nb_map].num = -1;
         while (M->num[current_read] != -1) {
                 int offset = M->offset[current_read]; /* address of the first neighbour */
                 int min = MAX_SCORE;
@@ -262,11 +263,11 @@ static void *align_on_dpu(void *arg)
                                         /*        M->coordinate[offset+nb_neighbour] &0xffffffff, */
                                         /*        (M->coordinate[offset+nb_neighbour]>>32) &0xffffffff, */
                                         /*        score); */
-                                        M->out_num[nb_map] = M->num[current_read];
-                                        M->out_coord[nb_map] = M->coordinate[offset+nb_neighbour];
-                                        M->out_score[nb_map] = score;
+                                        M_res[nb_map].num = M->num[current_read];
+                                        M_res[nb_map].coord.coord = M->coordinate[offset+nb_neighbour];
+                                        M_res[nb_map].score = score;
                                         nb_map++;
-                                        M->out_num[nb_map] = -1;
+                                        M_res[nb_map].num = -1;
                                 } else {
                                         fprintf(stderr, "MAX_DPU_RESULTS reached!\n");
                                         exit(-42);
@@ -290,7 +291,7 @@ void write_vmi_simulation(__attribute__((unused)) vmi_t *vmis,
                           unsigned int dpuno,
                           unsigned int align_idx,
                           int8_t *nbr,
-                          long coords,
+                          uint64_t coords,
                           reads_info_t *reads_info)
 {
         write_neighbour_idx(dpuno, align_idx, nbr, reads_info);
@@ -321,7 +322,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
 }
 
 void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
-                        __attribute__((unused)) devices_t devices,
+                        __attribute__((unused)) devices_t *devices,
                         unsigned int nb_dpu,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info)
@@ -353,7 +354,7 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
                         int k = 0;
                         int num_read = read_out_num(this_dpu, k);
                         while (num_read != -1) {
-                                printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k));
+                                printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k).coord);
                                 k++;
                                 num_read = read_out_num(this_dpu, k);
                         }
@@ -365,10 +366,10 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
         times_ctx->tot_map_read += t2 - t1;
 }
 
-devices_t init_devices_simulation(__attribute__((unused)) unsigned int nb_dpu,
-                                  __attribute__((unused)) const char *dpu_binary)
+devices_t *init_devices_simulation(__attribute__((unused)) unsigned int nb_dpu,
+                                   __attribute__((unused)) const char *dpu_binary)
 {
         return NULL;
 }
 
-void free_devices_simulation(__attribute__((unused)) devices_t devices) {}
+void free_devices_simulation(__attribute__((unused)) devices_t *devices) {}

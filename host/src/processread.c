@@ -355,11 +355,11 @@ int process_read(genome_t *ref_genome,
                 int num_read = read_out_num(numdpu, k);
 
                 while (num_read != -1) {
-                        long coord = read_out_coord(numdpu, k);
+                        dpu_result_coord_t coord = read_out_coord(numdpu, k);
 
                         result_tab[nb_match].num_read = num_read;
-                        result_tab[nb_match].coord_seq = (int) (coord >> 32);
-                        result_tab[nb_match].coord_pos = (int) (coord & 0xFFFFFFFF);
+                        result_tab[nb_match].coord_seq = coord.seq_nr;
+                        result_tab[nb_match].coord_pos = coord.seed_nr;
                         result_tab[nb_match].score = read_out_score(numdpu, k);
                         nb_match++;
 

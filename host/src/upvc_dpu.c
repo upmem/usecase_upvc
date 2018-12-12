@@ -14,15 +14,23 @@
 
 /* static void print_neighbour(uint8_t *nbr, FILE *out, reads_info_t *reads_info); */
 static mem_dpu_t *MDPU;
+static dpu_result_out_t **MDPU_res;
 
 mem_dpu_t *get_mem_dpu(unsigned int dpu_number)
 {
         return &MDPU[dpu_number];
 }
 
+dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number)
+{
+        return MDPU_res[dpu_number];
+}
+
 void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
 {
         MDPU = (mem_dpu_t *) malloc(sizeof(mem_dpu_t) * nb_dpu);
+        MDPU_res = (dpu_result_out_t **) malloc(sizeof(dpu_result_out_t*) * nb_dpu);
+
         for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
                 MDPU[num_dpu].neighbour_idx = NULL;
                 MDPU[num_dpu].neighbour_idx_len = 0;
@@ -33,9 +41,8 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
                 MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].offset         = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].num            = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
-                MDPU[num_dpu].out_num        = (int *)    malloc(sizeof(int) * MAX_DPU_RESULTS);
-                MDPU[num_dpu].out_coord      = (long *)   malloc(sizeof(long) * MAX_DPU_RESULTS);
-                MDPU[num_dpu].out_score      = (int  *)   malloc(sizeof(long) * MAX_DPU_RESULTS);
+
+                MDPU_res[num_dpu]            = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
         }
 }
 
@@ -56,10 +63,9 @@ void free_dpu(int nb_dpu)
                 free (MDPU[num_dpu].count);
                 free (MDPU[num_dpu].offset);
                 free (MDPU[num_dpu].num);
-                free (MDPU[num_dpu].out_num);
-                free (MDPU[num_dpu].out_score);
-                free (MDPU[num_dpu].out_coord);
+                free (MDPU_res[num_dpu]);
         }
+        free(MDPU_res);
         free(MDPU);
 }
 
@@ -104,9 +110,9 @@ void write_count       (int num_dpu, int read_idx, int value)  { MDPU[num_dpu].c
 void write_offset      (int num_dpu, int read_idx, int value)  { MDPU[num_dpu].offset[read_idx]     = value; }
 void write_num         (int num_dpu, int read_idx, int value)  { MDPU[num_dpu].num[read_idx]        = value; }
 
-int read_out_num       (int num_dpu, int align_idx) { return MDPU[num_dpu].out_num[align_idx];   }
-int read_out_score     (int num_dpu, int align_idx) { return MDPU[num_dpu].out_score[align_idx]; }
-long read_out_coord    (int num_dpu, int align_idx) { return MDPU[num_dpu].out_coord[align_idx]; }
+int read_out_num       (int num_dpu, int align_idx) { return MDPU_res[num_dpu][align_idx].num;   }
+int read_out_score     (int num_dpu, int align_idx) { return MDPU_res[num_dpu][align_idx].score; }
+dpu_result_coord_t read_out_coord    (int num_dpu, int align_idx) { return MDPU_res[num_dpu][align_idx].coord; }
 
 static void print_byte_to_sym(uint8_t byte, unsigned int offset, FILE *out)
 {
@@ -167,12 +173,4 @@ void print_coordinates(int d, int offs, int l, FILE *out)
                 fprintf(out, " %lu", MDPU[d].coordinate[offs + i]);
         }
         fprintf(out, "\n");
-}
-
-void write_result(int d, int k, unsigned int num, long coords, unsigned int score)
-{
-        printf("R: %u %u %lu\n", num, score, coords);
-        MDPU[d].out_num[k] = num;
-        MDPU[d].out_coord[k] = coords;
-        MDPU[d].out_score[k] = score;
 }

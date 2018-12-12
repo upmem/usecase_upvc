@@ -67,14 +67,22 @@ typedef struct {
 #define MRAM_INFO_READ(addr, mram_info) do { mram_read16(addr, mram_info); } while(0)
 _Static_assert(sizeof(mram_info_t) == 16 ,"mram_info_t size changed (make sure that MRAM_INFO_READ changed as well)");
 
+typedef struct {
+        union {
+                uint64_t coord;
+                struct {
+                        uint32_t seed_nr;
+                        uint32_t seq_nr;
+                };
+        };
+} dpu_result_coord_t;
 /**
  * @brief One result produced for one read
  */
 typedef struct {
         int32_t num;
-        uint32_t seq_nr;
-        uint32_t seed_nr;
         uint32_t score;
+        dpu_result_coord_t coord;
 } dpu_result_out_t;
 
 #define DPU_RESULT_SIZE (MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
