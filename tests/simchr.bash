@@ -6,17 +6,19 @@
 # EDIT THESE TWO VARIABLES TO POINT TO THE PROPER BINARIES FOR VCF2DIPLOID AND ART_ILLUMINA
 # You can obtain VCF2Diploid from github.com/moselhy/vcf2diploid, you need to run "make" after you clone it to create the jar file
 # You can obtain ART from https://www.niehs.nih.gov/research/resources/software/biostatistics/art/index.cfm, you just need to untar the binary package
-VCF2DIPLOID="/home/rjodin/work/genomee/vcf2diploid/vcf2diploid.jar"
-ART_ILLUMINA="/home/rjodin/work/genomee/art_bin_MountRainier/art_illumina"
+VCF2DIPLOID="/home/ubuntu/work/genomee/vcf2diploid/vcf2diploid.jar"
+ART_ILLUMINA="/home/ubuntu/work/genomee/art_bin_MountRainier/art_illumina"
 
 # add in the $HOME/.bash_profile
 # PATH="/Users/lavenier/Documents/Projets/UPMEM/upvc1.4/VCScripts:${PATH}"
 
-
-if [ $(hostname -f | cut -d . -f2,3) == "genouest.org" ]; then
-	source /local/env/envjava-1.8.0.sh
-fi
-
+wait_jobs() {
+    for I in $(jobs -p)
+    do
+	echo "waiting $I"
+	wait $I
+    done
+}
 
 ################## START OF SIMULATION ##################
 
@@ -25,22 +27,6 @@ if [ $2 ]; then
 	seed=$2
 else
 	seed=$RANDOM
-fi
-
-# If the reference genome does not already exist on disk, download it
-if [ ! -f "chr${1}.fasta" ]; then
-        echo "get chromosome"
-	wget "ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/Assembled_chromosomes/seq/hs_ref_GRCh38.p12_chr${1}.fa.gz"
-        echo "unzip"
-	gzip -d "hs_ref_GRCh38.p12_chr${1}.fa.gz"
-	mv "hs_ref_GRCh38.p12_chr${1}.fa" "chr${1}.fasta"
-fi
-
-# If the first line of the reference genome (header line) is not ">chr" then the chromosome number, make it so
-if [ "$(head -n1 chr${1}.fasta)" != ">chr${1}" ]; then
-#	sed -i "1s/.*/>chr${1}/g" "hs_ref_GRCh38.p12_chr${1}.fa"
-# modif MAC OS X
-        sed -i '' "1s/.*/>chr${1}/g" "chr${1}.fasta"
 fi
 
 # If the common variants do not already exist on disk, download them
@@ -54,36 +40,108 @@ if [ ! -f "common_all_20170710.vcf" ]; then
 	gzip -d "common_all_20170710.vcf.gz"
 fi
 
-# Make the command that we will use with AWK to filter variants of the given chromosome
-awkcmd='$1 ~ /^#/ || $1 == '
-awkcmd+="$1 "
-
-# If the variants are not already filtered, then filter them using AWK
-if [ ! -f "chr${1}vars.vcf" ]; then
-        echo "filter variant with AWK:" $awkcmd
-	awk "$awkcmd" common_all_20170710.vcf > chr${1}vars.vcf
+if [ ! -f "chrallvars.vcf" ]; then
+    mv common_all_20170710.vcf chrallvars.vcf
 fi
 
 # Filter the chromosomes even more by choosing one out of 10 that are not in weak-spots of the reference genome
-if [ ! -f "chr${1}vars_filtered.vcf" ]; then
+if [ ! -f "chrallvars_filtered.vcf" ]; then
         echo "Select variants"
-	sel_var.py "chr${1}.fasta" "chr${1}vars.vcf" "chr${1}vars_filtered.vcf" "${seed}"
+	sel_var.py "chrall.fasta" "chrallvars.vcf" "chrallvars_filtered.vcf" "${seed}"
 fi
 
 # Split the reference genome into paternal/maternal chromosomes and insert the variants into them
 echo "split Genome into paternal/maternal chromosomes"
-java -jar $VCF2DIPLOID -id "chr${1}" -seed "${seed}" -nochains -chr "chr${1}.fasta" -vcf "chr${1}vars_filtered.vcf"
+java -jar $VCF2DIPLOID -id "chrall" -seed "${seed}" -nochains -chr "chrall.fasta" -vcf "chrallvars_filtered.vcf"
 
 # Simulate reads for each reference genome
-$ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "paternal_chr${1}_PE" -i "chr${1}_chr${1}_paternal.fa"
-$ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "maternal_chr${1}_PE" -i "chr${1}_chr${1}_maternal.fa"
+for paternal in *chrall_paternal.fa
+do
+    prefix=$(echo ${paternal} | sed 's/^\(.*\)_chrall_paternal.fa/\1/')
+    echo "prefix=${prefix}"
+    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "paternal_${prefix}_chrall_PE" -i "${paternal}" &
+done
+
+wait_jobs
+rm -rf *chrall_paternal.fa
+
+for maternal in *chrall_maternal.fa
+do
+    prefix=$(echo ${maternal} | sed 's/^\(.*\)_chrall_maternal.fa/\1/')
+    echo "prefix=${prefix}"
+    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "maternal_${prefix}_chrall_PE" -i "${maternal}" &
+done
+
+wait_jobs
+rm -rf *chrall_maternal.fa
 
 # Combine all the reads into one pair
 echo "Combine reads into a single pair of files"
-combineFastq.py "maternal_chr${1}_PE" "paternal_chr${1}_PE" "chr${1}_PE" "${seed}"
+for ((ii=1; ii<=24; ii++))
+do
+    combineFastq.py "maternal_chr${ii}_chrall_PE" "paternal_chr${ii}_chrall_PE" "chr${ii}_chrall_PE" "${seed}" &
+done
 
-mv "chr${1}vars_filtered.vcf" "chr${1}vars_ref.vcf"
+echo "first round!"
+wait_jobs
+
+rm -rf *.map
+rm -rf maternal* paternal*
+
+
+for ((ii=1; ii<=24; ii+=2))
+do
+    combineFastq.py "chr${ii}_chrall_PE" "chr$((${ii}+1))_chrall_PE" "chr${ii}_$((${ii}+1))_chrall_PE" "${seed}" &
+done
+
+echo "second round!"
+wait_jobs
+
+for ((ii=1; ii<=24; ii+=1))
+do
+    rm -rf chr${ii}_chrall_PE*
+done
+
+for ((ii=1; ii<=24; ii+=4))
+do
+    combineFastq.py "chr${ii}_$((${ii}+1))_chrall_PE" "chr$((${ii}+2))_$((${ii}+3))_chrall_PE" "chr${ii}_$((${ii}+3))_chrall_PE" "${seed}" &
+done
+
+echo "third round!"
+wait_jobs
+
+for ((ii=1; ii<=24; ii+=2))
+do
+    rm -rf chr${ii}_$((${ii}+1))_chrall_PE*
+done
+
+for ((ii=1; ii<=24; ii+=8))
+do
+    combineFastq.py "chr${ii}_$((${ii}+3))_chrall_PE" "chr$((${ii}+4))_$((${ii}+7))_chrall_PE" "chr${ii}_$((${ii}+7))_chrall_PE" "${seed}" &
+done
+
+echo "fourth round!"
+wait_jobs
+
+for ((ii=1; ii<=24; ii+=4))
+do
+    rm -rf chr${ii}_$((${ii}+3))_chrall_PE*
+done
+
+echo "fiveth round!"
+combineFastq.py "chr1_8_chrall_PE" "chr9_16_chrall_PE" "chr1_16_chrall_PE" "${seed}"
+
+rm -rf chr1_8_chrall_PE*
+rm -rf chr9_16_chrall_PE*
+
+echo "last round!"
+combineFastq.py "chr1_16_chrall_PE" "chr17_24_chrall_PE" "chrall_PE" "${seed}"
+
+rm -rf chr1_16_chrall_PE*
+rm -rf chr17_24_chrall_PE*
+
+mv "chrallvars_filtered.vcf" "chrallvars_ref.vcf"
 # Print the output file names to the user
-echo "Created chr${1}.fasta, chr${1}_PE1.fastq, chr${1}_PE2.fastq and chr${1}vars_ref.vcf"
+echo "Created chrall_PE1.fastq, chrall_PE2.fastq and chrallvars_ref.vcf"
 
 ################## END OF SIMULATION ##################
