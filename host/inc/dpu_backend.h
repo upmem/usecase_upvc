@@ -27,9 +27,8 @@ void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr,
  * @brief Add a seed to a request.
  */
 void add_seed_to_dpu_requests(dispatch_request_t *requests,
-                              int num_dpu,
                               int num_read,
-                              __attribute__((unused)) int nb_read_written,
+                              int nb_read_written,
                               index_seed_t *seed,
                               int8_t *nbr,
                               reads_info_t *reads_info);

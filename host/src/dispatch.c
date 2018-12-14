@@ -43,7 +43,7 @@ static void write_mem_DPU(index_seed_t *seed,
 
                 code_neighbour(&read[SIZE_SEED], buf, reads_info);
 
-                backends_functions->add_seed_to_requests(requests, seed->num_dpu, num_read, nb_read_written, seed, buf, reads_info);
+                backends_functions->add_seed_to_requests(requests, num_read, nb_read_written, seed, buf, reads_info);
 
                 counted_read[seed->num_dpu]++;
                 seed = seed->next;

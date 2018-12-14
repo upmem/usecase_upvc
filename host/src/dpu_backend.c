@@ -77,14 +77,13 @@ static void dispatch_request_add(dispatch_request_t *reads,
 }
 
 void add_seed_to_dpu_requests(dispatch_request_t *requests,
-                              int num_dpu,
                               int num_read,
                               __attribute__((unused)) int nb_read_written,
                               index_seed_t *seed,
                               int8_t *nbr,
                               reads_info_t *reads_info)
 {
-        dispatch_request_t *this_request = requests + num_dpu;
+        dispatch_request_t *this_request = requests + seed->num_dpu;
         dispatch_request_add(this_request,
                              (unsigned int) seed->offset,
                              (unsigned int) seed->nb_nbr,

@@ -40,7 +40,6 @@ index_seed_t **get_index_seed_simulation();
  * @brief Write seed information in the structure representing the DPU list of requests.
  */
 void add_seed_to_simulation_requests(dispatch_request_t *requests,
-                                     int num_dpu,
                                      int num_read,
                                      int nb_read_written,
                                      index_seed_t *seed,

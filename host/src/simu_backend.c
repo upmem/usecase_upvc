@@ -308,7 +308,6 @@ index_seed_t **get_index_seed_simulation(unsigned int nb_dpu,
 }
 
 void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t *requests,
-                                     __attribute__((unused)) int num_dpu,
                                      int num_read,
                                      int nb_read_written,
                                      index_seed_t *seed,
