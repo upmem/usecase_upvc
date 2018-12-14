@@ -33,7 +33,7 @@ static void usage()
         ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> -n <nb_dpus_per_run> [-s | -t <type> -g <goal> -b <dpu_binary> ] \n"
                    "options:\n"
                    "\t-i\tInput prefix that will be used to find the inputs files\n"
-                   "\t-d\tNumber of DPUs to use - value=128|256\n"
+                   "\t-d\tNumber of DPUs to use - value=128|256|2048|4096\n"
                    "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
                    "\t-t\tTarget type - values=hsim|fpga\n"
                    "\t-g\tGoal of the run - values=index|check|map\n"
@@ -189,6 +189,10 @@ static void validate_nb_dpu(const char *nb_dpu_str)
                 nb_dpu = nb_dpu_128;
         } else if (strcmp(nb_dpu_str, "256") == 0) {
                 nb_dpu = nb_dpu_256;
+        } else if (strcmp(nb_dpu_str, "2048") == 0) {
+                nb_dpu = nb_dpu_2048;
+        } else if (strcmp(nb_dpu_str, "4096") == 0) {
+                nb_dpu = nb_dpu_4096;
         } else {
                 ERROR("wrong number of DPUs");
                 usage();
