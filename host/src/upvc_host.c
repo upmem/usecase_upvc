@@ -32,6 +32,7 @@ static int map_var_call(char *filename_prefix,
                         variant_tree_t **variant_list,
                         int *substitution_list,
                         int8_t *mapping_coverage,
+                        dpu_result_out_t *result_tab,
                         reads_info_t *reads_info,
                         times_ctx_t *times_ctx,
                         backends_functions_t *backends_functions)
@@ -123,6 +124,7 @@ static int map_var_call(char *filename_prefix,
                                             variant_list,
                                             substitution_list,
                                             mapping_coverage,
+                                            result_tab,
                                             fope1,
                                             fope2,
                                             round,
@@ -152,7 +154,7 @@ static void reload_and_verify_mram_images(reads_info_t *reads_info)
         FILE *seed_file;
         unsigned int nb_dpu = get_nb_dpu();
         malloc_dpu(reads_info, nb_dpu);
-        index_seed = reload_mram_images_and_seeds(reads_info);
+        index_seed = load_index_seeds();
         seed_file = fopen(SEED_FILE_LOG, "w");
         print_index_seeds(index_seed, seed_file, reads_info);
         fclose(seed_file);
@@ -186,6 +188,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
 
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
+        dpu_result_out_t *result_tab = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS * nb_dpu);
 
         index_seed = backends_functions->get_index_seed(nb_dpu, ref_genome, reads_info, times_ctx, backends_functions);
 
@@ -201,7 +204,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                         continue;
                 }
                 map_var_call(input_prefix, round, devices, ref_genome, index_seed,
-                             &variant_list, substitution_list, mapping_coverage,
+                             &variant_list, substitution_list, mapping_coverage, result_tab,
                              reads_info, times_ctx, backends_functions);
         }
 
@@ -212,6 +215,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         free_variant_tree(variant_list);
         free_genome(ref_genome);
         free_index(index_seed);
+        free(result_tab);
         free(substitution_list);
         free(mapping_coverage);
         free_dpu(nb_dpu);

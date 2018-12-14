@@ -22,7 +22,7 @@ index_seed_t **get_index_seed_dpu(unsigned int nb_dpu,
                                   __attribute__((unused)) backends_functions_t *backends_funcions)
 {
         malloc_dpu(reads_info, nb_dpu);
-        return reload_mram_images_and_seeds(reads_info);
+        return load_index_seeds();
 }
 
 vmi_t *init_vmis_dpu(unsigned int nb_dpu)

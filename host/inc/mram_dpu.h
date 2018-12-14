@@ -58,9 +58,4 @@ bool mram_save(mram_info_t *mram, unsigned int dpu_id);
  */
 void mram_load(mram_info_t *mram, unsigned int dpu_id);
 
-/**
- * @brief Read mram files, and reproduce the index seed.
- */
-index_seed_t **reload_mram_images_and_seeds(reads_info_t *reads_info);
-
 #endif /* __INTEGRATION_MDPU_H__ */

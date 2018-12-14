@@ -10,6 +10,7 @@
 #include "genome.h"
 #include "vartree.h"
 #include "upvc.h"
+#include "common.h"
 
 /**
  * @brief Add each read that matched into the variant list.
@@ -20,6 +21,7 @@
  * @param variant_list       Output list of the variant found in process_read.
  * @param substitution_list  List of substitution.
  * @param mapping_coverage   Number of match for every position of the reference genome.
+ * @param result_tab         Buffer to store and sort results from every DPUs.
  * @param fpe1               First file of Pair-end read containing the read that didn't match.
  * @param fpe2               Second file of Pair-end read containing the read that didn't match.
  * @param round              Round number of the process_read.
@@ -34,6 +36,7 @@ int process_read(genome_t *ref_genome,
                  variant_tree_t **variant_list,
                  int *substitution_list,
                  int8_t *mapping_coverage,
+                 dpu_result_out_t *result_tab,
                  FILE *fpe1,
                  FILE *fpe2,
                  int round,
