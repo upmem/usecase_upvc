@@ -267,7 +267,7 @@ static void set_variant(result_t result_match,
         }
 }
 
-static void add_to_non_mapped_read(int numpair,
+static void add_to_non_mapped_read(int numread,
                                    int round,
                                    FILE *fpe1,
                                    FILE *fpe2,
@@ -276,7 +276,7 @@ static void add_to_non_mapped_read(int numpair,
 {
         char nucleotide[4] = {'A','C','T','G'};
         int size_read = reads_info->size_read;
-        int8_t *read = &reads_buffer[numpair * size_read];
+        int8_t *read = &reads_buffer[numread * size_read];
         fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
         for (int j = SIZE_SEED; j < size_read; j++) {
                 fprintf(fpe1, "%c", nucleotide[read[j]&3]);
@@ -285,7 +285,7 @@ static void add_to_non_mapped_read(int numpair,
                 fprintf(fpe1, "A");
         }
         fprintf(fpe1, "\n");
-        read = &reads_buffer[(numpair+2) * size_read];
+        read = &reads_buffer[(numread+2) * size_read];
         fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
         for (int j = SIZE_SEED; j < size_read; j++) {
                 fprintf(fpe2, "%c", nucleotide[read[j]&3]);
@@ -314,7 +314,7 @@ static bool compute_read_pair(int type1,
                 for (int pb = offset[type2]; pb < offset[type2] + nbread[type2]; pb++) {
                         if (check_pair(result_tab[pa], result_tab[pb], reads_info)) {
                                 if (*result_found) {
-                                        add_to_non_mapped_read(numpair, round, fpe1, fpe2, reads_buffer, reads_info);
+                                        add_to_non_mapped_read(numpair*4, round, fpe1, fpe2, reads_buffer, reads_info);
                                         return false;
                                 }
                                 result_tab_tmp[0] = pa;
@@ -444,7 +444,7 @@ int process_read(genome_t *ref_genome,
                                     reads_info);
                         nb_read_map += 2;
                 } else {
-                        add_to_non_mapped_read(numpair, round, fpe1, fpe2, reads_buffer, reads_info);
+                        add_to_non_mapped_read(numpair*4, round, fpe1, fpe2, reads_buffer, reads_info);
                 }
         }
 
