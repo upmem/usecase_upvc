@@ -5,7 +5,7 @@
  * @brief Specific function whether the application run on simulation or on DPU (hsim of fpga).
  */
 typedef struct backends_functions_struct {
-        void (*run_dpu)(dispatch_t, devices_t *, unsigned int, times_ctx_t *, reads_info_t *);
+        void (*run_dpu)(dispatch_request_t *, devices_t *, unsigned int, times_ctx_t *, reads_info_t *);
         void (*add_seed_to_requests)(dispatch_request_t *, int, int, int, index_seed_t *, int8_t *, reads_info_t *);
 
         vmi_t *(*init_vmis)(unsigned int);

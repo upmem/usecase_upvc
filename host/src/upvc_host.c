@@ -29,6 +29,7 @@ static int map_var_call(char *filename_prefix,
                         devices_t *devices,
                         genome_t *ref_genome,
                         index_seed_t **index_seed,
+                        dispatch_request_t *dispatch_requests,
                         variant_tree_t **variant_list,
                         int *substitution_list,
                         int8_t *mapping_coverage,
@@ -76,8 +77,6 @@ static int map_var_call(char *filename_prefix,
          *   - Reads post-processing
          */
         while ((nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info)) != 0) {
-                dispatch_t dispatch;
-
                 nb_read_total += nb_read;
 
                 printf("Round %d / Pass %d\n", round, nb_pass);
@@ -91,18 +90,19 @@ static int map_var_call(char *filename_prefix,
                         continue;
                 }
 
-                dispatch = dispatch_read(index_seed,
-                                         reads_buffer,
-                                         nb_read,
-                                         nb_dpu,
-                                         times_ctx,
-                                         reads_info,
-                                         backends_functions);
+                dispatch_read(index_seed,
+                              reads_buffer,
+                              nb_read,
+                              nb_dpu,
+                              dispatch_requests,
+                              times_ctx,
+                              reads_info,
+                              backends_functions);
                 printf(" - time to dispatch reads : %7.2lf sec. / %7.2lf sec.\n",
                        times_ctx->dispatch_read,
                        times_ctx->tot_dispatch_read);
 
-                backends_functions->run_dpu(dispatch,
+                backends_functions->run_dpu(dispatch_requests,
                                             devices,
                                             (DEBUG_NB_RUN != -1) ? ((DEBUG_NB_RUN + DEBUG_FIRST_RUN) * get_nb_dpus_per_run()) : nb_dpu,
                                             times_ctx,
@@ -110,8 +110,6 @@ static int map_var_call(char *filename_prefix,
                 printf(" - time to map reads      : %7.2lf sec. / %7.2lf sec.\n",
                        times_ctx->map_read,
                        times_ctx->tot_map_read);
-
-                dispatch_free(dispatch, nb_dpu);
 
                 if (DEBUG_PASS != -1) {
                         break;
@@ -189,6 +187,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
         dpu_result_out_t *result_tab = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS * nb_dpu);
         int8_t *reads_buffer = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
+        dispatch_request_t *dispatch_requests = dispatch_create(nb_dpu, reads_info);
 
         if ((DEBUG_NB_RUN != -1 && DEBUG_FIRST_RUN == -1)
             || (DEBUG_NB_RUN == 0)) {
@@ -209,7 +208,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                 if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {
                         continue;
                 }
-                map_var_call(input_prefix, round, devices, ref_genome, index_seed,
+                map_var_call(input_prefix, round, devices, ref_genome, index_seed, dispatch_requests,
                              &variant_list, substitution_list, mapping_coverage, reads_buffer, result_tab,
                              reads_info, times_ctx, backends_functions);
         }
@@ -221,6 +220,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         free_variant_tree(variant_list);
         free_genome(ref_genome);
         free_index(index_seed);
+        dispatch_free(dispatch_requests, nb_dpu);
         free(reads_buffer);
         free(result_tab);
         free(substitution_list);

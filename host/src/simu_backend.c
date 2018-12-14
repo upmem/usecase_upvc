@@ -322,7 +322,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
         write_neighbour_read(seed->num_dpu, nb_read_written, nbr, reads_info);
 }
 
-void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
+void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                         __attribute__((unused)) devices_t *devices,
                         unsigned int nb_dpu,
                         times_ctx_t *times_ctx,

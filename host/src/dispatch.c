@@ -12,7 +12,7 @@
 #include "code.h"
 #include "upvc.h"
 
-static dispatch_request_t *dispatch_create(unsigned int nb_dpu, reads_info_t *reads_info)
+dispatch_request_t *dispatch_create(unsigned int nb_dpu, reads_info_t *reads_info)
 {
         dispatch_request_t *request = (dispatch_request_t *) calloc(nb_dpu, sizeof(dispatch_request_t));
         if (request == NULL) {
@@ -50,7 +50,7 @@ static void write_mem_DPU(index_seed_t *seed,
         }
 }
 
-void dispatch_free(dispatch_t requests, unsigned int nb_dpu)
+void dispatch_free(dispatch_request_t *requests, unsigned int nb_dpu)
 {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
                 free(requests[each_dpu].reads_area);
@@ -58,24 +58,26 @@ void dispatch_free(dispatch_t requests, unsigned int nb_dpu)
         free(requests);
 }
 
-dispatch_t dispatch_read(index_seed_t **index_seed,
-                         int8_t* read_buffer,
-                         int nb_read,
-                         int nb_dpu,
-                         times_ctx_t *times_ctx,
-                         reads_info_t *reads_info,
-                         backends_functions_t *backends_functions)
+void dispatch_read(index_seed_t **index_seed,
+                   int8_t* read_buffer,
+                   int nb_read,
+                   int nb_dpu,
+                   dispatch_request_t *requests,
+                   times_ctx_t *times_ctx,
+                   reads_info_t *reads_info,
+                   backends_functions_t *backends_functions)
 {
         double t1, t2;
         int counted_read[nb_dpu];
         int size_read = reads_info->size_read;
-        dispatch_request_t *requests = NULL;
 
         t1 = my_clock();
 
-        requests = dispatch_create(nb_dpu, reads_info);
-
         memset(&counted_read, 0, nb_dpu * sizeof(unsigned int));
+
+        for (int numdpu = 0; numdpu < nb_dpu; numdpu++) {
+                requests[numdpu].nb_reads = 0;
+        }
 
         for (int num_read = 0; num_read < nb_read; num_read++) {
                 int8_t *read = &read_buffer[num_read * size_read];
@@ -92,6 +94,4 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
         t2 = my_clock();
         times_ctx->dispatch_read = t2 - t1;
         times_ctx->tot_dispatch_read += t2 - t1;
-
-        return requests;
 }

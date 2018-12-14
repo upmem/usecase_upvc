@@ -50,7 +50,7 @@ void add_seed_to_simulation_requests(dispatch_request_t *requests,
 /**
  * @brief Compute one pass in simulation mode.
  */
-void run_dpu_simulation(dispatch_t dispatch,
+void run_dpu_simulation(dispatch_request_t *dispatch,
                         devices_t *devices,
                         unsigned int nb_dpu,
                         times_ctx_t *times_ctx,

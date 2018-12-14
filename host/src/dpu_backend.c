@@ -131,7 +131,7 @@ static void print_memory_layout(mram_info_t *mram_info, unsigned int nb_reads, r
         assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);
 }
 
-void run_on_dpu(dispatch_t dispatch,
+void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int nb_dpu,
                 times_ctx_t *times_ctx,

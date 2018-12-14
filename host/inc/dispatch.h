@@ -18,13 +18,6 @@ typedef struct {
         int8_t *reads_area;
 } dispatch_request_t;
 
-/**
- * @brief A list of requests distributed amongst DPUs.
- *
- * A table of requests, indexed by target DPU.
- */
-typedef dispatch_request_t *dispatch_t;
-
 #include "upvc.h"
 #include "vmi.h"
 #include "index.h"
@@ -38,19 +31,29 @@ typedef dispatch_request_t *dispatch_t;
  * @param read_buffer      Buffer containning the reads to dispatch.
  * @param nb_read          Number of reads to dispatch.
  * @param nb_dpu           Number of DPUs on which to dispatch the reads.
+ * @param dispatch_requests  Table of dispatch_request_t to store the dispatching between the DPUs.
  * @param times_ctx        Times information for the whole application.
  * @param reads_info       Information on the size of the seed and the neighbour.
  * @param simulation_mode  Indicate if we have DPUs (fpga of hsim) to compute or only the host.
  *
  * @return The dispatcher result.
  */
-dispatch_t dispatch_read(index_seed_t **index_seed,
-                         int8_t *read_buffer,
-                         int nb_read,
-                         int nb_dpu,
-                         times_ctx_t *times_ctx,
-                         reads_info_t *reads_info,
-                         backends_functions_t *backends_functions);
+void dispatch_read(index_seed_t **index_seed,
+                   int8_t *read_buffer,
+                   int nb_read,
+                   int nb_dpu,
+                   dispatch_request_t *dispatch_requests,
+                   times_ctx_t *times_ctx,
+                   reads_info_t *reads_info,
+                   backends_functions_t *backends_functions);
+
+/**
+ * @brief Create a table of requests to be filled with dispatch_read
+ *
+ * @param nb_dpu      Number of DPUs on which to dispatch the reads.
+ * @param reads_info  Information on the size of the seed and the neighbour.
+ */
+dispatch_request_t *dispatch_create(unsigned int nb_dpu, reads_info_t *reads_info);
 
 /**
  * @brief Frees the requests produced by dispatch_read.
@@ -58,6 +61,6 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
  * @param dispatch  The free structure.
  * @param nb_dpu    The number of DPUs to use to compute.
  */
-void dispatch_free(dispatch_t dispatch, unsigned int nb_dpu);
+void dispatch_free(dispatch_request_t *dispatch, unsigned int nb_dpu);
 
 #endif /* __DISPATCH_H__ */

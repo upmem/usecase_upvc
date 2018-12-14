@@ -37,7 +37,7 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests,
 /**
  * @brief Compute one pass on DPUs.
  */
-void run_on_dpu(dispatch_t dispatch,
+void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int nb_dpu,
                 times_ctx_t *times_ctx,
