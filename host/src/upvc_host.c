@@ -24,27 +24,101 @@
 #include "simu_backend.h"
 #include "dpu_backend.h"
 
-static int map_var_call(char *filename_prefix,
-                        int round,
-                        devices_t *devices,
-                        genome_t *ref_genome,
-                        index_seed_t **index_seed,
-                        dispatch_request_t *dispatch_requests,
-                        variant_tree_t **variant_list,
-                        int *substitution_list,
-                        int8_t *mapping_coverage,
-                        int8_t *reads_buffer,
-                        dpu_result_out_t *result_tab,
-                        reads_info_t *reads_info,
-                        times_ctx_t *times_ctx,
-                        backends_functions_t *backends_functions)
+static void run_pass(int round,
+                     int nb_read,
+                     int nb_read_total,
+                     unsigned int nb_dpu,
+                     int nb_pass,
+                     FILE *fope1,
+                     FILE *fope2,
+                     int8_t *reads_buffer,
+                     dpu_result_out_t *result_tab,
+                     genome_t *ref_genome,
+                     index_seed_t **index_seed,
+                     dispatch_request_t *dispatch_requests,
+                     variant_tree_t **variant_list,
+                     int *substitution_list,
+                     int8_t *mapping_coverage,
+                     devices_t *devices,
+                     reads_info_t *reads_info,
+                     times_ctx_t *times_ctx,
+                     backends_functions_t *backends_functions)
+{
+        int nb_read_map;
+        printf("Round %d / Pass %d\n", round, nb_pass);
+        printf(" - get %d reads (%d)\n", nb_read / 2, nb_read_total / 2);
+        printf(" - time to get reads      : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->get_reads,
+               times_ctx->tot_get_reads);
+
+        if (DEBUG_PASS != -1 && DEBUG_PASS != nb_pass) {
+                return;
+        }
+
+        dispatch_read(index_seed,
+                      reads_buffer,
+                      nb_read,
+                      nb_dpu,
+                      dispatch_requests,
+                      times_ctx,
+                      reads_info,
+                      backends_functions);
+        printf(" - time to dispatch reads : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->dispatch_read,
+               times_ctx->tot_dispatch_read);
+
+        backends_functions->run_dpu(dispatch_requests,
+                                    devices,
+                                    (DEBUG_NB_RUN != -1) ? ((DEBUG_NB_RUN + DEBUG_FIRST_RUN) * get_nb_dpus_per_run()) : nb_dpu,
+                                    times_ctx,
+                                    reads_info);
+        printf(" - time to map reads      : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->map_read,
+               times_ctx->tot_map_read);
+
+        if (DEBUG_PASS != -1) {
+                return;
+        }
+
+        nb_read_map = process_read(ref_genome,
+                                   reads_buffer,
+                                   variant_list,
+                                   substitution_list,
+                                   mapping_coverage,
+                                   result_tab,
+                                   fope1,
+                                   fope2,
+                                   round,
+                                   nb_dpu,
+                                   times_ctx,
+                                   reads_info);
+        printf(" - time to process reads  : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->process_read,
+               times_ctx->tot_process_read);
+        printf(" - map %i reads\n", nb_read_map);
+        printf("\n");
+}
+
+static void map_var_call(char *filename_prefix,
+                         int round,
+                         devices_t *devices,
+                         genome_t *ref_genome,
+                         index_seed_t **index_seed,
+                         dispatch_request_t *dispatch_requests,
+                         variant_tree_t **variant_list,
+                         int *substitution_list,
+                         int8_t *mapping_coverage,
+                         int8_t *reads_buffer,
+                         dpu_result_out_t *result_tab,
+                         reads_info_t *reads_info,
+                         times_ctx_t *times_ctx,
+                         backends_functions_t *backends_functions)
 {
         char filename[1024];
         FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
         FILE *fope1, *fope2;  /* pair-end output file descriptor */
         int nb_read;
         int nb_read_total = 0;
-        int nb_read_map = 0;
         int nb_pass = 0;
         unsigned int nb_dpu = get_nb_dpu();
 
@@ -78,60 +152,14 @@ static int map_var_call(char *filename_prefix,
          */
         while ((nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info)) != 0) {
                 nb_read_total += nb_read;
-
-                printf("Round %d / Pass %d\n", round, nb_pass);
-                printf(" - get %d reads (%d)\n", nb_read / 2, nb_read_total / 2);
-                printf(" - time to get reads      : %7.2lf sec. / %7.2lf sec.\n",
-                       times_ctx->get_reads,
-                       times_ctx->tot_get_reads);
-
-                if (DEBUG_PASS != -1 && DEBUG_PASS != nb_pass) {
-                        nb_pass++;
-                        continue;
-                }
-
-                dispatch_read(index_seed,
-                              reads_buffer,
-                              nb_read,
-                              nb_dpu,
-                              dispatch_requests,
-                              times_ctx,
-                              reads_info,
-                              backends_functions);
-                printf(" - time to dispatch reads : %7.2lf sec. / %7.2lf sec.\n",
-                       times_ctx->dispatch_read,
-                       times_ctx->tot_dispatch_read);
-
-                backends_functions->run_dpu(dispatch_requests,
-                                            devices,
-                                            (DEBUG_NB_RUN != -1) ? ((DEBUG_NB_RUN + DEBUG_FIRST_RUN) * get_nb_dpus_per_run()) : nb_dpu,
-                                            times_ctx,
-                                            reads_info);
-                printf(" - time to map reads      : %7.2lf sec. / %7.2lf sec.\n",
-                       times_ctx->map_read,
-                       times_ctx->tot_map_read);
-
-                if (DEBUG_PASS != -1) {
-                        break;
-                }
-
-                nb_read_map += process_read(ref_genome,
-                                            reads_buffer,
-                                            variant_list,
-                                            substitution_list,
-                                            mapping_coverage,
-                                            result_tab,
-                                            fope1,
-                                            fope2,
-                                            round,
-                                            nb_dpu,
-                                            times_ctx,
-                                            reads_info);
-                printf(" - time to process reads  : %7.2lf sec. / %7.2lf sec.\n",
-                       times_ctx->process_read,
-                       times_ctx->tot_process_read);
-                printf(" - map %d reads\n", nb_read_map);
-                printf("\n");
+                run_pass(round, nb_read, nb_read_total, nb_dpu, nb_pass,
+                         fope1, fope2,
+                         reads_buffer, result_tab,
+                         ref_genome,
+                         index_seed, dispatch_requests,
+                         variant_list, substitution_list, mapping_coverage,
+                         devices,
+                         reads_info, times_ctx, backends_functions);
                 nb_pass++;
         }
 
@@ -139,8 +167,6 @@ static int map_var_call(char *filename_prefix,
         fclose(fipe2);
         fclose(fope1);
         fclose(fope2);
-
-        return nb_read_map;
 }
 
 static void reload_and_verify_mram_images(reads_info_t *reads_info)
