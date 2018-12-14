@@ -15,16 +15,6 @@
 #include "common.h"
 #include "parse_args.h"
 
-index_seed_t **get_index_seed_dpu(unsigned int nb_dpu,
-                                  __attribute__((unused)) genome_t *ref_genome,
-                                  reads_info_t *reads_info,
-                                  __attribute__((unused)) times_ctx_t *times_ctx,
-                                  __attribute__((unused)) backends_functions_t *backends_funcions)
-{
-        malloc_dpu(reads_info, nb_dpu);
-        return load_index_seeds();
-}
-
 vmi_t *init_vmis_dpu(unsigned int nb_dpu)
 {
         vmi_t *vmis = (vmi_t *) calloc(nb_dpu, sizeof(vmi_t));
@@ -222,4 +212,25 @@ void run_on_dpu(dispatch_t dispatch,
         t2 = my_clock();
         times_ctx->map_read = t2 - t1;
         times_ctx->tot_map_read += t2 - t1;
+}
+
+void init_backend_dpu(devices_t **devices,
+                             unsigned int nb_dpu_per_run,
+                             const char *dpu_binary,
+                             index_seed_t ***index_seed,
+                             unsigned int nb_dpu,
+                             __attribute__((unused)) genome_t *ref_genome,
+                             __attribute__((unused)) reads_info_t *reads_info,
+                             __attribute__((unused)) times_ctx_t *times_ctx,
+                             __attribute__((unused)) backends_functions_t *backends_functions)
+{
+        malloc_dpu_res(nb_dpu);
+        *index_seed = load_index_seeds();
+        *devices = dpu_try_alloc_for(nb_dpu_per_run, dpu_binary);
+}
+
+void free_backend_dpu(devices_t *devices, __attribute__((unused)) unsigned int nb_dpu)
+{
+        dpu_try_free(devices);
+        free_dpu_res();
 }

@@ -53,6 +53,12 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu);
  * @param reads_info  Information on the size of the seed and the neighbour.
  */
 void malloc_neighbour_idx (int num_dpu, int nb_index, reads_info_t *reads_info);
+/**
+ * @brief Allocate structure to store results information of DPUs.
+ *
+ * @param nb_dpu  Number of dpu used to compute.
+ */
+void malloc_dpu_res(int nb_dpu);
 
 /**
  * @brief Free all the structure allocated to store information of the DPU memory.
@@ -60,6 +66,10 @@ void malloc_neighbour_idx (int num_dpu, int nb_index, reads_info_t *reads_info);
  * @param nb_dpu  Number of DPUs.
  */
 void free_dpu(int nb_dpu);
+/**
+ * @brief Free the structure used to store results information of DPUs.
+ */
+void free_dpu_res();
 
 /**
  * @brief Write information of the DPU memory.

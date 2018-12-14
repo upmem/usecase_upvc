@@ -89,11 +89,6 @@ dispatch_t dispatch_read(index_seed_t **index_seed,
                               backends_functions);
         }
 
-        for (int numdpu = 0; numdpu < nb_dpu; numdpu++) {
-                int nb_counted_read = counted_read[numdpu];
-                write_num(numdpu, nb_counted_read, -1);
-        }
-
         t2 = my_clock();
         times_ctx->dispatch_read = t2 - t1;
         times_ctx->tot_dispatch_read += t2 - t1;

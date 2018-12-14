@@ -32,6 +32,7 @@ static int map_var_call(char *filename_prefix,
                         variant_tree_t **variant_list,
                         int *substitution_list,
                         int8_t *mapping_coverage,
+                        int8_t *reads_buffer,
                         dpu_result_out_t *result_tab,
                         reads_info_t *reads_info,
                         times_ctx_t *times_ctx,
@@ -40,7 +41,6 @@ static int map_var_call(char *filename_prefix,
         char filename[1024];
         FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
         FILE *fope1, *fope2;  /* pair-end output file descriptor */
-        int8_t *reads_buffer;
         int nb_read;
         int nb_read_total = 0;
         int nb_read_map = 0;
@@ -67,8 +67,6 @@ static int map_var_call(char *filename_prefix,
         fope1 = fopen(filename, "w");
         sprintf(filename, "%s_%d_PE2.fasta", filename_prefix, round+1);
         fope2 = fopen(filename, "w");
-
-        reads_buffer = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
 
         /*
          * Loop:
@@ -139,7 +137,6 @@ static int map_var_call(char *filename_prefix,
                 nb_pass++;
         }
 
-        free(reads_buffer);
         fclose(fipe1);
         fclose(fipe2);
         fclose(fope1);
@@ -176,6 +173,7 @@ static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_
 
         free_genome(ref_genome);
         free_index(index_seed);
+        free_dpu(get_nb_dpu());
 }
 
 static void do_mapping(backends_functions_t *backends_functions, reads_info_t *reads_info, times_ctx_t *times_ctx)
@@ -185,40 +183,48 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         unsigned int nb_dpu = get_nb_dpu();
         variant_tree_t *variant_list = NULL;
         genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
+        devices_t *devices;
 
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
         dpu_result_out_t *result_tab = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS * nb_dpu);
-
-        index_seed = backends_functions->get_index_seed(nb_dpu, ref_genome, reads_info, times_ctx, backends_functions);
+        int8_t *reads_buffer = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
 
         if ((DEBUG_NB_RUN != -1 && DEBUG_FIRST_RUN == -1)
             || (DEBUG_NB_RUN == 0)) {
                 ERROR_EXIT(42, "DEBUG MACRO has not been well configured!");
         }
 
-        devices_t *devices = backends_functions->init_devices(get_nb_dpus_per_run(), get_dpu_binary());
+        backends_functions->init_backend(&devices,
+                                         get_nb_dpus_per_run(),
+                                         get_dpu_binary(),
+                                         &index_seed,
+                                         nb_dpu,
+                                         ref_genome,
+                                         reads_info,
+                                         times_ctx,
+                                         backends_functions);
 
         for (int round = 0; round < 3; round++) {
                 if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {
                         continue;
                 }
                 map_var_call(input_prefix, round, devices, ref_genome, index_seed,
-                             &variant_list, substitution_list, mapping_coverage, result_tab,
+                             &variant_list, substitution_list, mapping_coverage, reads_buffer, result_tab,
                              reads_info, times_ctx, backends_functions);
         }
 
-        backends_functions->free_devices(devices);
+        backends_functions->free_backend(devices, nb_dpu);
 
         create_vcf(input_prefix, ref_genome, &variant_list, substitution_list, mapping_coverage, times_ctx);
 
         free_variant_tree(variant_list);
         free_genome(ref_genome);
         free_index(index_seed);
+        free(reads_buffer);
         free(result_tab);
         free(substitution_list);
         free(mapping_coverage);
-        free_dpu(nb_dpu);
 }
 
 static void print_time()
@@ -255,20 +261,18 @@ int main(int argc, char *argv[])
         setup_dpus_for_target_type(get_target_type());
 
         if (get_simulation_mode()) {
-                backends_functions.init_devices = init_devices_simulation;
-                backends_functions.free_devices = free_devices_simulation;
+                backends_functions.init_backend = init_backend_simulation;
+                backends_functions.free_backend = free_backend_simulation;
                 backends_functions.run_dpu = run_dpu_simulation;
                 backends_functions.add_seed_to_requests = add_seed_to_simulation_requests;
-                backends_functions.get_index_seed = get_index_seed_simulation;
                 backends_functions.init_vmis = init_vmis_simulation;
                 backends_functions.free_vmis = free_vmis_simulation;
                 backends_functions.write_vmi = write_vmi_simulation;
         } else {
-                backends_functions.init_devices = dpu_try_alloc_for;
-                backends_functions.free_devices = dpu_try_free;
+                backends_functions.init_backend = init_backend_dpu;
+                backends_functions.free_backend = free_backend_dpu;
                 backends_functions.run_dpu = run_on_dpu;
                 backends_functions.add_seed_to_requests = add_seed_to_dpu_requests;
-                backends_functions.get_index_seed = get_index_seed_dpu;
                 backends_functions.init_vmis = init_vmis_dpu;
                 backends_functions.free_vmis = free_vmis_dpu;
                 backends_functions.write_vmi = write_vmi_dpu;

@@ -26,10 +26,17 @@ dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number)
         return MDPU_res[dpu_number];
 }
 
+void malloc_dpu_res(int nb_dpu) {
+        MDPU_res = (dpu_result_out_t **) malloc(sizeof(dpu_result_out_t*) * nb_dpu);
+        for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
+                MDPU_res[num_dpu] = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
+        }
+}
+
 void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
 {
+        malloc_dpu_res(nb_dpu);
         MDPU = (mem_dpu_t *) malloc(sizeof(mem_dpu_t) * nb_dpu);
-        MDPU_res = (dpu_result_out_t **) malloc(sizeof(dpu_result_out_t*) * nb_dpu);
 
         for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
                 MDPU[num_dpu].neighbour_idx = NULL;
@@ -41,8 +48,6 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
                 MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].offset         = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].num            = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
-
-                MDPU_res[num_dpu]            = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
         }
 }
 
@@ -52,6 +57,11 @@ void malloc_neighbour_idx (int num_dpu, int nb_index, reads_info_t *reads_info)
         MDPU[num_dpu].neighbour_idx = (int8_t *) malloc(MDPU[num_dpu].neighbour_idx_len);
         MDPU[num_dpu].coordinate_len = sizeof(long) * nb_index;
         MDPU[num_dpu].coordinate = (long *) malloc(MDPU[num_dpu].coordinate_len);
+}
+
+void free_dpu_res()
+{
+        free(MDPU_res);
 }
 
 void free_dpu(int nb_dpu)
@@ -65,7 +75,7 @@ void free_dpu(int nb_dpu)
                 free (MDPU[num_dpu].num);
                 free (MDPU_res[num_dpu]);
         }
-        free(MDPU_res);
+        free_dpu_res();
         free(MDPU);
 }
 

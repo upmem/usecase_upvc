@@ -318,6 +318,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
         write_count(seed->num_dpu, nb_read_written, seed->nb_nbr);
         write_offset(seed->num_dpu, nb_read_written, seed->offset);
         write_num(seed->num_dpu, nb_read_written, num_read);
+        write_num(seed->num_dpu, nb_read_written + 1, -1);
         write_neighbour_read(seed->num_dpu, nb_read_written, nbr, reads_info);
 }
 
@@ -366,10 +367,20 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
         times_ctx->tot_map_read += t2 - t1;
 }
 
-devices_t *init_devices_simulation(__attribute__((unused)) unsigned int nb_dpu,
-                                   __attribute__((unused)) const char *dpu_binary)
+void init_backend_simulation(__attribute__((unused)) devices_t **devices,
+                             __attribute__((unused)) unsigned int nb_dpu_per_run,
+                             __attribute__((unused)) const char *dpu_binary,
+                             index_seed_t ***index_seed,
+                             unsigned int nb_dpu,
+                             genome_t *ref_genome,
+                             reads_info_t *reads_info,
+                             times_ctx_t *times_ctx,
+                             backends_functions_t *backends_functions)
 {
-        return NULL;
+        *index_seed = index_genome(ref_genome, nb_dpu, times_ctx, reads_info, backends_functions);
 }
 
-void free_devices_simulation(__attribute__((unused)) devices_t *devices) {}
+void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigned int nb_dpu)
+{
+        free_dpu(nb_dpu);
+}

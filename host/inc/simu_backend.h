@@ -11,20 +11,20 @@
 /**
  * @brief Does nothing for simulation
  */
-vmi_t *init_vmis_simulation(__attribute__((unused)) unsigned int nb_dpu);
+vmi_t *init_vmis_simulation( unsigned int nb_dpu);
 
 /**
  * @brief Does nothing for simulation
  */
-void free_vmis_simulation(__attribute__((unused)) vmi_t *vmis,
-                          __attribute__((unused)) unsigned int nb_dpu,
-                          __attribute__((unused)) unsigned int *nb_neighbours,
-                          __attribute__((unused)) reads_info_t *reads_info);
+void free_vmis_simulation( vmi_t *vmis,
+                           unsigned int nb_dpu,
+                           unsigned int *nb_neighbours,
+                           reads_info_t *reads_info);
 
 /**
  * @brief Write neighbour and coordinate in structure representing the DPUs in simulation mode
  */
-void write_vmi_simulation(__attribute__((unused)) vmi_t *vmis,
+void write_vmi_simulation( vmi_t *vmis,
                           unsigned int dpuno,
                           unsigned int align_idx,
                           int8_t *nbr,
@@ -34,17 +34,13 @@ void write_vmi_simulation(__attribute__((unused)) vmi_t *vmis,
 /**
  * @brief Read the reference genome and create the index seed with it.
  */
-index_seed_t **get_index_seed_simulation(unsigned int nb_dpu,
-                                         genome_t *ref_genome,
-                                         reads_info_t *reads_info,
-                                         times_ctx_t *times_ctx,
-                                         backends_functions_t *backends_functions);
+index_seed_t **get_index_seed_simulation();
 
 /**
  * @brief Write seed information in the structure representing the DPU list of requests.
  */
-void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t *requests,
-                                     __attribute__((unused)) int num_dpu,
+void add_seed_to_simulation_requests(dispatch_request_t *requests,
+                                     int num_dpu,
                                      int num_read,
                                      int nb_read_written,
                                      index_seed_t *seed,
@@ -52,23 +48,30 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
                                      reads_info_t *reads_info);
 
 /**
- * @brief Compute one pass in simulation mode
+ * @brief Compute one pass in simulation mode.
  */
-void run_dpu_simulation(__attribute__((unused)) dispatch_t dispatch,
-                        __attribute__((unused)) devices_t *devices,
+void run_dpu_simulation(dispatch_t dispatch,
+                        devices_t *devices,
                         unsigned int nb_dpu,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info);
 
 /**
- * @brief Does nothing in simulation
+ * @brief Index the reference genome.
  */
-devices_t *init_devices_simulation(unsigned int nb_dpu,
-                                   const char *dpu_binary);
+void init_backend_simulation(devices_t **devices,
+                             unsigned int nb_dpu_per_run,
+                             const char *dpu_binary,
+                             index_seed_t ***index_seed,
+                             unsigned int nb_dpu,
+                             genome_t *ref_genome,
+                             reads_info_t *reads_info,
+                             times_ctx_t *times_ctx,
+                             backends_functions_t *backends_functions);
 
 /**
- * @brief Does nothing in simulation
+ * @brief Free structure used by simulation.
  */
-void free_devices_simulation(devices_t *devices);
+void free_backend_simulation(devices_t *devices, unsigned int nb_dpu);
 
 #endif /* __SIMU_BACKEND_H__ */

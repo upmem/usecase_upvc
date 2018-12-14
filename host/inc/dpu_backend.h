@@ -9,15 +9,6 @@
 #include "backends_functions.h"
 
 /**
- * @brief get index of seed from files on disk
- */
-index_seed_t **get_index_seed_dpu(unsigned int nb_dpu,
-                                  __attribute__((unused)) genome_t *ref_genome,
-                                  reads_info_t *reads_info,
-                                  __attribute__((unused)) times_ctx_t *times_ctx,
-                                  __attribute__((unused)) backends_functions_t *backends_funcions);
-
-/**
  * @brief Init the Virtual Memory Images structure needed to produce the mram images.
  */
 vmi_t *init_vmis_dpu(unsigned int nb_dpu);
@@ -51,5 +42,23 @@ void run_on_dpu(dispatch_t dispatch,
                 unsigned int nb_dpu,
                 times_ctx_t *times_ctx,
                 reads_info_t *reads_info);
+
+/**
+ * @brief Index the reference genome and alloc physical DPUs
+ */
+void init_backend_dpu(devices_t **devices,
+                      unsigned int nb_dpu_per_run,
+                      const char *dpu_binary,
+                      index_seed_t ***index_seed,
+                      unsigned int nb_dpu,
+                      genome_t *ref_genome,
+                      reads_info_t *reads_info,
+                      times_ctx_t *times_ctx,
+                      backends_functions_t *backends_functions);
+
+/**
+ * @brief Free DPUs.
+ */
+void free_backend_dpu(devices_t *devices, unsigned int nb_dpu);
 
 #endif /* __DPU_BACKEND_H__ */
