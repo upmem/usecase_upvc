@@ -45,7 +45,7 @@ index_seed_t **load_index_seeds()
 
     assert(f != NULL);
 
-    index_seed = (index_seed_t **) malloc(sizeof(index_seed_t *) * NB_SEED);
+    index_seed = (index_seed_t **) calloc(NB_SEED, sizeof(index_seed_t *));
 
     { /* First line is just a comment, skip */
             char line[512];
