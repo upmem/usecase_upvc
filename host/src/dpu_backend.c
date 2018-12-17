@@ -134,6 +134,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
 {
         double t1, t2;
         unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
+        unsigned int nb_ranks_per_run = devices->nb_ranks_per_run;
 
         t1 = my_clock();
 
@@ -152,14 +153,14 @@ void run_on_dpu(dispatch_request_t *dispatch,
         }
 
         double start = my_clock();
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                printf("() boot DPU #%d\n", each_dpu);
-                dpu_try_run(each_dpu, devices);
+        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
+                printf("() boot DPU rank #%d\n", each_rank);
+                dpu_try_run(each_rank, devices);
         }
 
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                while (!dpu_try_check_status(each_dpu, devices));
-                printf("DPU #%u completed\n", each_dpu);
+        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
+                while (!dpu_try_check_status(each_rank, devices));
+                printf("DPU rank #%u completed\n", each_rank);
         }
         printf("time: %lf\n", my_clock() - start);
 

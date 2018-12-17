@@ -63,25 +63,25 @@ void dpu_try_write_mram(dpu_t dpu_id,
 void dpu_try_free(devices_t *devices);
 
 /**
- * @brief Boots a DPU, raises an exception if the execution fails.
+ * @brief Boots a rank of DPUs, raises an exception if the execution fails.
  *
- * The DPU is simply booted. Further calls to dpu_try_get_status will tell whether the execution
+ * The DPUs are simply booted. Further calls to dpu_try_get_status will tell whether the execution
  * is complete.
  *
- * @param dpu_id   The DPU number.
+ * @param rank_id  The rank number.
  * @param devices  Available devices.
  */
-void dpu_try_run(unsigned int dpu_id, devices_t *devices);
+void dpu_try_run(unsigned int rank_id, devices_t *devices);
 
 /**
- * @brief Checks the status of a DPU.
+ * @brief Checks the status of a rank of DPUs.
  *
- * @param dpu_id   The DPU number.
+ * @param rank_id  The rank number.
  * @param devices  Available devices.
  *
  * @return Whether the DPU has finished its run.
  */
-bool dpu_try_check_status(unsigned int dpu_id, devices_t *devices);
+bool dpu_try_check_status(unsigned int rank_id, devices_t *devices);
 
 /**
  * @brief Stores the dispatch parameters into a DPU, raises an exception if the MRAM limit is reached.

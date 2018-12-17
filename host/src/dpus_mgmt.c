@@ -123,33 +123,35 @@ void dpu_try_free(devices_t *devices)
         free(devices);
 }
 
-void dpu_try_run(unsigned int dpu_id, devices_t *devices)
+void dpu_try_run(unsigned int rank_id, devices_t *devices)
 {
-        if (dpu_boot_individual(devices->dpus[dpu_id], ASYNCHRONOUS) != DPU_API_SUCCESS) {
-                log_dpu(devices->dpus[dpu_id], stdout);
-                ERROR_EXIT(8, "*** run failed on DPU number %u - aborting!", dpu_id);
+        if (dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS) != DPU_API_SUCCESS) {
+                ERROR_EXIT(8, "*** run failed on rank number %u - aborting!", rank_id);
         }
 }
 
-bool dpu_try_check_status(unsigned int dpu_id, devices_t *devices)
+bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
 {
-        dpu_run_status_t run_status;
-        if (dpu_get_individual_status(devices->dpus[dpu_id], &run_status) != DPU_API_SUCCESS) {
-                ERROR_EXIT(9, "*** could not get status from DPU number %u - aborting", dpu_id);
+        dpu_run_status_t run_status[devices->nb_dpus_per_rank];
+        uint32_t nb_dpus_running;
+        if (dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running) != DPU_API_SUCCESS) {
+                ERROR_EXIT(9, "*** could not get status from rank number %u - aborting", rank_id);
         }
 
-        switch (run_status) {
-        case DPU_STATUS_IDLE:
-                return true;
-        case DPU_STATUS_RUNNING:
-                return false;
-        case DPU_STATUS_ERROR:
-                log_dpu(devices->dpus[dpu_id], stdout);
-                ERROR_EXIT(10, "*** DPU %u reported an error - aborting", dpu_id);
-        default:
-                log_dpu(devices->dpus[dpu_id], stdout);
-                ERROR_EXIT(11, "*** could not get DPU status %u - aborting", dpu_id);
+        for (unsigned int each_dpu = 0; each_dpu < devices->nb_dpus_per_rank; each_dpu++) {
+                switch (run_status[each_dpu]) {
+                case DPU_STATUS_IDLE:
+                case DPU_STATUS_RUNNING:
+                        continue;
+                case DPU_STATUS_ERROR:
+                        log_dpu(devices->dpus[each_dpu], stdout);
+                        ERROR_EXIT(10, "*** DPU %u reported an error - aborting", each_dpu);
+                default:
+                        log_dpu(devices->dpus[each_dpu], stdout);
+                        ERROR_EXIT(11, "*** could not get DPU status %u - aborting", each_dpu);
+                }
         }
+        return (nb_dpus_running == 0);
 }
 
 void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
