@@ -223,24 +223,17 @@ static void *align_on_dpu(void *arg)
         mem_dpu_t *M = get_mem_dpu(numdpu);
         dpu_result_out_t *M_res = get_mem_dpu_res(numdpu);
         int current_read = 0;
-        /* int debug_nb = -1; */
 
         M_res[nb_map].num = -1;
         while (M->num[current_read] != -1) {
                 int offset = M->offset[current_read]; /* address of the first neighbour */
                 int min = MAX_SCORE;
                 int nb_map_start = nb_map;
-                /* print_neighbour((uint8_t*)&M->neighbour_read[current_read*size_neighbour], stdout, reads_info); */
-                /* debug_nb++; */
-                /* if (toto++ > 5) */
-                /*         exit(0); */
                 for (int nb_neighbour = 0; nb_neighbour < M->count[current_read]; nb_neighbour++) {
-                        /* print_neighbour((uint8_t*)&M->neighbour_idx[(offset+nb_neighbour)*size_neighbour], stdout, reads_info); */
                         int score_noDP =noDP(&M->neighbour_read[current_read*size_neighbour],
                                              &M->neighbour_idx[(offset+nb_neighbour)*size_neighbour],
                                              min,
                                              reads_info);
-                        /* printf("noDP score = %i\n", score_noDP); */
                         int score = score_noDP;
                         if (score_noDP == -1) {
                                 int score_ODPD = ODPD(&M->neighbour_read[current_read*size_neighbour],
@@ -248,21 +241,13 @@ static void *align_on_dpu(void *arg)
                                                       min,
                                                       reads_info);
                                 score = score_ODPD;
-                                /* printf("ODPD score = %i\n", score_ODPD); */
                         }
                         if (score <= min) {
                                 if (score <  min) {
-                                        /* printf("mini\n"); */
                                         min = score;
                                         nb_map = nb_map_start;
                                 }
                                 if (nb_map < MAX_DPU_RESULTS-1) {
-                                        /* printf("[0] nr=%u ix=%u num=%u ", debug_nb, nb_neighbour, M->num[current_read]); */
-                                        /* printf("offset=%u seed=%li seq=%li score=%i\n", */
-                                        /*        offset, */
-                                        /*        M->coordinate[offset+nb_neighbour] &0xffffffff, */
-                                        /*        (M->coordinate[offset+nb_neighbour]>>32) &0xffffffff, */
-                                        /*        score); */
                                         M_res[nb_map].num = M->num[current_read];
                                         M_res[nb_map].coord.coord = M->coordinate[offset+nb_neighbour];
                                         M_res[nb_map].score = score;
@@ -345,20 +330,6 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 pthread_join(thread_id[numdpu], NULL);
         }
-
-        /* for (; first_dpu < nb_dpu; first_dpu += nb_dpus_per_run) { */
-        /*         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) { */
-        /*                 unsigned int this_dpu = first_dpu + each_dpu; */
-        /*                 printf("LOG DPU=%u\n", this_dpu); */
-        /*                 int k = 0; */
-        /*                 int num_read = read_out_num(this_dpu, k); */
-        /*                 while (num_read != -1) { */
-        /*                         /\* printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k).coord); *\/ */
-        /*                         k++; */
-        /*                         num_read = read_out_num(this_dpu, k); */
-        /*                 } */
-        /*         } */
-        /* } */
 
         t2 = my_clock();
         times_ctx->map_read = t2 - t1;

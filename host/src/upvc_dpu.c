@@ -12,7 +12,6 @@
 
 #include "common.h"
 
-/* static void print_neighbour(uint8_t *nbr, FILE *out, reads_info_t *reads_info); */
 static mem_dpu_t *MDPU;
 static dpu_result_out_t **MDPU_res;
 
@@ -161,21 +160,6 @@ void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *r
         }
         fprintf(out, "\n");
 }
-
-/* static void print_neighbour(uint8_t *nbr, FILE *out, reads_info_t *reads_info) */
-/* { */
-/*         unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes; */
-/*         fprintf(out, "\t"); */
-/*         unsigned int i; */
-/*         for (i = 0; i < size_neighbour_in_bytes; i++) { */
-/*                 uint8_t this_byte = (uint8_t) nbr[i]; */
-/*                 print_byte_to_sym(this_byte, 0, out); */
-/*                 print_byte_to_sym(this_byte, 2, out); */
-/*                 print_byte_to_sym(this_byte, 4, out); */
-/*                 print_byte_to_sym(this_byte, 6, out); */
-/*         } */
-/*         fprintf(out, "\n"); */
-/* } */
 
 void print_coordinates(int d, int offs, int l, FILE *out)
 {
