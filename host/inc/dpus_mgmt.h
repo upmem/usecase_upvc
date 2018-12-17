@@ -49,13 +49,13 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program);
 /**
  * @brief Initializes the contents of an MRAM.
  *
- * @param dpu_id       The DPU number.
+ * @param rank_id      The rank number.
  * @param devices      Available devices.
  * @param mram         The mram content.
  */
-void dpu_try_write_mram(dpu_t dpu_id,
+void dpu_try_write_mram(unsigned int rank_id,
                         devices_t *devices,
-                        mram_info_t *mram);
+                        mram_info_t **mram);
 
 /**
  * @brief Frees the allocated DPUs.
@@ -102,20 +102,14 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
 
 /**
  * @brief Reads the result area of a DPU, raises an exception if something went wrong with the DPU.
+ *        Also print the log (statistic).
  *
- * @param dpu_id   The DPU number.
+ * @param rank_id  The rank number.
+ * @param dpu_offset The offset in the DPUs.
  * @param devices  List of available devices.
  * @param result_buffer The table of DPU results to store the results (last one having a request number equal to -1).
  */
-void dpu_try_get_results(unsigned int dpu_id, devices_t *devices, dpu_result_out_t *result_buffer);
-
-/**
- * @brief Reports the log of a DPU and the execution time.
- *
- * @param dpu_id   The DPU number.
- * @param devices  Available devices.
- */
-void dpu_try_log(unsigned int dpu_id, devices_t *devices);
+void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
 
 /**
  * @brief Makes a snapshot of an MRAM into a given file.
