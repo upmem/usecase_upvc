@@ -102,7 +102,7 @@ void create_vcf(char *chromosome_name,
         for (int seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
                 int start_position = ref_genome->pt_seq[seq_number];
                 /* for each position in the sequence */
-                for (int seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
+                for (int seq_position = 0; seq_position < (int64_t)ref_genome->len_seq[seq_number]; seq_position++) {
                         /* get the substitution at the `start_position+seq_position`th position in the genome */
                         int current_position = start_position + seq_position;
                         int substitution = substitution_list[current_position];

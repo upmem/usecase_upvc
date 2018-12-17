@@ -23,8 +23,8 @@
 typedef struct {
         int8_t *data;
         int nb_seq;
-        int pt_seq[MAX_SEQ_GEN];
-        int len_seq[MAX_SEQ_GEN];
+        uint64_t pt_seq[MAX_SEQ_GEN];
+        uint64_t len_seq[MAX_SEQ_GEN];
         long fasta_file_size;
         char *seq_name[MAX_SEQ_GEN];
         char *fasta_file_name;

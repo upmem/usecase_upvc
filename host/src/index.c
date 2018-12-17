@@ -136,8 +136,8 @@ index_seed_t **index_genome(genome_t *ref_genome,
                 seed_counter[i].seed_code = i;
         }
         for (int i = 0; i < ref_genome->nb_seq; i++) {
-                int sequence_start_idx = ref_genome->pt_seq[i];
-                for (int sequence_idx = 0;
+                uint64_t sequence_start_idx = ref_genome->pt_seq[i];
+                for (uint64_t sequence_idx = 0;
                      sequence_idx < ref_genome->len_seq[i] - size_neighbour - SIZE_SEED + 1;
                      sequence_idx++) {
                         int seed_code = code_seed(&ref_genome->data[sequence_start_idx + sequence_idx]);
@@ -220,8 +220,8 @@ index_seed_t **index_genome(genome_t *ref_genome,
         printf("\tWriting data in DPUs memories\n");
         memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
         for (int seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
-                int sequence_start_idx = ref_genome->pt_seq[seq_number];
-                for (int sequence_idx = 0;
+                uint64_t sequence_start_idx = ref_genome->pt_seq[seq_number];
+                for (uint64_t sequence_idx = 0;
                      sequence_idx < ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1;
                      sequence_idx++) {
                         index_seed_t *seed;
@@ -251,11 +251,11 @@ index_seed_t **index_genome(genome_t *ref_genome,
                                        buf_code_neighbour,
                                        reads_info);
                         if (sequence_idx % 1000 == 0)
-                        printf("\r\t%i/%i %i/%i",
-                               sequence_idx,
-                               ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1,
-                               seq_number,
-                               ref_genome->nb_seq);
+                                printf("\r\t%lli/%lli %i/%i         ",
+                                       (unsigned long long)sequence_idx,
+                                       (unsigned long long)ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1,
+                                       seq_number,
+                                       ref_genome->nb_seq);
                         backends_functions->write_vmi(vmis,
                                                       seed->num_dpu,
                                                       align_idx,
@@ -266,8 +266,8 @@ index_seed_t **index_genome(genome_t *ref_genome,
 
                         seed_counter[seed_code].nb_seed++;
                 }
+                printf("\n");
         }
-        printf("\n");
 
         backends_functions->free_vmis(vmis, nb_dpu, nb_neighbours, reads_info);
         free(seed_counter);

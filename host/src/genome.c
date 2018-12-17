@@ -15,7 +15,7 @@
 genome_t *get_genome(char* fasta_file, times_ctx_t *times_ctx)
 {
         FILE *genome_file;
-        long genome_file_size;
+        size_t genome_file_size;
         double t1, t2;
         char genome_file_line[MAX_BUF_SIZE];
         genome_t *genome;
