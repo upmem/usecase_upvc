@@ -27,7 +27,7 @@
 static void run_pass(int round,
                      int nb_read,
                      int nb_read_total,
-                     unsigned int nb_dpu,
+                     unsigned int dpu_offset,
                      int nb_pass,
                      FILE *fope1,
                      FILE *fope2,
@@ -45,7 +45,7 @@ static void run_pass(int round,
                      backends_functions_t *backends_functions)
 {
         int nb_read_map;
-        printf("Round %d / Pass %d\n", round, nb_pass);
+        printf("Round %d / DPU offset %d / Pass %d\n", round, dpu_offset, nb_pass);
         printf(" - get %d reads (%d)\n", nb_read / 2, nb_read_total / 2);
         printf(" - time to get reads      : %7.2lf sec. / %7.2lf sec.\n",
                times_ctx->get_reads,
@@ -58,7 +58,6 @@ static void run_pass(int round,
         dispatch_read(index_seed,
                       reads_buffer,
                       nb_read,
-                      nb_dpu,
                       dispatch_requests,
                       times_ctx,
                       reads_info,
@@ -69,7 +68,7 @@ static void run_pass(int round,
 
         backends_functions->run_dpu(dispatch_requests,
                                     devices,
-                                    (DEBUG_NB_RUN != -1) ? ((DEBUG_NB_RUN + DEBUG_FIRST_RUN) * get_nb_dpus_per_run()) : nb_dpu,
+                                    dpu_offset,
                                     times_ctx,
                                     reads_info);
         printf(" - time to map reads      : %7.2lf sec. / %7.2lf sec.\n",
@@ -89,7 +88,7 @@ static void run_pass(int round,
                                    fope1,
                                    fope2,
                                    round,
-                                   nb_dpu,
+                                   dpu_offset,
                                    times_ctx,
                                    reads_info);
         printf(" - time to process reads  : %7.2lf sec. / %7.2lf sec.\n",
@@ -115,28 +114,12 @@ static void map_var_call(char *filename_prefix,
                          backends_functions_t *backends_functions)
 {
         char filename[1024];
-        FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
         FILE *fope1, *fope2;  /* pair-end output file descriptor */
-        int nb_read;
-        int nb_read_total = 0;
-        int nb_pass = 0;
         unsigned int nb_dpu = get_nb_dpu();
 
         reads_info->delta_neighbour_in_bytes = (SIZE_SEED * round)/4;
         reads_info->size_neighbour_in_32bits_words =
                 (reads_info->size_neighbour_in_bytes-reads_info->delta_neighbour_in_bytes) * 4;
-
-        if (round == 0) {
-                sprintf(filename, "%s_PE1.fastq", filename_prefix);
-                fipe1 = fopen(filename, "r");
-                sprintf(filename, "%s_PE2.fastq", filename_prefix);
-                fipe2 = fopen(filename, "r");
-        } else {
-                sprintf(filename, "%s_%d_PE1.fasta", filename_prefix, round);
-                fipe1 = fopen(filename, "r");
-                sprintf(filename, "%s_%d_PE2.fasta", filename_prefix, round);
-                fipe2 = fopen(filename, "r");
-        }
 
         sprintf(filename, "%s_%d_PE1.fasta", filename_prefix, round+1);
         fope1 = fopen(filename, "w");
@@ -150,21 +133,42 @@ static void map_var_call(char *filename_prefix,
          *   - Execution on DPUs
          *   - Reads post-processing
          */
-        while ((nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info)) != 0) {
-                nb_read_total += nb_read;
-                run_pass(round, nb_read, nb_read_total, nb_dpu, nb_pass,
-                         fope1, fope2,
-                         reads_buffer, result_tab,
-                         ref_genome,
-                         index_seed, dispatch_requests,
-                         variant_list, substitution_list, mapping_coverage,
-                         devices,
-                         reads_info, times_ctx, backends_functions);
-                nb_pass++;
+        for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += get_nb_dpus_per_run()) {
+                int nb_read;
+                int nb_read_total = 0;
+                int nb_pass = 0;
+                FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
+
+                if (round == 0) {
+                        sprintf(filename, "%s_PE1.fastq", filename_prefix);
+                        fipe1 = fopen(filename, "r");
+                        sprintf(filename, "%s_PE2.fastq", filename_prefix);
+                        fipe2 = fopen(filename, "r");
+                } else {
+                        sprintf(filename, "%s_%d_PE1.fasta", filename_prefix, round);
+                        fipe1 = fopen(filename, "r");
+                        sprintf(filename, "%s_%d_PE2.fasta", filename_prefix, round);
+                        fipe2 = fopen(filename, "r");
+                }
+                backends_functions->load_mram(dpu_offset, devices, reads_info);
+
+                while ((nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info)) != 0) {
+                        nb_read_total += nb_read;
+                        run_pass(round, nb_read, nb_read_total, dpu_offset, nb_pass,
+                                 fope1, fope2,
+                                 reads_buffer, result_tab,
+                                 ref_genome,
+                                 index_seed, dispatch_requests,
+                                 variant_list, substitution_list, mapping_coverage,
+                                 devices,
+                                 reads_info, times_ctx, backends_functions);
+                        nb_pass++;
+                }
+
+                fclose(fipe1);
+                fclose(fipe2);
         }
 
-        fclose(fipe1);
-        fclose(fipe2);
         fclose(fope1);
         fclose(fope2);
 }
@@ -294,6 +298,7 @@ int main(int argc, char *argv[])
                 backends_functions.init_vmis = init_vmis_simulation;
                 backends_functions.free_vmis = free_vmis_simulation;
                 backends_functions.write_vmi = write_vmi_simulation;
+                backends_functions.load_mram = load_mram_simulation;
         } else {
                 backends_functions.init_backend = init_backend_dpu;
                 backends_functions.free_backend = free_backend_dpu;
@@ -302,6 +307,7 @@ int main(int argc, char *argv[])
                 backends_functions.init_vmis = init_vmis_dpu;
                 backends_functions.free_vmis = free_vmis_dpu;
                 backends_functions.write_vmi = write_vmi_dpu;
+                backends_functions.load_mram = load_mram_dpu;
         }
 
         switch(get_goal()) {

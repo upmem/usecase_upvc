@@ -12,6 +12,7 @@
 #include "vartree.h"
 #include "genome.h"
 #include "upvc.h"
+#include "parse_args.h"
 
 #include "common.h"
 
@@ -328,7 +329,7 @@ int process_read(genome_t *ref_genome,
                  FILE *fpe1,
                  FILE *fpe2,
                  int round,
-                 int nb_dpu,
+                 int dpu_offset,
                  times_ctx_t *times_ctx,
                  reads_info_t *reads_info)
 {
@@ -343,7 +344,7 @@ int process_read(genome_t *ref_genome,
         t1 = my_clock();
 
         /* Get output data from DPUs */
-        for (int numdpu = 0; numdpu < nb_dpu; numdpu++) {
+        for (int numdpu = dpu_offset; numdpu < dpu_offset + (int)get_nb_dpus_per_run(); numdpu++) {
                 int k = 0;
                 int num_read = read_out_num(numdpu, k);
 

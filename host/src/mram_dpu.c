@@ -13,7 +13,7 @@
 
 #define MRAM_FILE_NAME_SIZE (24)
 
-void mram_reset(mram_info_t *mram, reads_info_t *reads_info)
+static void mram_reset(mram_info_t *mram, reads_info_t *reads_info)
 {
         mram->total_nbr_size = 0;
         mram->nb_nbr = 0;
@@ -61,7 +61,7 @@ bool mram_save(mram_info_t *mram, unsigned int dpu_id)
         return true;
 }
 
-void mram_load(mram_info_t *mram, unsigned int dpu_id)
+static void mram_load_size(mram_info_t *mram, unsigned int dpu_id, unsigned int size)
 {
         char file_name[MRAM_FILE_NAME_SIZE];
         make_mram_file_name(dpu_id, file_name);
@@ -70,7 +70,16 @@ void mram_load(mram_info_t *mram, unsigned int dpu_id)
                 ERROR_EXIT(21, "could not load MRAM file '%s'", file_name);
         }
 
-        __attribute__((unused)) size_t read_size = fread(mram, sizeof(uint8_t), MRAM_SIZE, f);
+        __attribute__((unused)) size_t read_size = fread(mram, sizeof(uint8_t), size, f);
 
         fclose(f);
+}
+void mram_load(mram_info_t *mram, unsigned int dpu_id)
+{
+        mram_load_size(mram, dpu_id, MRAM_SIZE);
+}
+
+void mram_load_info(mram_info_t *mram, unsigned int dpu_id)
+{
+        mram_load_size(mram, dpu_id, sizeof(mram_info_t));
 }

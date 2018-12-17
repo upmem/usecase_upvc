@@ -19,14 +19,6 @@
 #include "common.h"
 
 /**
- * @brief Initializes a mapping.
- *
- * @param mram        The target MRAM image, all fields will be reset.
- * @param reads_info  Information on the size of the seed and the neighbour.
- */
-void mram_reset(mram_info_t *mram, reads_info_t *reads_info);
-
-/**
  * @brief Puts a VMI file directly into the neighbour and coordinates area of an MRAM file.
  *
  * Creates the MRAM header accordingly.
@@ -57,5 +49,12 @@ bool mram_save(mram_info_t *mram, unsigned int dpu_id);
  * @param dpu_id index of the DPU
  */
 void mram_load(mram_info_t *mram, unsigned int dpu_id);
+
+/**
+ * @brief Loads an MRAM file info into an MRAM image.
+ * @param mram the MRAM image
+ * @param dpu_id index of the DPU
+ */
+void mram_load_info(mram_info_t *mram, unsigned int dpu_id);
 
 #endif /* __INTEGRATION_MDPU_H__ */

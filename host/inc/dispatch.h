@@ -30,7 +30,6 @@ typedef struct {
  * @param index_seed       List of the seed of the reference genome.
  * @param read_buffer      Buffer containning the reads to dispatch.
  * @param nb_read          Number of reads to dispatch.
- * @param nb_dpu           Number of DPUs on which to dispatch the reads.
  * @param dispatch_requests  Table of dispatch_request_t to store the dispatching between the DPUs.
  * @param times_ctx        Times information for the whole application.
  * @param reads_info       Information on the size of the seed and the neighbour.
@@ -41,7 +40,6 @@ typedef struct {
 void dispatch_read(index_seed_t **index_seed,
                    int8_t *read_buffer,
                    int nb_read,
-                   int nb_dpu,
                    dispatch_request_t *dispatch_requests,
                    times_ctx_t *times_ctx,
                    reads_info_t *reads_info,

@@ -51,17 +51,32 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
         if (devices == NULL) {
                 ERROR_EXIT(3, "*** could not allocate structure for devices - aborting");
         }
+
         devices->nb_dpus = nb_dpus;
         if (dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank)) != DPU_API_SUCCESS) {
                 ERROR_EXIT(30, "*** could not guess the number of DPUs per rank - aborting");
         }
+
         devices->dpus = (dpu_t *) calloc(nb_dpus, sizeof(dpu_t));
         if (devices->dpus == NULL) {
                 ERROR_EXIT(4, "*** could not allocate array of DPUs - aborting");
         }
-        unsigned int nb_ranks = (nb_dpus + devices->nb_dpus_per_rank - 1) / devices->nb_dpus_per_rank;
-        devices->nb_ranks = nb_ranks;
-        devices->ranks = (dpu_rank_t *) calloc(nb_ranks, sizeof(dpu_rank_t));
+
+        devices->mram_info = (mram_info_t *) malloc(get_nb_dpu() * sizeof(mram_info_t));
+        if (devices->mram_info == NULL) {
+                ERROR_EXIT(4, "*** could not allocate array of mram_info - aborting");
+        }
+
+        unsigned nb_dpus_per_run = get_nb_dpus_per_run();
+        if (nb_dpus_per_run % devices->nb_dpus_per_rank != 0) {
+                ERROR_EXIT(5, "*** number of DPUs per run is not a multiple of the DPUs in a rank - aborting");
+        }
+        devices->nb_ranks_per_run = nb_dpus_per_run / devices->nb_dpus_per_rank;
+        if (nb_dpus % devices->nb_dpus_per_rank != 0) {
+                ERROR_EXIT(5, "*** number of DPUs is not a multiple of the DPUs in a rank - aborting");
+        }
+        devices->nb_ranks = nb_dpus / devices->nb_dpus_per_rank;;
+        devices->ranks = (dpu_rank_t *) calloc(devices->nb_ranks, sizeof(dpu_rank_t));
         if (devices->ranks == NULL) {
                 ERROR_EXIT(5, "*** could not allocate array of DPU ranks - aborting");
         }
@@ -75,6 +90,9 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
                      each_member++, each_dpu++) {
                         devices->dpus[each_dpu] = dpu_get_id(devices->ranks[each_rank], each_member);
                 }
+        }
+        for (unsigned int each_dpu = 0; each_dpu < get_nb_dpu(); each_dpu++) {
+                mram_load_info(&devices->mram_info[each_dpu], each_dpu);
         }
 
         for (unsigned int each_rank = 0; each_rank < devices->nb_ranks; each_rank++) {
@@ -101,6 +119,7 @@ void dpu_try_free(devices_t *devices)
         }
         free(devices->ranks);
         free(devices->dpus);
+        free(devices->mram_info);
         free(devices);
 }
 
@@ -134,12 +153,13 @@ bool dpu_try_check_status(unsigned int dpu_id, devices_t *devices)
 }
 
 void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
+                                      unsigned int dpu_offset,
                                       devices_t *devices,
                                       unsigned int nb_reads,
                                       int8_t *reads,
-                                      mram_info_t *mram,
                                       reads_info_t *reads_info)
 {
+        mram_info_t *mram = &devices->mram_info[dpu_id + dpu_offset];
         unsigned int io_len;
         request_info_t io_header =
                 {

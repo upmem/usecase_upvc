@@ -323,43 +323,42 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
 
 void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                         __attribute__((unused)) devices_t *devices,
-                        unsigned int nb_dpu,
+                        __attribute__((unused)) unsigned int dpu_offset,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info)
 {
         double t1, t2;
+        unsigned int nb_dpu = get_nb_dpu();
         pthread_t thread_id[nb_dpu];
         align_on_dpu_arg_t thread_args[nb_dpu];
-        unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-        unsigned int first_dpu = ((DEBUG_FIRST_RUN != -1) ? (DEBUG_FIRST_RUN * nb_dpus_per_run) : 0);
 
         t1 = my_clock();
 
-        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+        for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 thread_args[numdpu].reads_info = *reads_info;
                 thread_args[numdpu].numdpu = numdpu;
         }
 
-        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+        for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 pthread_create(&thread_id[numdpu], NULL, align_on_dpu, &thread_args[numdpu]);
         }
-        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+        for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 pthread_join(thread_id[numdpu], NULL);
         }
 
-        for (; first_dpu < nb_dpu; first_dpu += nb_dpus_per_run) {
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
-                        unsigned int this_dpu = first_dpu + each_dpu;
-                        printf("LOG DPU=%u\n", this_dpu);
-                        int k = 0;
-                        int num_read = read_out_num(this_dpu, k);
-                        while (num_read != -1) {
-                                printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k).coord);
-                                k++;
-                                num_read = read_out_num(this_dpu, k);
-                        }
-                }
-        }
+        /* for (; first_dpu < nb_dpu; first_dpu += nb_dpus_per_run) { */
+        /*         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) { */
+        /*                 unsigned int this_dpu = first_dpu + each_dpu; */
+        /*                 printf("LOG DPU=%u\n", this_dpu); */
+        /*                 int k = 0; */
+        /*                 int num_read = read_out_num(this_dpu, k); */
+        /*                 while (num_read != -1) { */
+        /*                         /\* printf("R: %u %u %lu\n", num_read, read_out_score(this_dpu, k), read_out_coord(this_dpu, k).coord); *\/ */
+        /*                         k++; */
+        /*                         num_read = read_out_num(this_dpu, k); */
+        /*                 } */
+        /*         } */
+        /* } */
 
         t2 = my_clock();
         times_ctx->map_read = t2 - t1;
@@ -383,3 +382,8 @@ void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigne
 {
         free_dpu(nb_dpu);
 }
+
+void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset,
+                          __attribute__((unused)) devices_t *devices,
+                          __attribute__((unused)) reads_info_t *reads_info)
+{}

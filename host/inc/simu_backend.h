@@ -51,7 +51,7 @@ void add_seed_to_simulation_requests(dispatch_request_t *requests,
  */
 void run_dpu_simulation(dispatch_request_t *dispatch,
                         devices_t *devices,
-                        unsigned int nb_dpu,
+                        unsigned int dpu_offset,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info);
 
@@ -72,5 +72,10 @@ void init_backend_simulation(devices_t **devices,
  * @brief Free structure used by simulation.
  */
 void free_backend_simulation(devices_t *devices, unsigned int nb_dpu);
+
+/**
+ * @brief Does nothing in sumation mode.
+ */
+void load_mram_simulation(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info);
 
 #endif /* __SIMU_BACKEND_H__ */

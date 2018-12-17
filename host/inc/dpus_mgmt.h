@@ -17,10 +17,12 @@
  */
 typedef struct {
         unsigned int nb_dpus_per_rank;
+        unsigned int nb_ranks_per_run;
         unsigned int nb_ranks;
         dpu_rank_t *ranks;
         unsigned int nb_dpus;
         dpu_t *dpus;
+        mram_info_t *mram_info;
 } devices_t;
 
 /**
@@ -84,17 +86,18 @@ bool dpu_try_check_status(unsigned int dpu_id, devices_t *devices);
 /**
  * @brief Stores the dispatch parameters into a DPU, raises an exception if the MRAM limit is reached.
  *
- * @param dpu_id      The DPU number.
+ * @param dpu_id      The DPU number (physical).
+ * @param dpu_offset  The offset in DPUs to find the mram.
  * @param devices     List of available devices.
  * @param nb_reads    How many reads to write.
  * @param reads       A table of nb_reads requests.
  * @param reads_info  Information on the size of the seed and the neighbour.
  */
 void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
+                                      unsigned int dpu_offset,
                                       devices_t *devices,
                                       unsigned int nb_reads,
                                       int8_t *reads,
-                                      mram_info_t *mram,
                                       reads_info_t *reads_info);
 
 /**

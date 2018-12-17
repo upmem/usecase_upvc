@@ -22,6 +22,7 @@ typedef struct backends_functions_struct {
                              times_ctx_t *,
                              struct backends_functions_struct *);
         void (*free_backend)(devices_t *, unsigned int);
+        void (*load_mram)(unsigned int, devices_t *, reads_info_t *);
 } backends_functions_t;
 
 #endif /* __BACKENDS_FUNCTIONS_H__ */

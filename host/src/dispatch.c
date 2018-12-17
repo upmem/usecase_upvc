@@ -61,13 +61,13 @@ void dispatch_free(dispatch_request_t *requests, unsigned int nb_dpu)
 void dispatch_read(index_seed_t **index_seed,
                    int8_t* read_buffer,
                    int nb_read,
-                   int nb_dpu,
                    dispatch_request_t *requests,
                    times_ctx_t *times_ctx,
                    reads_info_t *reads_info,
                    backends_functions_t *backends_functions)
 {
         double t1, t2;
+        int nb_dpu = get_nb_dpu();
         int counted_read[nb_dpu];
         int size_read = reads_info->size_read;
 
