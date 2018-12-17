@@ -7,8 +7,10 @@
 
 #include <dpu.h>
 #include <dpulog.h>
+
 #include "parse_args.h"
 #include "upvc.h"
+#include "dispatch.h"
 
 #include "common.h"
 
@@ -86,18 +88,16 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices);
 /**
  * @brief Stores the dispatch parameters into a DPU, raises an exception if the MRAM limit is reached.
  *
- * @param dpu_id      The DPU number (physical).
+ * @param rank_id     The rank number.
  * @param dpu_offset  The offset in DPUs to find the mram.
  * @param devices     List of available devices.
- * @param nb_reads    How many reads to write.
- * @param reads       A table of nb_reads requests.
+ * @param dispatch    The structure containing the dispatching of the reads into the DPUs.
  * @param reads_info  Information on the size of the seed and the neighbour.
  */
-void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
+void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
                                       unsigned int dpu_offset,
                                       devices_t *devices,
-                                      unsigned int nb_reads,
-                                      int8_t *reads,
+                                      dispatch_request_t *dispatch,
                                       reads_info_t *reads_info);
 
 /**

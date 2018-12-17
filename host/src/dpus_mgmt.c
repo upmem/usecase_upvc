@@ -47,25 +47,19 @@ void setup_dpus_for_target_type(target_type_t target_type)
 
 devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
 {
+        dpu_api_status_t status;
         devices_t *devices = (devices_t *) malloc(sizeof(devices_t));
-        if (devices == NULL) {
-                ERROR_EXIT(3, "*** could not allocate structure for devices - aborting");
-        }
+        assert(devices != NULL);
 
         devices->nb_dpus = nb_dpus;
-        if (dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank)) != DPU_API_SUCCESS) {
-                ERROR_EXIT(30, "*** could not guess the number of DPUs per rank - aborting");
-        }
+        status = dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank));
+        assert(status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_for failed");
 
         devices->dpus = (dpu_t *) calloc(nb_dpus, sizeof(dpu_t));
-        if (devices->dpus == NULL) {
-                ERROR_EXIT(4, "*** could not allocate array of DPUs - aborting");
-        }
+        assert(devices->dpus != NULL);
 
         devices->mram_info = (mram_info_t *) malloc(get_nb_dpu() * sizeof(mram_info_t));
-        if (devices->mram_info == NULL) {
-                ERROR_EXIT(4, "*** could not allocate array of mram_info - aborting");
-        }
+        assert(devices->mram_info != NULL);
 
         unsigned nb_dpus_per_run = get_nb_dpus_per_run();
         if (nb_dpus_per_run % devices->nb_dpus_per_rank != 0) {
@@ -77,14 +71,11 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
         }
         devices->nb_ranks = nb_dpus / devices->nb_dpus_per_rank;;
         devices->ranks = (dpu_rank_t *) calloc(devices->nb_ranks, sizeof(dpu_rank_t));
-        if (devices->ranks == NULL) {
-                ERROR_EXIT(5, "*** could not allocate array of DPU ranks - aborting");
-        }
+        assert(devices->ranks != NULL);
 
         for (unsigned int each_rank = 0, each_dpu = 0; each_dpu < nb_dpus; each_rank++) {
-                if (dpu_alloc(&param, &(devices->ranks[each_rank])) != DPU_API_SUCCESS) {
-                        ERROR_EXIT(6, "*** could not allocate rank number %u - aborting", each_rank);
-                }
+                status = dpu_alloc(&param, &(devices->ranks[each_rank]));
+                assert(status == DPU_API_SUCCESS && "dpu_alloc failed");
                 for (unsigned int each_member = 0;
                      (each_member < devices->nb_dpus_per_rank) && (each_dpu < nb_dpus);
                      each_member++, each_dpu++) {
@@ -96,9 +87,8 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
         }
 
         for (unsigned int each_rank = 0; each_rank < devices->nb_ranks; each_rank++) {
-                if (dpu_load_all(devices->ranks[each_rank], opt_program) != DPU_API_SUCCESS) {
-                        ERROR_EXIT(7, "*** could not load program on rank number %u - aborting", each_rank);
-                }
+                status = dpu_load_all(devices->ranks[each_rank], opt_program);
+                assert(status == DPU_API_SUCCESS && "dpu_load_all failed");
         }
 
         return devices;
@@ -106,10 +96,11 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
 
 void dpu_try_write_mram(dpu_t dpu_id, devices_t *devices, mram_info_t *mram)
 {
-        dpu_copy_to_individual(devices->dpus[dpu_id],
-                               (uint8_t *) mram,
-                               MRAM_INFO_ADDR,
-                               sizeof(mram_info_t) + mram->total_nbr_size);
+        dpu_api_status_t status = dpu_copy_to_individual(devices->dpus[dpu_id],
+                                                         (uint8_t *) mram,
+                                                         MRAM_INFO_ADDR,
+                                                         sizeof(mram_info_t) + mram->total_nbr_size);
+        assert(status == DPU_API_SUCCESS && "dpu_try_write_mram failed");
 }
 
 void dpu_try_free(devices_t *devices)
@@ -125,18 +116,17 @@ void dpu_try_free(devices_t *devices)
 
 void dpu_try_run(unsigned int rank_id, devices_t *devices)
 {
-        if (dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS) != DPU_API_SUCCESS) {
-                ERROR_EXIT(8, "*** run failed on rank number %u - aborting!", rank_id);
-        }
+        dpu_api_status_t status = dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS);
+        assert(status == DPU_API_SUCCESS && "dpu_boot_all failed");
 }
 
 bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
 {
+        dpu_api_status_t status;
         dpu_run_status_t run_status[devices->nb_dpus_per_rank];
         uint32_t nb_dpus_running;
-        if (dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running) != DPU_API_SUCCESS) {
-                ERROR_EXIT(9, "*** could not get status from rank number %u - aborting", rank_id);
-        }
+        status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
+        assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
 
         for (unsigned int each_dpu = 0; each_dpu < devices->nb_dpus_per_rank; each_dpu++) {
                 switch (run_status[each_dpu]) {
@@ -154,45 +144,77 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
         return (nb_dpus_running == 0);
 }
 
-void dpu_try_write_dispatch_into_mram(unsigned int dpu_id,
+void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
                                       unsigned int dpu_offset,
                                       devices_t *devices,
-                                      unsigned int nb_reads,
-                                      int8_t *reads,
+                                      dispatch_request_t *dispatch,
                                       reads_info_t *reads_info)
 {
-        mram_info_t *mram = &devices->mram_info[dpu_id + dpu_offset];
-        unsigned int io_len;
-        request_info_t io_header =
-                {
-                 .nb_reads = nb_reads,
-                 .magic = 0xcdefabcd
-                };
+        dpu_api_status_t status;
+        dpu_rank_t rank = devices->ranks[rank_id];
+        unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
+        dpu_transfer_mram_t *matrix_header, *matrix_reads;
+        request_info_t io_header[nb_dpus_per_rank];
+        unsigned int io_len[nb_dpus_per_rank];
 
-        io_len = nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes);
+        status = dpu_transfer_matrix_allocate(rank, &matrix_header);
+        assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
+        status = dpu_transfer_matrix_allocate(rank, &matrix_reads);
+        assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
 
-        if ((DPU_REQUEST_ADDR(mram) - DPU_INPUTS_ADDR + io_len) > DPU_INPUTS_SIZE) {
-                ERROR_EXIT(12, "*** will exceed MRAM limit if writing reads on DPU number %u - aborting!", dpu_id);
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
+                mram_info_t *mram = &devices->mram_info[each_dpu + dpu_offset];
+                unsigned int nb_reads = dispatch[each_dpu + dpu_offset].nb_reads;
+                io_len[each_dpu] = nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes);
+                io_header[each_dpu].nb_reads = nb_reads;
+                io_header[each_dpu].magic = 0xcdefabcd;
+
+                if ((DPU_REQUEST_ADDR(mram) - DPU_INPUTS_ADDR + io_len[each_dpu]) > DPU_INPUTS_SIZE) {
+                        ERROR_EXIT(12,
+                                   "*** will exceed MRAM limit if writing reads on DPU number %u - aborting!",
+                                   each_dpu + dpu_offset);
+                }
+                status = dpu_transfer_matrix_add_dpu(rank,
+                                                     matrix_header,
+                                                     each_dpu/8,
+                                                     each_dpu%8,
+                                                     &io_header[each_dpu],
+                                                     sizeof(request_info_t),
+                                                     (mram_addr_t) DPU_REQUEST_INFO_ADDR(mram),
+                                                     0);
+                assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
+                status = dpu_transfer_matrix_add_dpu(rank,
+                                                     matrix_reads,
+                                                     each_dpu/8,
+                                                     each_dpu%8,
+                                                     dispatch[each_dpu + dpu_offset].reads_area,
+                                                     io_len[each_dpu],
+                                                     (mram_addr_t) DPU_REQUEST_ADDR(mram),
+                                                     0);
+                assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
         }
 
-        dpu_copy_to_individual(devices->dpus[dpu_id],
-                               (uint8_t *) &io_header,
-                               (mram_addr_t) DPU_REQUEST_INFO_ADDR(mram),
-                               sizeof(request_info_t));
-        dpu_copy_to_individual(devices->dpus[dpu_id],
-                               (uint8_t *) reads,
-                               (mram_addr_t) DPU_REQUEST_ADDR(mram),
-                               io_len);
+        status = dpu_copy_to_dpus(rank, matrix_header);
+        assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpus failed");
+        status = dpu_copy_to_dpus(rank, matrix_reads);
+        assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpus failed");
+
+        status = dpu_transfer_matrix_free(rank, matrix_header);
+        assert(status == DPU_API_SUCCESS && "dpu_transfer_free failed");
+        status = dpu_transfer_matrix_free(rank, matrix_reads);
+        assert(status == DPU_API_SUCCESS && "dpu_transfer_free failed");
 }
 
 #define CLOCK_PER_SEC (600000000.0)
 void dpu_try_log(unsigned int dpu_id, devices_t *devices)
 {
+        dpu_api_status_t status;
         dpu_compute_time_t compute_time;
-        dpu_copy_from_individual(devices->dpus[dpu_id],
-                                 (mram_addr_t) (DPU_COMPUTE_TIME_ADDR),
-                                 (uint8_t *) (&compute_time),
-                                 sizeof(dpu_compute_time_t));
+        status = dpu_copy_from_individual(devices->dpus[dpu_id],
+                                          (mram_addr_t) (DPU_COMPUTE_TIME_ADDR),
+                                          (uint8_t *) (&compute_time),
+                                          sizeof(dpu_compute_time_t));
+        assert(status == DPU_API_SUCCESS && "dpu_copy_from_individual failed");
 
         printf("LOG DPU=%u TIME=%llu SEC=%.3f\n", dpu_id, (unsigned long long)compute_time, (float)compute_time / CLOCK_PER_SEC);
         fflush(stdout);
@@ -202,10 +224,11 @@ void dpu_try_log(unsigned int dpu_id, devices_t *devices)
         for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
                 dpu_tasklet_stats_t tasklet_stats;
 
-                dpu_copy_from_individual(devices->dpus[dpu_id],
+                status = dpu_copy_from_individual(devices->dpus[dpu_id],
                                          (mram_addr_t) (DPU_TASKLET_STATS_ADDR + each_tasklet * sizeof(dpu_tasklet_stats_t)),
                                          (uint8_t *) (&tasklet_stats),
                                          sizeof(dpu_tasklet_stats_t));
+                assert(status == DPU_API_SUCCESS && "dpu_copy_from_individual failed");
 
                 /* TODO: show logs */
                 printf("LOG DPU=%u TID=%u REQ=%u\n", dpu_id, each_tasklet, tasklet_stats.nb_reqs);
@@ -225,10 +248,11 @@ void dpu_try_log(unsigned int dpu_id, devices_t *devices)
 
 void dpu_try_get_results(unsigned int dpu_id, devices_t *devices, dpu_result_out_t *result_buffer)
 {
-        dpu_copy_from_individual(devices->dpus[dpu_id],
-                                 (mram_addr_t) DPU_RESULT_ADDR,
-                                 (uint8_t *) result_buffer,
-                                 DPU_RESULT_SIZE);
+        dpu_api_status_t status = dpu_copy_from_individual(devices->dpus[dpu_id],
+                                                           (mram_addr_t) DPU_RESULT_ADDR,
+                                                           (uint8_t *) result_buffer,
+                                                           DPU_RESULT_SIZE);
+        assert(status == DPU_API_SUCCESS && "dpu_copy_from_individual failed");
 }
 
 void dpu_try_backup_mram(unsigned int tid, devices_t *devices, const char *file_name)
@@ -237,7 +261,8 @@ void dpu_try_backup_mram(unsigned int tid, devices_t *devices, const char *file_
         printf("saving DPU %u MRAM into '%s'\n", tid, file_name);
         if (f != NULL) {
                 uint8_t *mram = (uint8_t *) malloc(MRAM_SIZE);
-                dpu_copy_from_individual(devices->dpus[tid], 0, mram, MRAM_SIZE);
+                dpu_api_status_t status = dpu_copy_from_individual(devices->dpus[tid], 0, mram, MRAM_SIZE);
+                assert(status == DPU_API_SUCCESS && "dpu_copy_from_individual failed");
                 fwrite(mram, 1, MRAM_SIZE, f);
                 free(mram);
                 fclose(f);

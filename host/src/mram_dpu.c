@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "upvc_dpu.h"
 #include "mram_dpu.h"
@@ -46,9 +47,7 @@ bool mram_save(mram_info_t *mram, unsigned int dpu_id)
         char file_name[MRAM_FILE_NAME_SIZE];
         make_mram_file_name(dpu_id, file_name);
         FILE *f = fopen(file_name, "wb");
-        if (f == NULL) {
-                ERROR_EXIT(19, "FATAL: could not create file '%s' for writing - aborting!", file_name);
-        }
+        assert(f != NULL);
 
         size_t write_size = ALIGN_DPU(mram->total_nbr_size + sizeof(mram_info_t));
         size_t written = fwrite(mram, sizeof(uint8_t), write_size, f);
@@ -66,9 +65,7 @@ static void mram_load_size(mram_info_t *mram, unsigned int dpu_id, unsigned int 
         char file_name[MRAM_FILE_NAME_SIZE];
         make_mram_file_name(dpu_id, file_name);
         FILE *f = fopen(file_name, "rb");
-        if (f == NULL) {
-                ERROR_EXIT(21, "could not load MRAM file '%s'", file_name);
-        }
+        assert(f != NULL);
 
         __attribute__((unused)) size_t read_size = fread(mram, sizeof(uint8_t), size, f);
 

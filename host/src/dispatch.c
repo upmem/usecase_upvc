@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "dispatch.h"
 #include "index.h"
@@ -15,9 +16,7 @@
 dispatch_request_t *dispatch_create(unsigned int nb_dpu, reads_info_t *reads_info)
 {
         dispatch_request_t *request = (dispatch_request_t *) calloc(nb_dpu, sizeof(dispatch_request_t));
-        if (request == NULL) {
-                ERROR_EXIT(26, "*** could not allocate memory to store %u dispatch requests - aborting!", nb_dpu);
-        }
+        assert(request != NULL);
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
                 request[each_dpu].reads_area = malloc(DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST);

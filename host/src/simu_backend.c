@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <pthread.h>
 
-#include "dpus_mgmt.h"
 #include "upvc_dpu.h"
 #include "genome.h"
 #include "upvc.h"
 #include "vmi.h"
 #include "dispatch.h"
+#include "dpus_mgmt.h"
 #include "index.h"
 #include "parse_args.h"
 #include "backends_functions.h"

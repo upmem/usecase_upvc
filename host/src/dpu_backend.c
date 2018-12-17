@@ -138,17 +138,12 @@ void run_on_dpu(dispatch_request_t *dispatch,
 
         t1 = my_clock();
 
-        if (devices == NULL) {
-                ERROR("Unable to alloc devices!");
-        }
-
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu ++) {
-                unsigned int this_dpu = each_dpu + dpu_offset;
-                printf("() write MRAM #%d %u reads\n", each_dpu, dispatch[this_dpu].nb_reads);
-                dpu_try_write_dispatch_into_mram(each_dpu, dpu_offset,
+        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
+                printf("() write inputs to rank #%d\n", each_rank);
+                dpu_try_write_dispatch_into_mram(each_rank,
+                                                 dpu_offset + each_rank * devices->nb_dpus_per_rank,
                                                  devices,
-                                                 dispatch[this_dpu].nb_reads,
-                                                 dispatch[this_dpu].reads_area,
+                                                 dispatch,
                                                  reads_info);
         }
 
@@ -210,9 +205,8 @@ void free_backend_dpu(devices_t *devices, __attribute__((unused)) unsigned int n
 void load_mram_dpu(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info)
 {
         mram_info_t *mram = malloc(MRAM_SIZE);
-        if (mram == NULL) {
-                ERROR_EXIT(78, "Could not allocate mram while loading mram into DPUs!");
-        }
+        assert(mram != NULL);
+
         for (unsigned int each_dpu = 0; each_dpu < get_nb_dpus_per_run(); each_dpu++) {
                 unsigned int this_dpu = dpu_offset + each_dpu;
                 printf("() load MRAM %d into DPU %d\n", this_dpu, each_dpu);

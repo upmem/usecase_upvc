@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "upvc_dpu.h"
 #include "code.h"
@@ -42,19 +43,13 @@ index_seed_t **load_index_seeds()
     FILE *f = fopen(SEED_FILE, "r");
     index_seed_t **index_seed;
 
-    if (f == NULL) {
-            ERROR_EXIT(14, "*** could not open 'seeds.txt' for reading");
-    }
+    assert(f != NULL);
 
     index_seed = (index_seed_t **) malloc(sizeof(index_seed_t *) * NB_SEED);
 
     { /* First line is just a comment, skip */
             char line[512];
-            if (fgets(line, sizeof(line), f) == NULL) {
-                    fclose(f);
-                    free_index(index_seed);
-                    ERROR_EXIT(15, "failed to read seeds.txt");
-            }
+            assert(fgets(line, sizeof(line), f) != NULL);
     }
 
     {
@@ -86,10 +81,7 @@ void save_index_seeds(index_seed_t **index_seed)
 {
     index_seed_t *seed;
     FILE *f = fopen(SEED_FILE, "w");
-
-    if (f == NULL) {
-            ERROR_EXIT(16, "*** could not save seeds into 'seeds.txt' - aborting!");
-    }
+    assert(f != NULL);
 
     fprintf(f, "# seed dpu offset nb_nbr\n");
     for (int i = 0; i < NB_SEED; i++) {
