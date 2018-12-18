@@ -24,27 +24,24 @@
 #include "simu_backend.h"
 #include "dpu_backend.h"
 
+#define MAX_NB_PASS (1024)
+
 static void run_pass(int round,
                      int nb_read,
                      int nb_read_total,
                      unsigned int dpu_offset,
                      int nb_pass,
-                     FILE *fope1,
-                     FILE *fope2,
                      int8_t *reads_buffer,
-                     dpu_result_out_t *result_tab,
-                     genome_t *ref_genome,
+                     dpu_result_out_t **result_tab,
+                     unsigned int *result_tab_nb_read,
                      index_seed_t **index_seed,
                      dispatch_request_t *dispatch_requests,
-                     variant_tree_t **variant_list,
-                     int *substitution_list,
-                     int8_t *mapping_coverage,
                      devices_t *devices,
                      reads_info_t *reads_info,
                      times_ctx_t *times_ctx,
                      backends_functions_t *backends_functions)
 {
-        int nb_read_map;
+        unsigned nb_read_map;
         printf("Round %d / DPU offset %d / Pass %d\n", round, dpu_offset, nb_pass);
         printf(" - get %d reads (%d)\n", nb_read / 2, nb_read_total / 2);
         printf(" - time to get reads      : %7.2lf sec. / %7.2lf sec.\n",
@@ -92,21 +89,10 @@ static void run_pass(int round,
                 return;
         }
 
-        nb_read_map = process_read(ref_genome,
-                                   reads_buffer,
-                                   variant_list,
-                                   substitution_list,
-                                   mapping_coverage,
-                                   result_tab,
-                                   fope1,
-                                   fope2,
-                                   round,
-                                   dpu_offset,
-                                   times_ctx,
-                                   reads_info);
-        printf(" - time to process reads  : %7.2lf sec. / %7.2lf sec.\n",
-               times_ctx->process_read,
-               times_ctx->tot_process_read);
+        nb_read_map = accumulate_read(result_tab, result_tab_nb_read, dpu_offset, times_ctx);
+        printf(" - time to accumulate read  : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->acc_read,
+               times_ctx->tot_acc_read);
         printf(" - map %i reads\n", nb_read_map);
         printf("\n");
 }
@@ -120,8 +106,6 @@ static void map_var_call(char *filename_prefix,
                          variant_tree_t **variant_list,
                          int *substitution_list,
                          int8_t *mapping_coverage,
-                         int8_t *reads_buffer,
-                         dpu_result_out_t *result_tab,
                          reads_info_t *reads_info,
                          times_ctx_t *times_ctx,
                          backends_functions_t *backends_functions)
@@ -129,6 +113,12 @@ static void map_var_call(char *filename_prefix,
         char filename[1024];
         FILE *fope1, *fope2;  /* pair-end output file descriptor */
         unsigned int nb_dpu = get_nb_dpu();
+        unsigned int nb_read_map;
+        unsigned int result_tab_nb_read[MAX_NB_PASS] = {0};
+        dpu_result_out_t *result_tab[MAX_NB_PASS] = {NULL};
+        unsigned int nb_pass = 0;
+        int8_t *reads_buffer[MAX_NB_PASS];
+        int nb_read[MAX_NB_PASS] = {0};
 
         reads_info->delta_neighbour_in_bytes = (SIZE_SEED * round)/4;
         reads_info->size_neighbour_in_32bits_words =
@@ -141,7 +131,9 @@ static void map_var_call(char *filename_prefix,
 
         sprintf(filename, "%s_%d_time.csv", filename_prefix, round);
         times_ctx->time_file = fopen(filename, "w");
-        fprintf(times_ctx->time_file, "time, write_mram, get_reads, dispatch_reads, write_reads, compute, read_result, map_read, process_read\n");
+        fprintf(times_ctx->time_file,
+                "time, write_mram, get_reads, dispatch_reads, write_reads, compute, "
+                "read_result, map_read, accumulate_read, process_read\n");
 
         /*
          * Loop:
@@ -151,10 +143,10 @@ static void map_var_call(char *filename_prefix,
          *   - Reads post-processing
          */
         for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += get_nb_dpus_per_run()) {
-                int nb_read;
                 int nb_read_total = 0;
-                int nb_pass = 0;
                 FILE *fipe1, *fipe2;  /* pair-end input file descriptor */
+
+                nb_pass = 0;
 
                 if (round == 0) {
                         sprintf(filename, "%s_PE1.fastq", filename_prefix);
@@ -175,29 +167,54 @@ static void map_var_call(char *filename_prefix,
 
                 PRINT_TIME(times_ctx, "%lf, %f, %f\n", my_clock(), nb_pass + 0.0, nb_pass + 0.1);
 
-                nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info);
+                if (dpu_offset == 0) {
+                        reads_buffer[nb_pass] = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
+                        nb_read[nb_pass] = get_reads(fipe1, fipe2, reads_buffer[nb_pass], times_ctx, reads_info);
+                }
 
                 PRINT_TIME(times_ctx, "%lf, , %f, %f\n", my_clock(), nb_pass + 0.1, nb_pass + 0.2);
 
-                while ( nb_read != 0) {
-                        nb_read_total += nb_read;
-                        run_pass(round, nb_read, nb_read_total, dpu_offset, nb_pass,
-                                 fope1, fope2,
-                                 reads_buffer, result_tab,
-                                 ref_genome,
+                while ( nb_read[nb_pass] != 0) {
+                        nb_read_total += nb_read[nb_pass];
+                        run_pass(round, nb_read[nb_pass], nb_read_total, dpu_offset, nb_pass,
+                                 reads_buffer[nb_pass], &result_tab[nb_pass], &result_tab_nb_read[nb_pass],
                                  index_seed, dispatch_requests,
-                                 variant_list, substitution_list, mapping_coverage,
                                  devices,
                                  reads_info, times_ctx, backends_functions);
                         nb_pass++;
+                        assert(nb_pass < MAX_NB_PASS);
 
                         PRINT_TIME(times_ctx, "%lf, , %f, , , , , , %f\n", my_clock(), nb_pass + 0.1, nb_pass-1 + 0.7);
-                        nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info);
+                        if (dpu_offset == 0) {
+                                reads_buffer[nb_pass] = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
+                                nb_read[nb_pass] = get_reads(fipe1, fipe2, reads_buffer[nb_pass], times_ctx, reads_info);
+                        }
                         PRINT_TIME(times_ctx, "%lf, , %f, %f\n", my_clock(), nb_pass + 0.1, nb_pass + 0.2);
                 }
 
                 fclose(fipe1);
                 fclose(fipe2);
+        }
+
+        for (unsigned int each_pass = 0; each_pass < nb_pass; each_pass++) {
+                nb_read_map = process_read(ref_genome,
+                                           reads_buffer[each_pass],
+                                           variant_list,
+                                           substitution_list,
+                                           mapping_coverage,
+                                           result_tab[each_pass],
+                                           result_tab_nb_read[each_pass],
+                                           fope1,
+                                           fope2,
+                                           round,
+                                           times_ctx,
+                                           reads_info);
+                printf(" - time to process reads (pass %i) : %7.2lf sec. / %7.2lf sec.\n",
+                       each_pass,
+                       times_ctx->process_read,
+                       times_ctx->tot_process_read);
+                printf(" - map %i reads (pass %i)\n", nb_read_map, each_pass);
+                free(reads_buffer[each_pass]);
         }
 
         fclose(times_ctx->time_file);
@@ -247,8 +264,6 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
 
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
-        dpu_result_out_t *result_tab = (dpu_result_out_t *) malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS * nb_dpu);
-        int8_t *reads_buffer = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
         dispatch_request_t *dispatch_requests = dispatch_create(nb_dpu, reads_info);
 
         if ((DEBUG_NB_RUN != -1 && DEBUG_FIRST_RUN == -1)
@@ -271,7 +286,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                         continue;
                 }
                 map_var_call(input_prefix, round, devices, ref_genome, index_seed, dispatch_requests,
-                             &variant_list, substitution_list, mapping_coverage, reads_buffer, result_tab,
+                             &variant_list, substitution_list, mapping_coverage,
                              reads_info, times_ctx, backends_functions);
         }
 
@@ -283,8 +298,6 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         free_genome(ref_genome);
         free_index(index_seed);
         dispatch_free(dispatch_requests, nb_dpu);
-        free(reads_buffer);
-        free(result_tab);
         free(substitution_list);
         free(mapping_coverage);
 }
@@ -309,6 +322,7 @@ int main(int argc, char *argv[])
         backends_functions_t backends_functions;
 
         memset(&times_ctx, 0, sizeof(times_ctx_t));
+        pthread_mutex_init(&times_ctx.time_file_mutex, NULL);
 
         validate_args(argc, argv);
 
@@ -357,6 +371,7 @@ int main(int argc, char *argv[])
                 ERROR_EXIT(23, "goal has not been specified!");
         }
 
+        pthread_mutex_destroy(&times_ctx.time_file_mutex);
         free_args();
 
         return 0;

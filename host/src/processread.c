@@ -320,30 +320,26 @@ static bool compute_read_pair(int type1,
         return true;
 }
 
-int process_read(genome_t *ref_genome,
-                 int8_t *reads_buffer,
-                 variant_tree_t **variant_list,
-                 int *substitution_list,
-                 int8_t *mapping_coverage,
-                 dpu_result_out_t *result_tab,
-                 FILE *fpe1,
-                 FILE *fpe2,
-                 int round,
-                 int dpu_offset,
-                 times_ctx_t *times_ctx,
-                 reads_info_t *reads_info)
+int accumulate_read(dpu_result_out_t **result_tab, unsigned int *result_tab_nb_read, int dpu_offset, times_ctx_t *times_ctx)
 {
         double t1, t2;
-        int nb_match = 0;
-        int nb_read_map = 0;
-        int offset[4]; /* offset in result_tab of the first read  */
-        int nbread[4]; /* number of reads                        */
-        unsigned int score[4];
-        int result_tab_tmp[2];
+        unsigned int nb_match = *result_tab_nb_read;
+        unsigned int nb_total_read = 0;
 
         t1 = my_clock();
 
-        /* Get output data from DPUs */
+        for (int numdpu = dpu_offset; numdpu < dpu_offset + (int)get_nb_dpus_per_run(); numdpu++) {
+                unsigned int k = 0;
+                int num_read;
+                do {
+                        num_read = read_out_num(numdpu, k);
+                        k++;
+                } while (num_read != -1);
+                nb_total_read += (k - 1);
+        }
+        *result_tab_nb_read = *result_tab_nb_read + nb_total_read;
+        *result_tab = realloc(*result_tab, *result_tab_nb_read * sizeof(dpu_result_out_t));
+
         for (int numdpu = dpu_offset; numdpu < dpu_offset + (int)get_nb_dpus_per_run(); numdpu++) {
                 int k = 0;
                 int num_read = read_out_num(numdpu, k);
@@ -351,18 +347,47 @@ int process_read(genome_t *ref_genome,
                 while (num_read != -1) {
                         dpu_result_coord_t coord = read_out_coord(numdpu, k);
 
-                        result_tab[nb_match].num = num_read;
-                        result_tab[nb_match].coord.seq_nr = coord.seq_nr;
-                        result_tab[nb_match].coord.seed_nr = coord.seed_nr;
-                        result_tab[nb_match].score = read_out_score(numdpu, k);
+                        (*result_tab)[nb_match].num = num_read;
+                        (*result_tab)[nb_match].coord.seq_nr = coord.seq_nr;
+                        (*result_tab)[nb_match].coord.seed_nr = coord.seed_nr;
+                        (*result_tab)[nb_match].score = read_out_score(numdpu, k);
                         nb_match++;
 
                         num_read = read_out_num(numdpu, ++k);
                 }
         }
+        assert(nb_match == *result_tab_nb_read);
+        qsort(*result_tab, nb_match, sizeof(dpu_result_out_t), cmpresult);
 
-        /* Sort output data from DPUs */
-        qsort(result_tab, nb_match, sizeof(dpu_result_out_t), cmpresult);
+        t2 = my_clock();
+        times_ctx->acc_read = t2 - t1;
+        times_ctx->tot_acc_read += t2 - t1;
+
+        return (int)nb_total_read;
+}
+
+int process_read(genome_t *ref_genome,
+                 int8_t *reads_buffer,
+                 variant_tree_t **variant_list,
+                 int *substitution_list,
+                 int8_t *mapping_coverage,
+                 dpu_result_out_t *result_tab,
+                 unsigned int result_tab_nb_read,
+                 FILE *fpe1,
+                 FILE *fpe2,
+                 int round,
+                 times_ctx_t *times_ctx,
+                 reads_info_t *reads_info)
+{
+        double t1, t2;
+        int nb_match = result_tab_nb_read;
+        int nb_read_map = 0;
+        int offset[4]; /* offset in result_tab of the first read  */
+        int nbread[4]; /* number of reads                        */
+        unsigned int score[4];
+        int result_tab_tmp[2];
+
+        t1 = my_clock();
 
         /*
          * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -441,6 +466,8 @@ int process_read(genome_t *ref_genome,
                         add_to_non_mapped_read(numpair*4, round, fpe1, fpe2, reads_buffer, reads_info);
                 }
         }
+
+        free(result_tab);
 
         t2 = my_clock();
         times_ctx->process_read = t2 - t1;

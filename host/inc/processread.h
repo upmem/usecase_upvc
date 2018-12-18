@@ -31,17 +31,22 @@
  *
  * @return The number of reads that matched.
  */
-int process_read(genome_t *ref_genome,
-                 int8_t *reads_buffer,
-                 variant_tree_t **variant_list,
-                 int *substitution_list,
-                 int8_t *mapping_coverage,
-                 dpu_result_out_t *result_tab,
-                 FILE *fpe1,
-                 FILE *fpe2,
-                 int round,
-                 int dpu_offset,
-                 times_ctx_t *times_ctx,
-                 reads_info_t *reads_info);
+unsigned int process_read(genome_t *ref_genome,
+                          int8_t *reads_buffer,
+                          variant_tree_t **variant_list,
+                          int *substitution_list,
+                          int8_t *mapping_coverage,
+                          dpu_result_out_t *result_tab,
+                          unsigned int result_tab_nb_read,
+                          FILE *fpe1,
+                          FILE *fpe2,
+                          int round,
+                          times_ctx_t *times_ctx,
+                          reads_info_t *reads_info);
+
+unsigned int accumulate_read(dpu_result_out_t **result_tab,
+                             unsigned int *result_tab_nb_read,
+                             int dpu_offset,
+                             times_ctx_t *times_ctx);
 
 #endif /* __PROCESSREAD_H__ */

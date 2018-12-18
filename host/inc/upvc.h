@@ -51,6 +51,7 @@ typedef struct {
         double dispatch_read;
         double map_read;
         double process_read;
+        double acc_read;
         double write_mram;
         double write_reads;
         double read_result;
@@ -59,6 +60,7 @@ typedef struct {
         double tot_dispatch_read;
         double tot_map_read;
         double tot_process_read;
+        double tot_acc_read;
         double tot_write_mram;
         double tot_write_reads;
         double tot_read_result;
