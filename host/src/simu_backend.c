@@ -309,6 +309,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
 void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                         __attribute__((unused)) devices_t *devices,
                         __attribute__((unused)) unsigned int dpu_offset,
+                        __attribute__((unused)) unsigned int nb_pass,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info)
 {
@@ -356,5 +357,6 @@ void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigne
 
 void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset,
                           __attribute__((unused)) devices_t *devices,
-                          __attribute__((unused)) reads_info_t *reads_info)
+                          __attribute__((unused)) reads_info_t *reads_info,
+                          __attribute__((unused)) times_ctx_t *times_ctx)
 {}

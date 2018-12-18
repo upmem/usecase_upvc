@@ -39,6 +39,7 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests,
 void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int dpu_offset,
+                unsigned int nb_pass,
                 times_ctx_t *times_ctx,
                 reads_info_t *reads_info);
 
@@ -63,6 +64,6 @@ void free_backend_dpu(devices_t *devices, unsigned int nb_dpu);
 /**
  * @brief load mram into DPUs for one run
  */
-void load_mram_dpu(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info);
+void load_mram_dpu(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx);
 
 #endif /* __DPU_BACKEND_H__ */

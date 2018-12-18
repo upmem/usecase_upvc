@@ -65,15 +65,28 @@ static void run_pass(int round,
         printf(" - time to dispatch reads : %7.2lf sec. / %7.2lf sec.\n",
                times_ctx->dispatch_read,
                times_ctx->tot_dispatch_read);
+        PRINT_TIME(times_ctx, "%lf, , , %f, %f, , , %f\n", my_clock(), nb_pass + 0.2, nb_pass + 0.3, nb_pass + 0.6);
 
         backends_functions->run_dpu(dispatch_requests,
                                     devices,
                                     dpu_offset,
+                                    nb_pass,
                                     times_ctx,
                                     reads_info);
-        printf(" - time to map reads      : %7.2lf sec. / %7.2lf sec.\n",
+        printf(" - time to write reads      : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->write_reads,
+               times_ctx->tot_write_reads);
+        printf(" - time to compute          : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->compute,
+               times_ctx->tot_compute);
+        printf(" - time to read results     : %7.2lf sec. / %7.2lf sec.\n",
+               times_ctx->read_result,
+               times_ctx->tot_read_result);
+        printf(" - time to map reads        : %7.2lf sec. / %7.2lf sec.\n",
                times_ctx->map_read,
                times_ctx->tot_map_read);
+
+        PRINT_TIME(times_ctx, "%lf, , , , , , %f, %f, %f\n", my_clock(), nb_pass + 0.5, nb_pass + 0.6, nb_pass + 0.7);
 
         if (DEBUG_PASS != -1) {
                 return;
@@ -126,6 +139,10 @@ static void map_var_call(char *filename_prefix,
         sprintf(filename, "%s_%d_PE2.fasta", filename_prefix, round+1);
         fope2 = fopen(filename, "w");
 
+        sprintf(filename, "%s_%d_time.csv", filename_prefix, round);
+        times_ctx->time_file = fopen(filename, "w");
+        fprintf(times_ctx->time_file, "time, write_mram, get_reads, dispatch_reads, write_reads, compute, read_result, map_read, process_read\n");
+
         /*
          * Loop:
          *   - Read a group of reads
@@ -150,9 +167,19 @@ static void map_var_call(char *filename_prefix,
                         sprintf(filename, "%s_%d_PE2.fasta", filename_prefix, round);
                         fipe2 = fopen(filename, "r");
                 }
-                backends_functions->load_mram(dpu_offset, devices, reads_info);
+                PRINT_TIME(times_ctx, "%lf, %f\n", my_clock(), nb_pass + 0.0);
+                backends_functions->load_mram(dpu_offset, devices, reads_info, times_ctx);
+                printf(" - time to write MRAMs : %7.2lf sec. / %7.2lf sec.\n",
+                       times_ctx->write_mram,
+                       times_ctx->tot_write_mram);
 
-                while ((nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info)) != 0) {
+                PRINT_TIME(times_ctx, "%lf, %f, %f\n", my_clock(), nb_pass + 0.0, nb_pass + 0.1);
+
+                nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info);
+
+                PRINT_TIME(times_ctx, "%lf, , %f, %f\n", my_clock(), nb_pass + 0.1, nb_pass + 0.2);
+
+                while ( nb_read != 0) {
                         nb_read_total += nb_read;
                         run_pass(round, nb_read, nb_read_total, dpu_offset, nb_pass,
                                  fope1, fope2,
@@ -163,12 +190,17 @@ static void map_var_call(char *filename_prefix,
                                  devices,
                                  reads_info, times_ctx, backends_functions);
                         nb_pass++;
+
+                        PRINT_TIME(times_ctx, "%lf, , %f, , , , , , %f\n", my_clock(), nb_pass + 0.1, nb_pass-1 + 0.7);
+                        nb_read = get_reads(fipe1, fipe2, reads_buffer, times_ctx, reads_info);
+                        PRINT_TIME(times_ctx, "%lf, , %f, %f\n", my_clock(), nb_pass + 0.1, nb_pass + 0.2);
                 }
 
                 fclose(fipe1);
                 fclose(fipe2);
         }
 
+        fclose(times_ctx->time_file);
         fclose(fope1);
         fclose(fope2);
 }

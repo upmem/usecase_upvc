@@ -5,7 +5,7 @@
  * @brief Specific function whether the application run on simulation or on DPU (hsim of fpga).
  */
 typedef struct backends_functions_struct {
-        void (*run_dpu)(dispatch_request_t *, devices_t *, unsigned int, times_ctx_t *, reads_info_t *);
+        void (*run_dpu)(dispatch_request_t *, devices_t *, unsigned int, unsigned int, times_ctx_t *, reads_info_t *);
         void (*add_seed_to_requests)(dispatch_request_t *, int, int, index_seed_t *, int8_t *, reads_info_t *);
 
         vmi_t *(*init_vmis)(unsigned int);
@@ -22,7 +22,7 @@ typedef struct backends_functions_struct {
                              times_ctx_t *,
                              struct backends_functions_struct *);
         void (*free_backend)(devices_t *, unsigned int);
-        void (*load_mram)(unsigned int, devices_t *, reads_info_t *);
+        void (*load_mram)(unsigned int, devices_t *, reads_info_t *, times_ctx_t *);
 } backends_functions_t;
 
 #endif /* __BACKENDS_FUNCTIONS_H__ */

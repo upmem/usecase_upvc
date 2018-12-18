@@ -39,6 +39,8 @@ typedef struct {
         int delta_neighbour_in_bytes;
 } reads_info_t;
 
+#include <pthread.h>
+#include <stdio.h>
 /**
  * @brief Structure to get the time to do each part of the application.
  */
@@ -49,11 +51,21 @@ typedef struct {
         double dispatch_read;
         double map_read;
         double process_read;
+        double write_mram;
+        double write_reads;
+        double read_result;
+        double compute;
         double tot_get_reads;
         double tot_dispatch_read;
         double tot_map_read;
         double tot_process_read;
+        double tot_write_mram;
+        double tot_write_reads;
+        double tot_read_result;
+        double tot_compute;
         double vcf;
+        FILE *time_file;
+        pthread_mutex_t time_file_mutex;
 } times_ctx_t;
 
 #include <stddef.h>
@@ -64,6 +76,13 @@ static inline double my_clock(void)
         gettimeofday(&t, NULL);
         return (1.0e-6 * t.tv_usec + t.tv_sec);
 }
+
+#define PRINT_TIME(times_ctx, str, ...)                            \
+        do {                                                       \
+                pthread_mutex_lock(&times_ctx->time_file_mutex);   \
+                fprintf(times_ctx->time_file, str, __VA_ARGS__);   \
+                pthread_mutex_unlock(&times_ctx->time_file_mutex); \
+        } while (0)
 
 #include <stdlib.h>
 
