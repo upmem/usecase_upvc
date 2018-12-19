@@ -1,6 +1,8 @@
 #ifndef __SIMU_BACKEND_H__
 #define __SIMU_BACKEND_H__
 
+#include <semaphore.h>
+
 #include "genome.h"
 #include "vmi.h"
 #include "upvc.h"
@@ -53,6 +55,8 @@ void run_dpu_simulation(dispatch_request_t *dispatch,
                         devices_t *devices,
                         unsigned int dpu_offset,
                         unsigned int nb_pass,
+                        sem_t *dispatch_free_sem,
+                        sem_t *acc_wait_sem,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info);
 

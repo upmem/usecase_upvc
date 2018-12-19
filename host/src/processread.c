@@ -320,7 +320,7 @@ static bool compute_read_pair(int type1,
         return true;
 }
 
-int accumulate_read(dpu_result_out_t **result_tab, unsigned int *result_tab_nb_read, int dpu_offset, times_ctx_t *times_ctx)
+int accumulate_read(dpu_result_out_t **result_tab, unsigned int *result_tab_nb_read, unsigned int dpu_offset, times_ctx_t *times_ctx)
 {
         double t1, t2;
         unsigned int nb_match = *result_tab_nb_read;
@@ -328,7 +328,7 @@ int accumulate_read(dpu_result_out_t **result_tab, unsigned int *result_tab_nb_r
 
         t1 = my_clock();
 
-        for (int numdpu = dpu_offset; numdpu < dpu_offset + (int)get_nb_dpus_per_run(); numdpu++) {
+        for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run(); numdpu++) {
                 unsigned int k = 0;
                 int num_read;
                 do {
@@ -340,7 +340,7 @@ int accumulate_read(dpu_result_out_t **result_tab, unsigned int *result_tab_nb_r
         *result_tab_nb_read = *result_tab_nb_read + nb_total_read;
         *result_tab = realloc(*result_tab, *result_tab_nb_read * sizeof(dpu_result_out_t));
 
-        for (int numdpu = dpu_offset; numdpu < dpu_offset + (int)get_nb_dpus_per_run(); numdpu++) {
+        for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run(); numdpu++) {
                 int k = 0;
                 int num_read = read_out_num(numdpu, k);
 

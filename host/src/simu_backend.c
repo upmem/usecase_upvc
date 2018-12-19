@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #include "upvc_dpu.h"
 #include "genome.h"
@@ -310,6 +311,8 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                         __attribute__((unused)) devices_t *devices,
                         __attribute__((unused)) unsigned int dpu_offset,
                         __attribute__((unused)) unsigned int nb_pass,
+                        sem_t *dispatch_free_sem,
+                        sem_t *acc_wait_sem,
                         times_ctx_t *times_ctx,
                         reads_info_t *reads_info)
 {
@@ -319,6 +322,9 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         align_on_dpu_arg_t thread_args[nb_dpu];
 
         t1 = my_clock();
+
+        //printf("[%u] exec_rank wait acc\n", nb_pass);
+        sem_wait(acc_wait_sem);
 
         for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 thread_args[numdpu].reads_info = *reads_info;
@@ -331,6 +337,9 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
                 pthread_join(thread_id[numdpu], NULL);
         }
+
+        //printf("[%u] exec_rank post dispatch\n", nb_pass);
+        sem_post(dispatch_free_sem);
 
         t2 = my_clock();
         times_ctx->map_read = t2 - t1;

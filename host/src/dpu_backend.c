@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <semaphore.h>
 
 #include "mram_dpu.h"
 #include "dpus_mgmt.h"
@@ -130,6 +131,8 @@ void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int dpu_offset,
                 unsigned int nb_pass,
+                sem_t *dispatch_free_sem,
+                sem_t *acc_wait_sem,
                 times_ctx_t *times_ctx,
                 reads_info_t *reads_info)
 {
@@ -148,6 +151,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
                                                  dispatch,
                                                  reads_info);
         }
+        sem_post(dispatch_free_sem);
 
         PRINT_TIME_WRITE_READS(times_ctx, nb_pass);
         t2 = my_clock();
@@ -167,6 +171,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
         t3 = my_clock();
         PRINT_TIME_READ_RES(times_ctx, nb_pass);
 
+        sem_wait(acc_wait_sem);
         /* Gather results and free DPUs */
         for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
                 dpu_result_out_t *results[nb_dpus_per_rank];

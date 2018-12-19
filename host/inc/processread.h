@@ -46,7 +46,7 @@ unsigned int process_read(genome_t *ref_genome,
 
 unsigned int accumulate_read(dpu_result_out_t **result_tab,
                              unsigned int *result_tab_nb_read,
-                             int dpu_offset,
+                             unsigned int dpu_offset,
                              times_ctx_t *times_ctx);
 
 #endif /* __PROCESSREAD_H__ */
