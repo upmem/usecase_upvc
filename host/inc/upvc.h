@@ -79,12 +79,29 @@ static inline double my_clock(void)
         return (1.0e-6 * t.tv_usec + t.tv_sec);
 }
 
-#define PRINT_TIME(times_ctx, str, ...)                            \
-        do {                                                       \
-                pthread_mutex_lock(&times_ctx->time_file_mutex);   \
-                fprintf(times_ctx->time_file, str, __VA_ARGS__);   \
-                pthread_mutex_unlock(&times_ctx->time_file_mutex); \
+#define PRINT_TIME(times_ctx, str, pass)                                \
+        do {                                                            \
+                pthread_mutex_lock(&times_ctx->time_file_mutex);        \
+                fprintf(times_ctx->time_file, str, my_clock(), pass);   \
+                pthread_mutex_unlock(&times_ctx->time_file_mutex);      \
         } while (0)
+
+#define PRINT_TIME_WRITE_MRAM(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, %lf\n", pass + 0.0)
+#define PRINT_TIME_DISPATCH(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, ,%lf\n", pass + 0.1)
+#define PRINT_TIME_WRITE_READS(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, , ,%lf\n", pass + 0.2)
+#define PRINT_TIME_COMPUTE(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, , , ,%lf\n", pass + 0.3)
+#define PRINT_TIME_READ_RES(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, , , , ,%lf\n", pass + 0.4)
+#define PRINT_TIME_MAP_READ(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, , , , , ,%lf\n", pass + 0.5)
+#define PRINT_TIME_ACC_READ(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, , , , , , ,%lf\n", pass + 0.6)
+#define PRINT_TIME_PROCESS_READ(times_ctx, pass)  \
+        PRINT_TIME(times_ctx, "%lf, , , , , , , ,%lf\n", pass + 0.7)
 
 #include <stdlib.h>
 

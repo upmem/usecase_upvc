@@ -139,6 +139,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
 
         t1 = my_clock();
 
+        PRINT_TIME_WRITE_READS(times_ctx, nb_pass);
         for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
                 printf("() write inputs to rank #%d\n", each_rank);
                 dpu_try_write_dispatch_into_mram(each_rank,
@@ -148,8 +149,9 @@ void run_on_dpu(dispatch_request_t *dispatch,
                                                  reads_info);
         }
 
+        PRINT_TIME_WRITE_READS(times_ctx, nb_pass);
         t2 = my_clock();
-        PRINT_TIME(times_ctx, "%lf, , , , %f ,%f\n", my_clock(), nb_pass + 0.3, nb_pass + 0.4);
+        PRINT_TIME_COMPUTE(times_ctx, nb_pass);
 
         for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
                 printf("() boot DPU rank #%d\n", each_rank);
@@ -161,8 +163,9 @@ void run_on_dpu(dispatch_request_t *dispatch,
                 printf("DPU rank #%u completed\n", each_rank);
         }
 
+        PRINT_TIME_COMPUTE(times_ctx, nb_pass);
         t3 = my_clock();
-        PRINT_TIME(times_ctx, "%lf, , , , ,%f, %f\n", my_clock(), nb_pass + 0.4, nb_pass + 0.5);
+        PRINT_TIME_READ_RES(times_ctx, nb_pass);
 
         /* Gather results and free DPUs */
         for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
@@ -181,6 +184,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
                 }
         }
 
+        PRINT_TIME_READ_RES(times_ctx, nb_pass);
         t4 = my_clock();
         times_ctx->map_read = t4 - t1;
         times_ctx->tot_map_read += t4 - t1;
