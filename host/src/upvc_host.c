@@ -48,6 +48,8 @@ void *thread_get_reads(void *arg)
         times_ctx_t *times_ctx = args->times_ctx;
         reads_info_t *reads_info = args->reads_info;
 
+        unsigned int nb_dpu = get_nb_dpu();
+        unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
         unsigned int each_pass = 0;
 
         PRINT_TIME_GET_READS(times_ctx, each_pass);
@@ -57,7 +59,7 @@ void *thread_get_reads(void *arg)
 
         do {
                 if (DEBUG_PASS != -1) {
-                        if (each_pass == DEBUG_PASS) {
+                        if ((int)each_pass == DEBUG_PASS) {
                                 nb_read[each_pass + 1] = 0;
                                 sem_post(dispatch_free_sem);
                                 break;
@@ -74,6 +76,19 @@ void *thread_get_reads(void *arg)
                 nb_read[each_pass] = get_reads(fipe1, fipe2, reads_buffer[each_pass], times_ctx, reads_info);
                 PRINT_TIME_GET_READS(times_ctx, each_pass);
         } while (nb_read[each_pass] != 0);
+
+        for (unsigned int dpu_offset = nb_dpus_per_run; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
+                for (unsigned int ii = 0; ii < each_pass; ii++) {
+                        if (DEBUG_PASS != -1) {
+                                if ((int)ii == DEBUG_PASS) {
+                                        sem_post(dispatch_free_sem);
+                                }
+                        } else {
+                                sem_post(dispatch_free_sem);
+                        }
+                }
+        }
+
         return NULL;
 }
 
@@ -110,13 +125,13 @@ void *thread_exec_rank(void *arg)
         unsigned int nb_dpu = get_nb_dpu();
         unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
         for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
-                printf("[%u] loading mram\n", dpu_offset);
+                printf("[%u-%u] loading mram\n", dpu_offset, rank_id);
                 PRINT_TIME_WRITE_MRAM(times_ctx, 0, rank_id);
                 t1 = my_clock();
                 backends_functions->load_mram(dpu_offset, rank_id, devices, reads_info, times_ctx);
                 t2 = my_clock();
                 PRINT_TIME_WRITE_MRAM(times_ctx, 0, rank_id);
-                printf("  time %.2lf sec\n", t2 - t1);
+                printf("[%u-%u]  time %.2lf sec\n", dpu_offset, rank_id, t2 - t1);
 
                 unsigned int each_pass = 0;
                 if (DEBUG_PASS != -1) {
@@ -126,7 +141,7 @@ void *thread_exec_rank(void *arg)
                 do {
                         sem_wait(dispatch_wait_sem);
 
-                        printf("[%u] running pass\n", each_pass);
+                        printf("[%u-%u] running pass\n", each_pass, rank_id);
                         PRINT_TIME_MAP_READ(times_ctx, each_pass, rank_id);
                         t1 = my_clock();
                         backends_functions->run_dpu(dispatch_requests,
@@ -140,7 +155,7 @@ void *thread_exec_rank(void *arg)
                                                     reads_info);
                         t2 = my_clock();
                         PRINT_TIME_MAP_READ(times_ctx, each_pass, rank_id);
-                        printf("  time %.2lf sec\n", t2 - t1);
+                        printf("[%u-%u]  time %.2lf sec\n", each_pass, rank_id, t2 - t1);
 
                         sem_post(acc_free_sem);
                         each_pass++;
