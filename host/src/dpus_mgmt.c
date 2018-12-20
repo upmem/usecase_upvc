@@ -130,28 +130,47 @@ void dpu_try_free(devices_t *devices)
 
 void dpu_try_run(unsigned int rank_id, devices_t *devices)
 {
-        dpu_api_status_t status = dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS);
-        assert(status == DPU_API_SUCCESS && "dpu_boot_all failed");
+        if (DEBUG_DPU != -1) {
+                if (DEBUG_DPU / devices->nb_dpus_per_rank == rank_id) {
+                        dpu_api_status_t status = dpu_boot_individual(devices->dpus[DEBUG_DPU], ASYNCHRONOUS);
+                        assert(status == DPU_API_SUCCESS && "dpu_boot_individual failed");
+                }
+        } else {
+                dpu_api_status_t status = dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS);
+                assert(status == DPU_API_SUCCESS && "dpu_boot_all failed");
+        }
 }
 
 bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
 {
         dpu_api_status_t status;
         dpu_run_status_t run_status[devices->nb_dpus_per_rank];
-        uint32_t nb_dpus_running;
-        status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
-        assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
-
-        for (unsigned int each_dpu = 0; each_dpu < devices->nb_dpus_per_rank; each_dpu++) {
+        unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
+        unsigned int each_dpu = 0;
+        uint32_t nb_dpus_running = 0;
+        if (DEBUG_DPU != -1) {
+                if (DEBUG_DPU / nb_dpus_per_rank == rank_id) {
+                        status = dpu_get_individual_status(devices->dpus[DEBUG_DPU], run_status);
+                        assert(status == DPU_API_SUCCESS && "dpu_get_individual_status failed");
+                        each_dpu = DEBUG_DPU;
+                        nb_dpus_per_rank = DEBUG_DPU + 1;
+                        nb_dpus_running = run_status[0] == DPU_STATUS_RUNNING;
+                }
+        } else {
+                dpu_run_status_t run_status[devices->nb_dpus_per_rank];
+                status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
+                assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
+        }
+        for (; each_dpu < nb_dpus_per_rank; each_dpu++) {
                 switch (run_status[each_dpu]) {
                 case DPU_STATUS_IDLE:
                 case DPU_STATUS_RUNNING:
                         continue;
                 case DPU_STATUS_ERROR:
-                        log_dpu(devices->dpus[each_dpu], stdout);
+                        log_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank], stdout);
                         ERROR_EXIT(10, "*** DPU %u reported an error - aborting", each_dpu);
                 default:
-                        log_dpu(devices->dpus[each_dpu], stdout);
+                        log_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank], stdout);
                         ERROR_EXIT(11, "*** could not get DPU status %u - aborting", each_dpu);
                 }
         }
@@ -319,7 +338,9 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
         status = dpu_copy_from_dpus(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
 
-        dpu_try_log(rank_id, dpu_offset, devices, matrix);
+        if (DEBUG_ROUND == -1 && DEBUG_PASS == -1 && DEBUG_DPU == -1) {
+                dpu_try_log(rank_id, dpu_offset, devices, matrix);
+        }
 
         status = dpu_transfer_matrix_free(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_free failed");

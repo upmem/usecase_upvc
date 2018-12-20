@@ -56,7 +56,15 @@ void *thread_get_reads(void *arg)
         PRINT_TIME_GET_READS(times_ctx, each_pass);
 
         do {
-                sem_post(dispatch_free_sem);
+                if (DEBUG_PASS != -1) {
+                        if (each_pass == DEBUG_PASS) {
+                                nb_read[each_pass + 1] = 0;
+                                sem_post(dispatch_free_sem);
+                                break;
+                        }
+                } else {
+                        sem_post(dispatch_free_sem);
+                }
 
                 each_pass++;
                 assert(each_pass < MAX_NB_PASS);
@@ -111,6 +119,10 @@ void *thread_exec_rank(void *arg)
                 printf("  time %.2lf sec\n", t2 - t1);
 
                 unsigned int each_pass = 0;
+                if (DEBUG_PASS != -1) {
+                        each_pass = DEBUG_PASS;
+                }
+
                 do {
                         sem_wait(dispatch_wait_sem);
 
@@ -170,6 +182,10 @@ void *thread_dispatch(void *arg)
         unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
         for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
                 unsigned int each_pass = 0;
+                if (DEBUG_PASS != -1) {
+                        each_pass = DEBUG_PASS;
+                }
+
                 do {
                         sem_wait(get_reads_wait_sem);
                         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
@@ -223,6 +239,10 @@ void *thread_acc(void *arg)
         unsigned int dpu_offset = 0;
         for (; dpu_offset < (nb_dpu - nb_dpus_per_run); dpu_offset += nb_dpus_per_run) {
                 unsigned int each_pass = 0;
+                if (DEBUG_PASS != -1) {
+                        each_pass = DEBUG_PASS;
+                }
+
                 do {
                         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
                                 sem_wait(&exec_rank_wait_sem[each_rank]);
@@ -240,6 +260,10 @@ void *thread_acc(void *arg)
         }
         {
                 unsigned int each_pass = 0;
+                if (DEBUG_PASS != -1) {
+                        each_pass = DEBUG_PASS;
+                }
+
                 do {
                         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
                                 sem_wait(&exec_rank_wait_sem[each_rank]);
@@ -295,6 +319,10 @@ void *thread_process(void *arg)
         reads_info_t *reads_info = args->reads_info;
 
         unsigned int each_pass = 0;
+        if (DEBUG_PASS != -1) {
+                each_pass = DEBUG_PASS;
+        }
+
         do {
                 sem_wait(acc_wait_sem);
 
@@ -465,10 +493,12 @@ static void exec_round(unsigned int round,
                 }
                 ret = pthread_create(&tid_dispatch, NULL, thread_dispatch, (void *)&dispatch_arg);
                 assert(ret == 0);
-                ret = pthread_create(&tid_acc, NULL, thread_acc, (void *)&acc_arg);
-                assert(ret == 0);
-                ret = pthread_create(&tid_process, NULL, thread_process, (void *)&process_arg);
-                assert(ret == 0);
+                if (DEBUG_DPU == -1) {
+                        ret = pthread_create(&tid_acc, NULL, thread_acc, (void *)&acc_arg);
+                        assert(ret == 0);
+                        ret = pthread_create(&tid_process, NULL, thread_process, (void *)&process_arg);
+                        assert(ret == 0);
+                }
 
                 ret = pthread_join(tid_get_reads, NULL);
                 assert(ret == 0);
@@ -478,10 +508,12 @@ static void exec_round(unsigned int round,
                 }
                 ret = pthread_join(tid_dispatch, NULL);
                 assert(ret == 0);
-                ret = pthread_join(tid_acc, NULL);
-                assert(ret == 0);
-                ret = pthread_join(tid_process, NULL);
-                assert(ret == 0);
+                if (DEBUG_DPU == -1) {
+                        ret = pthread_join(tid_acc, NULL);
+                        assert(ret == 0);
+                        ret = pthread_join(tid_process, NULL);
+                        assert(ret == 0);
+                }
         }
 
         fclose(fipe1);
@@ -535,11 +567,6 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
         dispatch_request_t *dispatch_requests = dispatch_create(nb_dpu, reads_info);
-
-        if ((DEBUG_NB_RUN != -1 && DEBUG_FIRST_RUN == -1)
-            || (DEBUG_NB_RUN == 0)) {
-                ERROR_EXIT(42, "DEBUG MACRO has not been well configured!");
-        }
 
         backends_functions->init_backend(&nb_rank,
                                          &devices,

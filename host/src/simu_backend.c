@@ -321,20 +321,26 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         unsigned int nb_dpu = get_nb_dpu();
         pthread_t thread_id[nb_dpu];
         align_on_dpu_arg_t thread_args[nb_dpu];
+        unsigned int first_dpu = 0;
+
+        if (DEBUG_DPU != -1) {
+                first_dpu = DEBUG_DPU;
+                nb_dpu = DEBUG_DPU + 1;
+        }
 
         t1 = my_clock();
 
         sem_wait(acc_wait_sem);
 
-        for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
+        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
                 thread_args[numdpu].reads_info = *reads_info;
                 thread_args[numdpu].numdpu = numdpu;
         }
 
-        for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
+        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
                 pthread_create(&thread_id[numdpu], NULL, align_on_dpu, &thread_args[numdpu]);
         }
-        for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
+        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
                 pthread_join(thread_id[numdpu], NULL);
         }
 
