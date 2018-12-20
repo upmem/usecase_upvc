@@ -94,27 +94,27 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests,
 
 static void print_memory_layout(mram_info_t *mram_info, reads_info_t *reads_info)
 {
-        printf("\t                 addr       size\n");
-        printf("\tmram_info        0x%.8x 0x%.8x\n", MRAM_INFO_ADDR, (unsigned int)sizeof(mram_info_t));
-        printf("\tref inputs       0x%.8x 0x%.8x\n", (unsigned int)DPU_INPUTS_ADDR, mram_info->total_nbr_size);
-        printf("\trequest_info     0x%.8x 0x%.8x\n",
-               (unsigned int)DPU_REQUEST_INFO_ADDR(mram_info),
-               (unsigned int)sizeof(request_info_t));
-        printf("\trequest          0x%.8x 0x%.8x\n"
-               "\t                 (one:  0x%.8x)\n",
-               (unsigned int)DPU_REQUEST_ADDR(mram_info),
-               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST,
-               (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
-        printf("\tempty space      0x%.8x 0x%.8x\n",
-               (unsigned int)(DPU_REQUEST_ADDR(mram_info)
-                              + DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST),
-               (unsigned int)(DPU_COMPUTE_TIME_ADDR
-                              - (DPU_REQUEST_ADDR(mram_info)
-                                 + DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST)));
-        printf("\tdpu time stats   0x%.8x 0x%.8x\n", (unsigned int)DPU_COMPUTE_TIME_ADDR,(unsigned int)DPU_COMPUTE_TIME_SIZE);
-        printf("\ttasklet stats    0x%.8x 0x%.8x\n", (unsigned int)DPU_TASKLET_STATS_ADDR,(unsigned int)DPU_TASKLET_STATS_SIZE);
-        printf("\tresult swap area 0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE);
-        printf("\tresult area      0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE);
+        /* printf("\t                 addr       size\n"); */
+        /* printf("\tmram_info        0x%.8x 0x%.8x\n", MRAM_INFO_ADDR, (unsigned int)sizeof(mram_info_t)); */
+        /* printf("\tref inputs       0x%.8x 0x%.8x\n", (unsigned int)DPU_INPUTS_ADDR, mram_info->total_nbr_size); */
+        /* printf("\trequest_info     0x%.8x 0x%.8x\n", */
+        /*        (unsigned int)DPU_REQUEST_INFO_ADDR(mram_info), */
+        /*        (unsigned int)sizeof(request_info_t)); */
+        /* printf("\trequest          0x%.8x 0x%.8x\n" */
+        /*        "\t                 (one:  0x%.8x)\n", */
+        /*        (unsigned int)DPU_REQUEST_ADDR(mram_info), */
+        /*        (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST, */
+        /*        (unsigned int)DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes)); */
+        /* printf("\tempty space      0x%.8x 0x%.8x\n", */
+        /*        (unsigned int)(DPU_REQUEST_ADDR(mram_info) */
+        /*                       + DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST), */
+        /*        (unsigned int)(DPU_COMPUTE_TIME_ADDR */
+        /*                       - (DPU_REQUEST_ADDR(mram_info) */
+        /*                          + DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes) * MAX_DPU_REQUEST))); */
+        /* printf("\tdpu time stats   0x%.8x 0x%.8x\n", (unsigned int)DPU_COMPUTE_TIME_ADDR,(unsigned int)DPU_COMPUTE_TIME_SIZE); */
+        /* printf("\ttasklet stats    0x%.8x 0x%.8x\n", (unsigned int)DPU_TASKLET_STATS_ADDR,(unsigned int)DPU_TASKLET_STATS_SIZE); */
+        /* printf("\tresult swap area 0x%.8x 0x%.8x\n", (unsigned int)DPU_SWAP_RESULT_ADDR, (unsigned int)DPU_SWAP_RESULT_SIZE); */
+        /* printf("\tresult area      0x%.8x 0x%.8x\n", (unsigned int)DPU_RESULT_ADDR, (unsigned int)DPU_RESULT_SIZE); */
 
         assert((MRAM_INFO_ADDR + sizeof(mram_info_t)) <= DPU_INPUTS_ADDR);
         assert((DPU_INPUTS_ADDR + mram_info->total_nbr_size) <= DPU_REQUEST_INFO_ADDR(mram_info));
@@ -143,7 +143,6 @@ void run_on_dpu(dispatch_request_t *dispatch,
         t1 = my_clock();
 
         PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
-        printf("() write inputs to rank #%d\n", rank_id);
         dpu_try_write_dispatch_into_mram(rank_id,
                                          dpu_offset + rank_id * nb_dpus_per_rank,
                                          devices,
@@ -155,11 +154,8 @@ void run_on_dpu(dispatch_request_t *dispatch,
         t2 = my_clock();
         PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
 
-        printf("() boot DPU rank #%d\n", rank_id);
         dpu_try_run(rank_id, devices);
-
         while (!dpu_try_check_status(rank_id, devices));
-        printf("DPU rank #%u completed\n", rank_id);
 
         PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
         t3 = my_clock();
@@ -225,8 +221,8 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, devices_t *dev
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
                 unsigned int this_dpu = dpu_offset + each_dpu + rank_id * nb_dpus_per_rank;
-                printf("() load MRAM %d into DPU %d of rank %d\n", this_dpu, each_dpu, rank_id);
                 mram_load(mram[each_dpu], this_dpu);
+                mram[each_dpu]->delta = reads_info->delta_neighbour_in_bytes;
                 print_memory_layout(mram[each_dpu], reads_info);
         }
         dpu_try_write_mram(rank_id, devices, mram);

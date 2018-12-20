@@ -13,6 +13,8 @@
 #include "dispatch.h"
 #include "parse_args.h"
 
+#include "upvc_dpu.h"
+
 #define DPU_SLICE_SIZE (8)
 
 /* #define LOG_DPUS */
@@ -152,10 +154,13 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
                 if (DEBUG_DPU / nb_dpus_per_rank == rank_id) {
                         status = dpu_get_individual_status(devices->dpus[DEBUG_DPU], run_status);
                         assert(status == DPU_API_SUCCESS && "dpu_get_individual_status failed");
-                        each_dpu = DEBUG_DPU;
-                        nb_dpus_per_rank = DEBUG_DPU + 1;
                         nb_dpus_running = run_status[0] == DPU_STATUS_RUNNING;
+                } else {
+                        run_status[0] = DPU_STATUS_IDLE;
+                        nb_dpus_running = 0;
                 }
+                each_dpu = 0;
+                nb_dpus_per_rank = 1;
         } else {
                 status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
                 assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
@@ -336,6 +341,20 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
         }
         status = dpu_copy_from_dpus(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
+
+        if (DEBUG_DPU != -1) {
+                if (DEBUG_DPU / nb_dpus_per_rank == rank_id) {
+                        int k = 0;
+                        while (read_out_num(DEBUG_DPU, k) != -1) {
+                                printf("R: %u %u %llu\n",
+                                       read_out_num(DEBUG_DPU, k),
+                                       read_out_score(DEBUG_DPU, k),
+                                       (unsigned long long)read_out_coord(DEBUG_DPU, k).coord);
+                                k++;
+                        }
+                        log_dpu(devices->dpus[DEBUG_DPU], stdout);
+                }
+        }
 
         if (DEBUG_ROUND == -1 && DEBUG_PASS == -1 && DEBUG_DPU == -1) {
                 dpu_try_log(rank_id, dpu_offset, devices, matrix);

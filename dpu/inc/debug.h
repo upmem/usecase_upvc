@@ -71,9 +71,9 @@
 
 #define DEBUG_RESULTS_VAR int debug_nr = -1
 #define DEBUG_RESULTS_INCR (debug_nr++)
-#define DEBUG_RESULTS_PRINT(thread, idx, request_num, request_offset, seed, seq, score) \
+#define DEBUG_RESULTS_PRINT(thread, request_num, request_offset, seed, seq, score) \
         do {                                                            \
-                printf("[%u] nr=%u ix=%u num=%u ", (thread), debug_nr, (idx), (request_num)); \
+                printf("[%u] nr=%u num=%u ", (thread), debug_nr, (request_num)); \
                 printf("offset=%u seed=%u seq=%u score=%u\n",           \
                        (request_offset),                                \
                        (seed),                                          \
@@ -85,7 +85,7 @@
 
 #define DEBUG_RESULTS_VAR
 #define DEBUG_RESULTS_INCR
-#define DEBUG_RESULTS_PRINT(thread, idx, request_num, request_offset, seed, seq, score)
+#define DEBUG_RESULTS_PRINT(thread, request_num, request_offset, seed, seq, score)
 
 #endif /* DEBUG_RESULTS */
 

@@ -344,6 +344,17 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                 pthread_join(thread_id[numdpu], NULL);
         }
 
+        if (DEBUG_DPU != -1) {
+                int k = 0;
+                while (read_out_num(DEBUG_DPU, k) != -1) {
+                        printf("R: %u %u %llu\n",
+                               read_out_num(DEBUG_DPU, k),
+                               read_out_score(DEBUG_DPU, k),
+                               (unsigned long long)read_out_coord(DEBUG_DPU, k).coord);
+                        k++;
+                }
+        }
+
         sem_post(dispatch_free_sem);
 
         t2 = my_clock();

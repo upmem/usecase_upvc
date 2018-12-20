@@ -96,6 +96,7 @@ static void compare_neighbours(sysname_t tasklet_id,
 {
         int score, score_nodp, score_odpd = -1;
         uint8_t *ref_nbr = cached_coords_and_nbr + COORDS_SIZE;
+        DEBUG_RESULTS_VAR;
         DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len, mram_info.delta);
 
         score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, *mini);
@@ -130,7 +131,6 @@ static void compare_neighbours(sysname_t tasklet_id,
                                  ((uint32_t *) cached_coords_and_nbr)[1],
                                  tasklet_stats);
                         DEBUG_RESULTS_PRINT(tasklet_id,
-                                            idx,
                                             request->num,
                                             request->offset,
                                             ((uint32_t *) cached_coords_and_nbr)[0],
