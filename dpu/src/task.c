@@ -231,15 +231,15 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
                                 &tasklet_stats,
                                 &mutex_miscellaneous);
 
-                if (dout->nb_results != 0) {
-                        STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
-                        result_pool_write(dout, &tasklet_stats);
-                }
+                STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
+                result_pool_write(dout, &tasklet_stats);
         }
 
         DEBUG_STATS_PRINT(tasklet_stats, mutex_miscellaneous);
 
         DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + tasklet_id * sizeof(dpu_tasklet_stats_t));
+
+        result_pool_finish(&tasklet_stats);
 }
 
 /**

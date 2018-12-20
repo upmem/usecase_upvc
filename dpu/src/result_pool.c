@@ -44,16 +44,6 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
 {
         unsigned int ii = 0;
         unsigned int pageno;
-        __attribute__((aligned(8))) static const dpu_result_out_t end_of_results =
-                {
-                 .num = (unsigned int) -1,
-                 .score = (unsigned int) -1,
-                 .coord.seq_nr = 0,
-                 .coord.seed_nr = 0
-                };
-        /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
-         * has a num equal to -1.
-         */
 
         mutex_lock(result_pool.mutex);
 
@@ -95,12 +85,28 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
                 halt();
         }
 
+        mutex_unlock(result_pool.mutex);
+}
+
+void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
+{
+        __attribute__((aligned(8))) static const dpu_result_out_t end_of_results =
+                {
+                 .num = (unsigned int) -1,
+                 .score = (unsigned int) -1,
+                 .coord.seq_nr = 0,
+                 .coord.seed_nr = 0
+                };
+        /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
+         * has a num equal to -1.
+         */
+        mutex_lock(result_pool.mutex);
         /* Mark the end of result data, do not increment the indexes, so that the next one restarts from this
          * point.
          */
         DPU_RESULT_WRITE((void*)&end_of_results, result_pool.cur_write);
         STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
         STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
+
         mutex_unlock(result_pool.mutex);
 }
-

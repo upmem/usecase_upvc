@@ -180,13 +180,6 @@ void run_on_dpu(dispatch_request_t *dispatch,
                         results[each_dpu] = get_mem_dpu_res(this_dpu);
                 }
                 dpu_try_get_results_and_log(each_rank, dpu_offset, devices, results);
-
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                        unsigned int this_dpu = each_rank * nb_dpus_per_rank + dpu_offset + each_dpu;
-                        if (dispatch[this_dpu].nb_reads == 0) {
-                                results[each_dpu][0].num = -1;
-                        }
-                }
         }
 
         PRINT_TIME_READ_RES(times_ctx, nb_pass);

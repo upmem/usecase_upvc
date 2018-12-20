@@ -17,4 +17,9 @@ void result_pool_write(const dout_t *results, dpu_tasklet_stats_t *stats);
  */
 void result_pool_init();
 
+/**
+ * @brief Add end mark in result pool.
+ */
+void result_pool_finish(dpu_tasklet_stats_t *stats);
+
 #endif /* __RESULT_POOL_H__ */
