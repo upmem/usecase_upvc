@@ -41,6 +41,7 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests,
 void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int dpu_offset,
+                unsigned int rank_id,
                 unsigned int nb_pass,
                 sem_t *dispatch_free_sem,
                 sem_t *acc_wait_sem,
@@ -50,7 +51,8 @@ void run_on_dpu(dispatch_request_t *dispatch,
 /**
  * @brief Index the reference genome and alloc physical DPUs
  */
-void init_backend_dpu(devices_t **devices,
+void init_backend_dpu(unsigned int *nb_rank,
+                      devices_t **devices,
                       unsigned int nb_dpu_per_run,
                       const char *dpu_binary,
                       index_seed_t ***index_seed,
@@ -68,6 +70,10 @@ void free_backend_dpu(devices_t *devices, unsigned int nb_dpu);
 /**
  * @brief load mram into DPUs for one run
  */
-void load_mram_dpu(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx);
+void load_mram_dpu(unsigned int dpu_offset,
+                   unsigned int rank_id,
+                   devices_t *devices,
+                   reads_info_t *reads_info,
+                   times_ctx_t *times_ctx);
 
 #endif /* __DPU_BACKEND_H__ */

@@ -54,6 +54,7 @@ void add_seed_to_simulation_requests(dispatch_request_t *requests,
 void run_dpu_simulation(dispatch_request_t *dispatch,
                         devices_t *devices,
                         unsigned int dpu_offset,
+                        unsigned int rank_id,
                         unsigned int nb_pass,
                         sem_t *dispatch_free_sem,
                         sem_t *acc_wait_sem,
@@ -63,7 +64,8 @@ void run_dpu_simulation(dispatch_request_t *dispatch,
 /**
  * @brief Index the reference genome.
  */
-void init_backend_simulation(devices_t **devices,
+void init_backend_simulation(unsigned int *nb_rank,
+                             devices_t **devices,
                              unsigned int nb_dpu_per_run,
                              const char *dpu_binary,
                              index_seed_t ***index_seed,
@@ -81,6 +83,10 @@ void free_backend_simulation(devices_t *devices, unsigned int nb_dpu);
 /**
  * @brief Does nothing in sumation mode.
  */
-void load_mram_simulation(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx);
+void load_mram_simulation(unsigned int dpu_offset,
+                          unsigned int rank_id,
+                          devices_t *devices,
+                          reads_info_t *reads_info,
+                          times_ctx_t *times_ctx);
 
 #endif /* __SIMU_BACKEND_H__ */

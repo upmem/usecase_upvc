@@ -86,24 +86,24 @@ static inline double my_clock(void)
                 pthread_mutex_unlock(&times_ctx->time_file_mutex);      \
         } while (0)
 
-#define PRINT_TIME_WRITE_MRAM(times_ctx, pass)          \
+#define PRINT_TIME_GET_READS(times_ctx, pass)           \
         PRINT_TIME(times_ctx, "%lf, %lf\n", pass + 0.0)
 #define PRINT_TIME_DISPATCH(times_ctx, pass)                    \
-        PRINT_TIME(times_ctx, "%lf, ,%lf\n", pass + 0.1)
-#define PRINT_TIME_WRITE_READS(times_ctx, pass)                 \
-        PRINT_TIME(times_ctx, "%lf, , ,%lf\n", pass + 0.2)
-#define PRINT_TIME_COMPUTE(times_ctx, pass)                     \
-        PRINT_TIME(times_ctx, "%lf, , , ,%lf\n", pass + 0.3)
-#define PRINT_TIME_READ_RES(times_ctx, pass)                    \
-        PRINT_TIME(times_ctx, "%lf, , , , ,%lf\n", pass + 0.4)
-#define PRINT_TIME_MAP_READ(times_ctx, pass)                            \
-        PRINT_TIME(times_ctx, "%lf, , , , , ,%lf\n", pass + 0.5)
-#define PRINT_TIME_ACC_READ(times_ctx, pass)                            \
-        PRINT_TIME(times_ctx, "%lf, , , , , , ,%lf\n", pass + 0.6)
-#define PRINT_TIME_PROCESS_READ(times_ctx, pass)                        \
-        PRINT_TIME(times_ctx, "%lf, , , , , , , ,%lf\n", pass + 0.7)
-#define PRINT_TIME_GET_READS(times_ctx, pass)                           \
-        PRINT_TIME(times_ctx, "%lf, , , , , , , , ,%lf\n", pass + 0.8)
+        PRINT_TIME(times_ctx, "%lf, , %lf\n", pass + 0.02)
+#define PRINT_TIME_ACC_READ(times_ctx, pass)                    \
+        PRINT_TIME(times_ctx, "%lf, , , %lf\n", pass + 0.04)
+#define PRINT_TIME_PROCESS_READ(times_ctx, pass)                \
+        PRINT_TIME(times_ctx, "%lf, , , , %lf\n", pass + 0.06)
+#define PRINT_TIME_WRITE_MRAM(times_ctx, pass, rank)                    \
+        PRINT_TIME(times_ctx, "%lf, , , , , %lf\n", pass + 0.08 + rank * 0.1)
+#define PRINT_TIME_WRITE_READS(times_ctx, pass, rank)                   \
+        PRINT_TIME(times_ctx, "%lf, , , , , , %lf\n", pass + 0.10 + rank * 0.1)
+#define PRINT_TIME_COMPUTE(times_ctx, pass, rank)                       \
+        PRINT_TIME(times_ctx, "%lf, , , , , , , %lf\n", pass + 0.12 + rank * 0.1)
+#define PRINT_TIME_READ_RES(times_ctx, pass, rank)                      \
+        PRINT_TIME(times_ctx, "%lf, , , , , , , , %lf\n", pass + 0.14 + rank * 0.1)
+#define PRINT_TIME_MAP_READ(times_ctx, pass, rank)                      \
+        PRINT_TIME(times_ctx, "%lf, , , , , , , , , %lf\n", pass + 0.16 + rank * 0.1)
 
 #include <stdlib.h>
 

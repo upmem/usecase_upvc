@@ -11,6 +11,7 @@ typedef struct backends_functions_struct {
                         devices_t *,
                         unsigned int,
                         unsigned int,
+                        unsigned int,
                         sem_t *,
                         sem_t *,
                         times_ctx_t *,
@@ -21,7 +22,8 @@ typedef struct backends_functions_struct {
         void (*free_vmis)(vmi_t *, unsigned int, unsigned int *, reads_info_t *);
         void (*write_vmi)(vmi_t *, unsigned int, unsigned int, int8_t *, uint64_t, reads_info_t *);
 
-        void (*init_backend)(devices_t **,
+        void (*init_backend)(unsigned int *,
+                             devices_t **,
                              unsigned int,
                              const char *,
                              index_seed_t ***,
@@ -31,7 +33,7 @@ typedef struct backends_functions_struct {
                              times_ctx_t *,
                              struct backends_functions_struct *);
         void (*free_backend)(devices_t *, unsigned int);
-        void (*load_mram)(unsigned int, devices_t *, reads_info_t *, times_ctx_t *);
+        void (*load_mram)(unsigned int, unsigned int, devices_t *, reads_info_t *, times_ctx_t *);
 } backends_functions_t;
 
 #endif /* __BACKENDS_FUNCTIONS_H__ */

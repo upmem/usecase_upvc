@@ -20,7 +20,6 @@
 typedef struct {
         unsigned int nb_dpus_per_rank;
         unsigned int nb_ranks_per_run;
-        unsigned int nb_ranks;
         dpu_rank_t *ranks;
         unsigned int nb_dpus;
         dpu_t *dpus;

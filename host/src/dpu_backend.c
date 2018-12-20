@@ -130,6 +130,7 @@ static void print_memory_layout(mram_info_t *mram_info, reads_info_t *reads_info
 void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int dpu_offset,
+                unsigned int rank_id,
                 unsigned int nb_pass,
                 sem_t *dispatch_free_sem,
                 sem_t *acc_wait_sem,
@@ -137,52 +138,43 @@ void run_on_dpu(dispatch_request_t *dispatch,
                 reads_info_t *reads_info)
 {
         double t1, t2, t3, t4;
-        unsigned int nb_ranks_per_run = devices->nb_ranks_per_run;
         unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
 
         t1 = my_clock();
 
-        PRINT_TIME_WRITE_READS(times_ctx, nb_pass);
-        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
-                printf("() write inputs to rank #%d\n", each_rank);
-                dpu_try_write_dispatch_into_mram(each_rank,
-                                                 dpu_offset + each_rank * nb_dpus_per_rank,
-                                                 devices,
-                                                 dispatch,
-                                                 reads_info);
-        }
+        PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
+        printf("() write inputs to rank #%d\n", rank_id);
+        dpu_try_write_dispatch_into_mram(rank_id,
+                                         dpu_offset + rank_id * nb_dpus_per_rank,
+                                         devices,
+                                         dispatch,
+                                         reads_info);
         sem_post(dispatch_free_sem);
 
-        PRINT_TIME_WRITE_READS(times_ctx, nb_pass);
+        PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
         t2 = my_clock();
-        PRINT_TIME_COMPUTE(times_ctx, nb_pass);
+        PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
 
-        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
-                printf("() boot DPU rank #%d\n", each_rank);
-                dpu_try_run(each_rank, devices);
-        }
+        printf("() boot DPU rank #%d\n", rank_id);
+        dpu_try_run(rank_id, devices);
 
-        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
-                while (!dpu_try_check_status(each_rank, devices));
-                printf("DPU rank #%u completed\n", each_rank);
-        }
+        while (!dpu_try_check_status(rank_id, devices));
+        printf("DPU rank #%u completed\n", rank_id);
 
-        PRINT_TIME_COMPUTE(times_ctx, nb_pass);
+        PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
         t3 = my_clock();
-        PRINT_TIME_READ_RES(times_ctx, nb_pass);
+        PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
 
         sem_wait(acc_wait_sem);
         /* Gather results and free DPUs */
-        for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++) {
-                dpu_result_out_t *results[nb_dpus_per_rank];
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                        unsigned int this_dpu = each_rank * nb_dpus_per_rank + dpu_offset + each_dpu;
-                        results[each_dpu] = get_mem_dpu_res(this_dpu);
-                }
-                dpu_try_get_results_and_log(each_rank, dpu_offset, devices, results);
+        dpu_result_out_t *results[nb_dpus_per_rank];
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
+                unsigned int this_dpu = rank_id * nb_dpus_per_rank + dpu_offset + each_dpu;
+                results[each_dpu] = get_mem_dpu_res(this_dpu);
         }
+        dpu_try_get_results_and_log(rank_id, dpu_offset, devices, results);
 
-        PRINT_TIME_READ_RES(times_ctx, nb_pass);
+        PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
         t4 = my_clock();
         times_ctx->map_read = t4 - t1;
         times_ctx->tot_map_read += t4 - t1;
@@ -194,19 +186,21 @@ void run_on_dpu(dispatch_request_t *dispatch,
         times_ctx->tot_read_result += t4 - t3;
 }
 
-void init_backend_dpu(devices_t **devices,
-                             unsigned int nb_dpu_per_run,
-                             const char *dpu_binary,
-                             index_seed_t ***index_seed,
-                             unsigned int nb_dpu,
-                             __attribute__((unused)) genome_t *ref_genome,
-                             __attribute__((unused)) reads_info_t *reads_info,
-                             __attribute__((unused)) times_ctx_t *times_ctx,
-                             __attribute__((unused)) backends_functions_t *backends_functions)
+void init_backend_dpu(unsigned int *nb_rank,
+                      devices_t **devices,
+                      unsigned int nb_dpu_per_run,
+                      const char *dpu_binary,
+                      index_seed_t ***index_seed,
+                      unsigned int nb_dpu,
+                      __attribute__((unused)) genome_t *ref_genome,
+                      __attribute__((unused)) reads_info_t *reads_info,
+                      __attribute__((unused)) times_ctx_t *times_ctx,
+                      __attribute__((unused)) backends_functions_t *backends_functions)
 {
         malloc_dpu_res(nb_dpu);
         *index_seed = load_index_seeds();
         *devices = dpu_try_alloc_for(nb_dpu_per_run, dpu_binary);
+        *nb_rank = (*devices)->nb_ranks_per_run;
 }
 
 void free_backend_dpu(devices_t *devices, __attribute__((unused)) unsigned int nb_dpu)
@@ -215,7 +209,7 @@ void free_backend_dpu(devices_t *devices, __attribute__((unused)) unsigned int n
         free_dpu_res();
 }
 
-void load_mram_dpu(unsigned int dpu_offset, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx)
+void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx)
 {
         double t1, t2;
         unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
@@ -229,15 +223,14 @@ void load_mram_dpu(unsigned int dpu_offset, devices_t *devices, reads_info_t *re
                 assert(mram[each_dpu] != NULL);
         }
 
-        for (unsigned int each_rank = 0; each_rank < devices->nb_ranks_per_run; each_rank++) {
-                for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                        unsigned int this_dpu = dpu_offset + each_dpu + each_rank * nb_dpus_per_rank;
-                        printf("() load MRAM %d into DPU %d of rank %d\n", this_dpu, each_dpu, each_rank);
-                        mram_load(mram[each_dpu], this_dpu);
-                        print_memory_layout(mram[each_dpu], reads_info);
-                }
-                dpu_try_write_mram(each_rank, devices, mram);
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
+                unsigned int this_dpu = dpu_offset + each_dpu + rank_id * nb_dpus_per_rank;
+                printf("() load MRAM %d into DPU %d of rank %d\n", this_dpu, each_dpu, rank_id);
+                mram_load(mram[each_dpu], this_dpu);
+                print_memory_layout(mram[each_dpu], reads_info);
         }
+        dpu_try_write_mram(rank_id, devices, mram);
+
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
                 free(mram[each_dpu]);
         }

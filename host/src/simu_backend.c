@@ -310,6 +310,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
 void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                         __attribute__((unused)) devices_t *devices,
                         __attribute__((unused)) unsigned int dpu_offset,
+                        __attribute__((unused)) unsigned rank_id,
                         __attribute__((unused)) unsigned int nb_pass,
                         sem_t *dispatch_free_sem,
                         sem_t *acc_wait_sem,
@@ -323,7 +324,6 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
 
         t1 = my_clock();
 
-        //printf("[%u] exec_rank wait acc\n", nb_pass);
         sem_wait(acc_wait_sem);
 
         for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
@@ -338,7 +338,6 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                 pthread_join(thread_id[numdpu], NULL);
         }
 
-        //printf("[%u] exec_rank post dispatch\n", nb_pass);
         sem_post(dispatch_free_sem);
 
         t2 = my_clock();
@@ -346,7 +345,8 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         times_ctx->tot_map_read += t2 - t1;
 }
 
-void init_backend_simulation(__attribute__((unused)) devices_t **devices,
+void init_backend_simulation(unsigned int *nb_rank,
+                             __attribute__((unused)) devices_t **devices,
                              __attribute__((unused)) unsigned int nb_dpu_per_run,
                              __attribute__((unused)) const char *dpu_binary,
                              index_seed_t ***index_seed,
@@ -356,6 +356,7 @@ void init_backend_simulation(__attribute__((unused)) devices_t **devices,
                              times_ctx_t *times_ctx,
                              backends_functions_t *backends_functions)
 {
+        *nb_rank = 1;
         *index_seed = index_genome(ref_genome, nb_dpu, times_ctx, reads_info, backends_functions);
 }
 
@@ -365,6 +366,7 @@ void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigne
 }
 
 void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset,
+                          __attribute__((unused)) unsigned int rank_id,
                           __attribute__((unused)) devices_t *devices,
                           __attribute__((unused)) reads_info_t *reads_info,
                           __attribute__((unused)) times_ctx_t *times_ctx)

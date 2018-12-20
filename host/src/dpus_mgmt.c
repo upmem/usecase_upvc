@@ -47,39 +47,34 @@ void setup_dpus_for_target_type(target_type_t target_type)
         }
 }
 
-devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
+devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_program)
 {
         dpu_api_status_t status;
         devices_t *devices = (devices_t *) malloc(sizeof(devices_t));
         assert(devices != NULL);
 
-        devices->nb_dpus = nb_dpus;
+        devices->nb_dpus = nb_dpus_per_run;
         status = dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank));
         assert(status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_for failed");
 
-        devices->dpus = (dpu_t *) calloc(nb_dpus, sizeof(dpu_t));
+        devices->dpus = (dpu_t *) calloc(nb_dpus_per_run, sizeof(dpu_t));
         assert(devices->dpus != NULL);
 
         devices->mram_info = (mram_info_t *) malloc(get_nb_dpu() * sizeof(mram_info_t));
         assert(devices->mram_info != NULL);
 
-        unsigned nb_dpus_per_run = get_nb_dpus_per_run();
         if (nb_dpus_per_run % devices->nb_dpus_per_rank != 0) {
                 ERROR_EXIT(5, "*** number of DPUs per run is not a multiple of the DPUs in a rank - aborting");
         }
         devices->nb_ranks_per_run = nb_dpus_per_run / devices->nb_dpus_per_rank;
-        if (nb_dpus % devices->nb_dpus_per_rank != 0) {
-                ERROR_EXIT(5, "*** number of DPUs is not a multiple of the DPUs in a rank - aborting");
-        }
-        devices->nb_ranks = nb_dpus / devices->nb_dpus_per_rank;;
-        devices->ranks = (dpu_rank_t *) calloc(devices->nb_ranks, sizeof(dpu_rank_t));
+        devices->ranks = (dpu_rank_t *) calloc(devices->nb_ranks_per_run, sizeof(dpu_rank_t));
         assert(devices->ranks != NULL);
 
-        for (unsigned int each_rank = 0, each_dpu = 0; each_dpu < nb_dpus; each_rank++) {
+        for (unsigned int each_rank = 0, each_dpu = 0; each_dpu < nb_dpus_per_run; each_rank++) {
                 status = dpu_alloc(&param, &(devices->ranks[each_rank]));
                 assert(status == DPU_API_SUCCESS && "dpu_alloc failed");
                 for (unsigned int each_member = 0;
-                     (each_member < devices->nb_dpus_per_rank) && (each_dpu < nb_dpus);
+                     (each_member < devices->nb_dpus_per_rank) && (each_dpu < nb_dpus_per_run);
                      each_member++, each_dpu++) {
                         devices->dpus[each_dpu] = dpu_get_id(devices->ranks[each_rank], each_member);
                 }
@@ -88,7 +83,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program)
                 mram_load_info(&devices->mram_info[each_dpu], each_dpu);
         }
 
-        for (unsigned int each_rank = 0; each_rank < devices->nb_ranks; each_rank++) {
+        for (unsigned int each_rank = 0; each_rank < devices->nb_ranks_per_run; each_rank++) {
                 status = dpu_load_all(devices->ranks[each_rank], opt_program);
                 assert(status == DPU_API_SUCCESS && "dpu_load_all failed");
         }
@@ -124,7 +119,7 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, mram_info_t **
 
 void dpu_try_free(devices_t *devices)
 {
-        for (unsigned int each_rank = 0; each_rank < devices->nb_ranks; each_rank++) {
+        for (unsigned int each_rank = 0; each_rank < devices->nb_ranks_per_run; each_rank++) {
                 dpu_free(devices->ranks[each_rank]);
         }
         free(devices->ranks);
