@@ -157,7 +157,6 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
                         nb_dpus_running = run_status[0] == DPU_STATUS_RUNNING;
                 }
         } else {
-                dpu_run_status_t run_status[devices->nb_dpus_per_rank];
                 status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
                 assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
         }
@@ -171,7 +170,7 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
                         ERROR_EXIT(10, "*** DPU %u reported an error - aborting", each_dpu);
                 default:
                         log_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank], stdout);
-                        ERROR_EXIT(11, "*** could not get DPU status %u - aborting", each_dpu);
+                        ERROR_EXIT(11, "*** could not get DPU %u status %u - aborting", each_dpu, run_status[each_dpu]);
                 }
         }
         return (nb_dpus_running == 0);
