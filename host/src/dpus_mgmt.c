@@ -324,8 +324,8 @@ static void dpu_try_log(unsigned int rank_id,
 #endif
                 log_dpu(devices->dpus[this_dpu], devices->log_file);
         }
+        fflush(devices->log_file);
         pthread_mutex_unlock(&devices->log_mutex);
-        fflush(stdout);
 }
 
 void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)

@@ -82,6 +82,7 @@ static inline double my_clock(void)
         do {                                                            \
                 pthread_mutex_lock(&times_ctx->time_file_mutex);        \
                 fprintf(times_ctx->time_file, str, my_clock(), pass);   \
+                fflush(times_ctx->time_file);                           \
                 pthread_mutex_unlock(&times_ctx->time_file_mutex);      \
         } while (0)
 
