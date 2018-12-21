@@ -612,6 +612,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                 }
 
                 printf("starting round %u\n", round);
+                fprintf(devices->log_file, "round %i\n", round);
                 exec_round(round,
                            nb_rank,
                            mapping_coverage,

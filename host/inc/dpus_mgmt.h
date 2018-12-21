@@ -24,6 +24,8 @@ typedef struct {
         unsigned int nb_dpus;
         dpu_t *dpus;
         mram_info_t *mram_info;
+        pthread_mutex_t log_mutex;
+        FILE *log_file;
 } devices_t;
 
 /**

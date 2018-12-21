@@ -90,6 +90,9 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
                 assert(status == DPU_API_SUCCESS && "dpu_load_all failed");
         }
 
+        pthread_mutex_init(&devices->log_mutex, NULL);
+        devices->log_file = fopen("upvc_log.txt", "w");
+
         return devices;
 }
 
@@ -124,6 +127,8 @@ void dpu_try_free(devices_t *devices)
         for (unsigned int each_rank = 0; each_rank < devices->nb_ranks_per_run; each_rank++) {
                 dpu_free(devices->ranks[each_rank]);
         }
+        pthread_mutex_destroy(&devices->log_mutex);
+        fclose(devices->log_file);
         free(devices->ranks);
         free(devices->dpus);
         free(devices->mram_info);
@@ -288,35 +293,38 @@ static void dpu_try_log(unsigned int rank_id,
         }
 #endif
 
+        pthread_mutex_lock(&devices->log_mutex);
+        fprintf(devices->log_file, "rank %u offset %u\n", rank_id, dpu_offset);
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
                 unsigned int this_dpu = each_dpu + dpu_offset + rank_id * nb_dpus_per_rank;
-                printf("LOG DPU=%u TIME=%llu SEC=%.3f\n",
-                       this_dpu,
-                       (unsigned long long)compute_time[each_dpu],
-                       (float)compute_time[each_dpu] / CLOCK_PER_SEC);
+                fprintf(devices->log_file, "LOG DPU=%u TIME=%llu SEC=%.3f\n",
+                        this_dpu,
+                        (unsigned long long)compute_time[each_dpu],
+                        (float)compute_time[each_dpu] / CLOCK_PER_SEC);
 #ifdef STATS_ON
                 for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
                         /* TODO: show logs */
-                        printf("LOG DPU=%u TID=%u REQ=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_reqs);
-                        printf("LOG DPU=%u TID=%u NODP=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_nodp_calls);
-                        printf("LOG DPU=%u TID=%u ODPD=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_odpd_calls);
-                        printf("LOG DPU=%u TID=%u RESULTS=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_results);
-                        printf("LOG DPU=%u TID=%u DATA_IN=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_data_load);
-                        printf("LOG DPU=%u TID=%u RESULT_OUT=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_result_store);
-                        printf("LOG DPU=%u TID=%u LOAD=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_load);
-                        printf("LOG DPU=%u TID=%u STORE=%u\n",
-                               this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_store);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u REQ=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_reqs);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u NODP=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_nodp_calls);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u ODPD=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_odpd_calls);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u RESULTS=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_results);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u DATA_IN=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_data_load);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u RESULT_OUT=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_result_store);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u LOAD=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_load);
+                        fprintf(devices->log_file, "LOG DPU=%u TID=%u STORE=%u\n",
+                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_store);
                 }
 #endif
-                log_dpu(devices->dpus[this_dpu], stdout);
+                log_dpu(devices->dpus[this_dpu], devices->log_file);
         }
+        pthread_mutex_unlock(&devices->log_mutex);
         fflush(stdout);
 }
 
@@ -342,9 +350,7 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
         status = dpu_copy_from_dpus(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
 
-        if (DEBUG_ROUND == -1 && DEBUG_PASS == -1 && DEBUG_DPU == -1) {
-                dpu_try_log(rank_id, dpu_offset, devices, matrix);
-        }
+        dpu_try_log(rank_id, dpu_offset, devices, matrix);
 
         status = dpu_transfer_matrix_free(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_free failed");
