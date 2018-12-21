@@ -60,7 +60,8 @@ void *thread_get_reads(void *arg)
         do {
                 if (DEBUG_PASS != -1) {
                         if ((int)each_pass == DEBUG_PASS) {
-                                nb_read[each_pass + 1] = 0;
+                                each_pass++;
+                                nb_read[each_pass] = 0;
                                 sem_post(dispatch_free_sem);
                                 break;
                         }
@@ -576,7 +577,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
         char *input_prefix = get_input_path();
         variant_tree_t *variant_list = NULL;
         genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
-        devices_t *devices;
+        devices_t *devices = NULL;
         char filename[1024];
 
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
@@ -601,18 +602,14 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                 "write_mram, write_reads, compute, read_result, map_read\n");
 
         for (unsigned int round = 0; round < 3; round++) {
-                FILE *res_file;
-                unsigned int first_dpu = 0;
-                unsigned int last_dpu = nb_dpu;
-                sprintf(filename, "%s_%u_res.txt", input_prefix, round);
-                res_file = fopen(filename, "w");
-
                 if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {
                         continue;
                 }
 
                 printf("starting round %u\n", round);
-                fprintf(devices->log_file, "round %i\n", round);
+                if (devices != NULL) {
+                        fprintf(devices->log_file, "round %i\n", round);
+                }
                 exec_round(round,
                            nb_rank,
                            mapping_coverage,
@@ -627,22 +624,29 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                            reads_info,
                            backends_functions);
 
-                if (DEBUG_DPU != -1) {
-                        first_dpu = DEBUG_DPU;
-                        last_dpu = DEBUG_DPU + 1;
-                }
-                for (unsigned int numdpu = first_dpu; numdpu < last_dpu; numdpu++) {
-                        int k = 0;
-                        fprintf(res_file, "dpu %i\n", numdpu);
-                        while (read_out_num(numdpu, k) != -1) {
-                                fprintf(res_file, "R: %u %u %llu\n",
-                                        read_out_num(numdpu, k),
-                                        read_out_score(numdpu, k),
-                                        (unsigned long long)read_out_coord(numdpu, k).coord);
-                                k++;
+                if (DEBUG_PASS != -1) {
+                        FILE *res_file;
+                        unsigned int first_dpu = 0;
+                        unsigned int last_dpu = nb_dpu;
+                        sprintf(filename, "%s_%u_res.txt", input_prefix, round);
+                        res_file = fopen(filename, "w");
+                        if (DEBUG_DPU != -1) {
+                                first_dpu = DEBUG_DPU;
+                                last_dpu = DEBUG_DPU + 1;
                         }
+                        for (unsigned int numdpu = first_dpu; numdpu < last_dpu; numdpu++) {
+                                int k = 0;
+                                fprintf(res_file, "dpu %i\n", numdpu);
+                                while (read_out_num(numdpu, k) != -1) {
+                                        fprintf(res_file, "R: %u %u %llu\n",
+                                                read_out_num(numdpu, k),
+                                                read_out_score(numdpu, k),
+                                                (unsigned long long)read_out_coord(numdpu, k).coord);
+                                        k++;
+                                }
+                        }
+                        fclose(res_file);
                 }
-                fclose(res_file);
         }
 
         fclose(times_ctx->time_file);
