@@ -601,6 +601,12 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                 "write_mram, write_reads, compute, read_result, map_read\n");
 
         for (unsigned int round = 0; round < 3; round++) {
+                FILE *res_file;
+                unsigned int first_dpu = 0;
+                unsigned int last_dpu = nb_dpu;
+                sprintf(filename, "%s_%u_res.txt", input_prefix, round);
+                res_file = fopen(filename, "w");
+
                 if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {
                         continue;
                 }
@@ -619,6 +625,23 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                            times_ctx,
                            reads_info,
                            backends_functions);
+
+                if (DEBUG_DPU != -1) {
+                        first_dpu = DEBUG_DPU;
+                        last_dpu = DEBUG_DPU + 1;
+                }
+                for (unsigned int numdpu = first_dpu; numdpu < last_dpu; numdpu++) {
+                        int k = 0;
+                        fprintf(res_file, "dpu %i\n", numdpu);
+                        while (read_out_num(numdpu, k) != -1) {
+                                fprintf(res_file, "R: %u %u %llu\n",
+                                        read_out_num(numdpu, k),
+                                        read_out_score(numdpu, k),
+                                        (unsigned long long)read_out_coord(numdpu, k).coord);
+                                k++;
+                        }
+                }
+                fclose(res_file);
         }
 
         fclose(times_ctx->time_file);

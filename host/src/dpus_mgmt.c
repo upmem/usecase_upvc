@@ -342,20 +342,6 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
         status = dpu_copy_from_dpus(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
 
-        if (DEBUG_DPU != -1) {
-                if (DEBUG_DPU / nb_dpus_per_rank == rank_id) {
-                        int k = 0;
-                        while (read_out_num(DEBUG_DPU, k) != -1) {
-                                printf("R: %u %u %llu\n",
-                                       read_out_num(DEBUG_DPU, k),
-                                       read_out_score(DEBUG_DPU, k),
-                                       (unsigned long long)read_out_coord(DEBUG_DPU, k).coord);
-                                k++;
-                        }
-                        log_dpu(devices->dpus[DEBUG_DPU], stdout);
-                }
-        }
-
         if (DEBUG_ROUND == -1 && DEBUG_PASS == -1 && DEBUG_DPU == -1) {
                 dpu_try_log(rank_id, dpu_offset, devices, matrix);
         }
