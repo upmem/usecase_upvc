@@ -89,6 +89,7 @@ void *thread_get_reads(void *arg)
                         }
                 }
         }
+        sem_post(dispatch_free_sem);
 
         return NULL;
 }
@@ -202,8 +203,8 @@ void *thread_dispatch(void *arg)
                         each_pass = DEBUG_PASS;
                 }
 
+                sem_wait(get_reads_wait_sem);
                 do {
-                        sem_wait(get_reads_wait_sem);
                         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
                                 sem_wait(&exec_rank_wait_sem[each_rank]);
                         }
@@ -222,6 +223,7 @@ void *thread_dispatch(void *arg)
                                 sem_post(&exec_rank_free_sem[each_rank]);
                         }
                         each_pass++;
+                        sem_wait(get_reads_wait_sem);
                 } while (nb_read[each_pass] != 0);
         }
         return NULL;
