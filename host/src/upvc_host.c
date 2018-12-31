@@ -57,16 +57,18 @@ void *thread_get_reads(void *arg)
         nb_read[each_pass] = get_reads(fipe1, fipe2, reads_buffer[each_pass], times_ctx, reads_info);
         PRINT_TIME_GET_READS(times_ctx, each_pass);
 
-        do {
+        sem_post(dispatch_free_sem);
+
+        while (nb_read[each_pass] != 0) {
                 if (DEBUG_PASS != -1) {
                         if ((int)each_pass == DEBUG_PASS) {
                                 each_pass++;
                                 nb_read[each_pass] = 0;
                                 sem_post(dispatch_free_sem);
                                 break;
+                        } else {
+                                continue;
                         }
-                } else {
-                        sem_post(dispatch_free_sem);
                 }
 
                 each_pass++;
@@ -76,9 +78,14 @@ void *thread_get_reads(void *arg)
                 reads_buffer[each_pass] = (int8_t *) malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
                 nb_read[each_pass] = get_reads(fipe1, fipe2, reads_buffer[each_pass], times_ctx, reads_info);
                 PRINT_TIME_GET_READS(times_ctx, each_pass);
-        } while (nb_read[each_pass] != 0);
+
+                sem_post(dispatch_free_sem);
+        }
 
         for (unsigned int dpu_offset = nb_dpus_per_run; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
+
+                sem_post(dispatch_free_sem);
+
                 for (unsigned int ii = 0; ii < each_pass; ii++) {
                         if (DEBUG_PASS != -1) {
                                 if ((int)ii == DEBUG_PASS) {
@@ -89,7 +96,6 @@ void *thread_get_reads(void *arg)
                         }
                 }
         }
-        sem_post(dispatch_free_sem);
 
         return NULL;
 }
@@ -140,8 +146,8 @@ void *thread_exec_rank(void *arg)
                         each_pass = DEBUG_PASS;
                 }
 
-                do {
-                        sem_wait(dispatch_wait_sem);
+                sem_wait(dispatch_wait_sem);
+                while (nb_read[each_pass] != 0) {
 
                         printf("[%u-%u] running pass\n", each_pass, rank_id);
                         PRINT_TIME_MAP_READ(times_ctx, each_pass, rank_id);
@@ -161,7 +167,9 @@ void *thread_exec_rank(void *arg)
 
                         sem_post(acc_free_sem);
                         each_pass++;
-                } while (nb_read[each_pass] != 0);
+                        sem_wait(dispatch_wait_sem);
+                }
+                sem_post(acc_free_sem);
         }
         return NULL;
 }
@@ -204,7 +212,8 @@ void *thread_dispatch(void *arg)
                 }
 
                 sem_wait(get_reads_wait_sem);
-                do {
+
+                while (nb_read[each_pass] != 0) {
                         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
                                 sem_wait(&exec_rank_wait_sem[each_rank]);
                         }
@@ -222,9 +231,13 @@ void *thread_dispatch(void *arg)
                         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
                                 sem_post(&exec_rank_free_sem[each_rank]);
                         }
+
                         each_pass++;
                         sem_wait(get_reads_wait_sem);
-                } while (nb_read[each_pass] != 0);
+                }
+                for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
+                        sem_post(&exec_rank_free_sem[each_rank]);
+                }
         }
         return NULL;
 }
@@ -261,10 +274,10 @@ void *thread_acc(void *arg)
                         each_pass = DEBUG_PASS;
                 }
 
-                do {
-                        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                                sem_wait(&exec_rank_wait_sem[each_rank]);
-                        }
+                for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
+                        sem_wait(&exec_rank_wait_sem[each_rank]);
+                }
+                while (nb_read[each_pass] != 0) {
 
                         PRINT_TIME_ACC_READ(times_ctx, each_pass);
                         accumulate_read(&result_tab[each_pass], &result_tab_nb_read[each_pass], dpu_offset, times_ctx);
@@ -274,7 +287,11 @@ void *thread_acc(void *arg)
                                 sem_post(&exec_rank_free_sem[each_rank]);
                         }
                         each_pass++;
-                } while (nb_read[each_pass] != 0);
+
+                        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
+                                sem_wait(&exec_rank_wait_sem[each_rank]);
+                        }
+                }
         }
         {
                 unsigned int each_pass = 0;
@@ -282,10 +299,10 @@ void *thread_acc(void *arg)
                         each_pass = DEBUG_PASS;
                 }
 
-                do {
-                        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                                sem_wait(&exec_rank_wait_sem[each_rank]);
-                        }
+                for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
+                        sem_wait(&exec_rank_wait_sem[each_rank]);
+                }
+                while (nb_read[each_pass] != 0) {
 
                         PRINT_TIME_ACC_READ(times_ctx, each_pass);
                         accumulate_read(&result_tab[each_pass], &result_tab_nb_read[each_pass], dpu_offset, times_ctx);
@@ -296,7 +313,11 @@ void *thread_acc(void *arg)
                                 sem_post(&exec_rank_free_sem[each_rank]);
                         }
                         each_pass++;
-                } while (nb_read[each_pass] != 0);
+                        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
+                                sem_wait(&exec_rank_wait_sem[each_rank]);
+                        }
+                }
+                sem_post(process_free_sem);
         }
         return NULL;
 }
@@ -341,9 +362,8 @@ void *thread_process(void *arg)
                 each_pass = DEBUG_PASS;
         }
 
+        sem_wait(acc_wait_sem);
         do {
-                sem_wait(acc_wait_sem);
-
                 PRINT_TIME_PROCESS_READ(times_ctx, each_pass);
                 process_read(ref_genome,
                              reads_buffer[each_pass],
@@ -359,7 +379,9 @@ void *thread_process(void *arg)
                              reads_info);
                 free(reads_buffer[each_pass]);
                 PRINT_TIME_PROCESS_READ(times_ctx, each_pass);
+
                 each_pass++;
+                sem_wait(acc_wait_sem);
         } while (nb_read[each_pass] != 0);
         return NULL;
 }
