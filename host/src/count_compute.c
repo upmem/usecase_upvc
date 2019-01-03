@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <float.h>
 
 #include "parse_args.h"
 #include "getread.h"
@@ -20,8 +21,12 @@ int main(int argc, char *argv[])
         FILE *fipe1, *fipe2, *f_csv;
         char *input_prefix;
         unsigned long long nb_compute_total = 0ULL;
+        unsigned long long nb_compute_theorical = 0ULL;
         unsigned long long nb_seed_ref = 0ULL;
         unsigned long long nb_seed_input = 0ULL;
+        double diff = 0.0;
+        double max_diff = 0.0;
+        int max_index = -1;
 
         validate_args(argc, argv);
 
@@ -43,6 +48,9 @@ int main(int argc, char *argv[])
                         }
                 }
         }
+
+        printf("ref genome read\n");
+        fflush(stdout);
 
         sprintf(filename, "%s_PE1.fastq", input_prefix);
         fipe1 = fopen(filename, "r");
@@ -67,6 +75,14 @@ int main(int argc, char *argv[])
         fclose(fipe2);
 
         printf("nb compute total = %e\n", (double)nb_compute_total);
+        fflush(stdout);
+
+        for (int each_seed = 0; each_seed < NB_SEED; each_seed++) {
+                nb_compute_theorical += (seed_counter_ref[each_seed] * seed_counter_ref[each_seed]);
+        }
+
+        printf("nb compute theorical = %e\n", (double)nb_compute_theorical);
+        fflush(stdout);
 
         sprintf(filename, "%s_seed_counter.csv", input_prefix);
         f_csv = fopen(filename, "w");
@@ -76,12 +92,26 @@ int main(int argc, char *argv[])
                 fwrite(filename, sizeof(char), strlen(filename), f_csv);
                 nb_seed_ref += seed_counter_ref[each_seed];
                 nb_seed_input += seed_counter_input[each_seed];
+                if (seed_counter_ref[each_seed] != 0 && seed_counter_input[each_seed] != 0) {
+                        double cur_diff = ((double)(abs(seed_counter_ref[each_seed] - seed_counter_input[each_seed]))*100.0 / (double)(seed_counter_ref[each_seed]));
+                        diff += cur_diff;
+                        if (cur_diff > max_diff) {
+                                max_diff = cur_diff;
+                                max_index = each_seed;
+                        }
+                }
         }
 
         printf("nb_seed_ref = %e\n"
-               "nb_seed_input = %e\n",
+               "nb_seed_input = %e\n"
+               "diff = %lf%%\n"
+               "max_diff = %lf%%, index %i\n",
                (double)nb_seed_ref,
-               (double)nb_seed_input);
+               (double)nb_seed_input,
+               diff / NB_SEED,
+               max_diff,
+               max_index);
+        fflush(stdout);
 
         fclose(f_csv);
         free(seed_counter_ref);
