@@ -5,7 +5,7 @@
 #ifndef __INDEX_H__
 #define __INDEX_H__
 
-#define NB_SEED (16777216)
+#define NB_SEED (1 << (SIZE_SEED << 1))
 
 #define SEED_FILE_LOG ("seeds.log")
 
