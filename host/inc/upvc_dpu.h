@@ -39,14 +39,6 @@ dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number);
  */
 void malloc_dpu(reads_info_t *reads_info, int nb_dpu);
 /**
- * @brief Allocate sub-Structure to store information of DPU memory.
- *
- * @param num_dpu     Number of the dpu for which to allocate the sub-structure.
- * @param nb_index    Number of index for this DPU.
- * @param reads_info  Information on the size of the seed and the neighbour.
- */
-void malloc_neighbour_idx (int num_dpu, int nb_index, reads_info_t *reads_info);
-/**
  * @brief Allocate structure to store results information of DPUs.
  *
  * @param nb_dpu  Number of dpu used to compute.

@@ -200,11 +200,6 @@ index_seed_t **index_genome(genome_t *ref_genome,
                 }
         }
 
-        malloc_dpu(reads_info, nb_dpu);
-        for (int i = 0; i < nb_dpu; i++) {
-                malloc_neighbour_idx(i, dpu_index_size[i], reads_info);
-        }
-
         unsigned int nb_neighbours[nb_dpu];
         memset(nb_neighbours, 0, nb_dpu * sizeof(unsigned int));
 

@@ -57,10 +57,7 @@ void init_backend_dpu(unsigned int *nb_rank,
                       const char *dpu_binary,
                       index_seed_t ***index_seed,
                       unsigned int nb_dpu,
-                      genome_t *ref_genome,
-                      reads_info_t *reads_info,
-                      times_ctx_t *times_ctx,
-                      backends_functions_t *backends_functions);
+                      reads_info_t *reads_info);
 
 /**
  * @brief Free DPUs.

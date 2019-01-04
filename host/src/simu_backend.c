@@ -4,6 +4,7 @@
 #include <semaphore.h>
 
 #include "upvc_dpu.h"
+#include "mram_dpu.h"
 #include "genome.h"
 #include "upvc.h"
 #include "vmi.h"
@@ -268,8 +269,11 @@ static void *align_on_dpu(void *arg)
                 int nb_map_start = nb_map;
                 for (int nb_neighbour = 0; nb_neighbour < M->count[current_read]; nb_neighbour++) {
                         dpu_result_coord_t curr_coord =
-                                *((dpu_result_coord_t *)(&M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord]));
-                        int8_t *curr_nbr = &M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(dpu_result_coord_t)];
+                                *((dpu_result_coord_t *)
+                                  (&M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(mram_info_t)]));
+                        int8_t *curr_nbr = &M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord
+                                                             + sizeof(dpu_result_coord_t)
+                                                             + sizeof(mram_info_t)];
                         int8_t *curr_read = &M->neighbour_read[current_read * size_neighbour];
 
                         GET_TIME;
@@ -419,13 +423,12 @@ void init_backend_simulation(unsigned int *nb_rank,
                              __attribute__((unused)) const char *dpu_binary,
                              index_seed_t ***index_seed,
                              unsigned int nb_dpu,
-                             genome_t *ref_genome,
-                             reads_info_t *reads_info,
-                             times_ctx_t *times_ctx,
-                             backends_functions_t *backends_functions)
+                             reads_info_t *reads_info)
 {
+        malloc_dpu(reads_info, nb_dpu);
+
         *nb_rank = 1;
-        *index_seed = index_genome(ref_genome, nb_dpu, times_ctx, reads_info, backends_functions);
+        *index_seed = load_index_seeds();
 }
 
 void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigned int nb_dpu)
@@ -437,5 +440,18 @@ void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset,
                           __attribute__((unused)) unsigned int rank_id,
                           __attribute__((unused)) devices_t *devices,
                           __attribute__((unused)) reads_info_t *reads_info,
-                          __attribute__((unused)) times_ctx_t *times_ctx)
-{}
+                          times_ctx_t *times_ctx)
+{
+        double t1, t2;
+        mem_dpu_t *MDPU;
+        t1 = my_clock();
+
+        for (unsigned int each_dpu = 0; each_dpu < get_nb_dpu(); each_dpu++) {
+                MDPU = get_mem_dpu(each_dpu);
+                mram_load((mram_info_t *)(MDPU->neighbour_idx), each_dpu);
+        }
+
+        t2 = my_clock();
+        times_ctx->write_mram = t2 - t1;
+        times_ctx->tot_write_mram += t2 - t1;
+}

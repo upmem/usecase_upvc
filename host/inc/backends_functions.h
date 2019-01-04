@@ -28,10 +28,7 @@ typedef struct backends_functions_struct {
                              const char *,
                              index_seed_t ***,
                              unsigned int,
-                             genome_t *,
-                             reads_info_t *,
-                             times_ctx_t *,
-                             struct backends_functions_struct *);
+                             reads_info_t *);
         void (*free_backend)(devices_t *, unsigned int);
         void (*load_mram)(unsigned int, unsigned int, devices_t *, reads_info_t *, times_ctx_t *);
 } backends_functions_t;

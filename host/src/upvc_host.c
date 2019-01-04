@@ -614,10 +614,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                                          get_dpu_binary(),
                                          &index_seed,
                                          nb_dpu,
-                                         ref_genome,
-                                         reads_info,
-                                         times_ctx,
-                                         backends_functions);
+                                         reads_info);
 
         sprintf(filename, "%s_time.csv", input_prefix);
         times_ctx->time_file = fopen(filename, "w");

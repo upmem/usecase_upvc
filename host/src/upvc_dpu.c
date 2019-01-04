@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 
 #include "upvc_dpu.h"
 #include "upvc.h"
@@ -35,7 +36,8 @@ void malloc_dpu_res(int nb_dpu) {
 void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
 {
         malloc_dpu_res(nb_dpu);
-        MDPU = (mem_dpu_t *) malloc(sizeof(mem_dpu_t) * nb_dpu);
+        MDPU = (mem_dpu_t *) calloc(nb_dpu, sizeof(mem_dpu_t));
+        assert(MDPU != NULL);
 
         for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
                 MDPU[num_dpu].neighbour_idx = NULL;
@@ -44,14 +46,13 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
                 MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].offset         = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
                 MDPU[num_dpu].num            = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
+                MDPU[num_dpu].neighbour_idx = (int8_t *) malloc(MRAM_SIZE);
+                assert(MDPU[num_dpu].neighbour_idx != NULL);
+                assert(MDPU[num_dpu].neighbour_read != NULL);
+                assert(MDPU[num_dpu].count != NULL);
+                assert(MDPU[num_dpu].offset != NULL);
+                assert(MDPU[num_dpu].num != NULL);
         }
-}
-
-void malloc_neighbour_idx (int num_dpu, int nb_index, reads_info_t *reads_info)
-{
-        unsigned int neighbour_idx_len =
-                sizeof(int8_t) * nb_index * (ALIGN_DPU(reads_info->size_neighbour_in_bytes) + sizeof(dpu_result_coord_t));
-        MDPU[num_dpu].neighbour_idx = (int8_t *) malloc(neighbour_idx_len);
 }
 
 void free_dpu_res()

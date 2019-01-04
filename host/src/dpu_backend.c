@@ -188,10 +188,7 @@ void init_backend_dpu(unsigned int *nb_rank,
                       const char *dpu_binary,
                       index_seed_t ***index_seed,
                       unsigned int nb_dpu,
-                      __attribute__((unused)) genome_t *ref_genome,
-                      __attribute__((unused)) reads_info_t *reads_info,
-                      __attribute__((unused)) times_ctx_t *times_ctx,
-                      __attribute__((unused)) backends_functions_t *backends_functions)
+                      __attribute__((unused)) reads_info_t *reads_info)
 {
         malloc_dpu_res(nb_dpu);
         *index_seed = load_index_seeds();
