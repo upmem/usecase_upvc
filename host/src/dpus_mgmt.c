@@ -32,7 +32,7 @@ static dpu_logging_config_t logging_config = {
 
 static struct dpu_param param = {
                                  .type = FUNCTIONAL_SIMULATOR,
-                                 .profile = "",
+                                 .profile = "cycleAccurate=true",
                                  .on_boot = NULL,
                                  .logging_config = p_logging_config
 };
