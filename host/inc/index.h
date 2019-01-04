@@ -58,8 +58,7 @@ index_seed_t **load_index_seeds();
 index_seed_t **index_genome(genome_t *ref_genome,
                             int nb_dpu,
                             times_ctx_t *times_ctx,
-                            reads_info_t *reads_info,
-                            backends_functions_t *backends_functions);
+                            reads_info_t *reads_info);
 
 /**
  * @brief Free the table of linked-list of index.

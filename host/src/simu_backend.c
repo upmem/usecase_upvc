@@ -310,33 +310,6 @@ static void *align_on_dpu(void *arg)
         return NULL;
 }
 
-
-vmi_t *init_vmis_simulation(__attribute__((unused)) unsigned int nb_dpu) { return NULL; }
-
-void free_vmis_simulation(__attribute__((unused)) vmi_t *vmis,
-                          __attribute__((unused)) unsigned int nb_dpu,
-                          __attribute__((unused)) unsigned int *nb_neighbours,
-                          __attribute__((unused)) reads_info_t *reads_info) {}
-
-void write_vmi_simulation(__attribute__((unused)) vmi_t *vmis,
-                          unsigned int dpuno,
-                          unsigned int align_idx,
-                          int8_t *nbr,
-                          dpu_result_coord_t coord,
-                          reads_info_t *reads_info)
-{
-        write_neighbours_and_coordinates(dpuno, align_idx, nbr, coord, reads_info);
-}
-
-index_seed_t **get_index_seed_simulation(unsigned int nb_dpu,
-                                         genome_t *ref_genome,
-                                         reads_info_t *reads_info,
-                                         times_ctx_t *times_ctx,
-                                         backends_functions_t *backends_functions)
-{
-        return index_genome(ref_genome, nb_dpu, times_ctx, reads_info, backends_functions);
-}
-
 void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t *requests,
                                      int num_read,
                                      int nb_read_written,

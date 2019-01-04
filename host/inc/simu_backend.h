@@ -11,34 +11,6 @@
 #include "backends_functions.h"
 
 /**
- * @brief Does nothing for simulation
- */
-vmi_t *init_vmis_simulation( unsigned int nb_dpu);
-
-/**
- * @brief Does nothing for simulation
- */
-void free_vmis_simulation( vmi_t *vmis,
-                           unsigned int nb_dpu,
-                           unsigned int *nb_neighbours,
-                           reads_info_t *reads_info);
-
-/**
- * @brief Write neighbour and coordinate in structure representing the DPUs in simulation mode
- */
-void write_vmi_simulation( vmi_t *vmis,
-                          unsigned int dpuno,
-                          unsigned int align_idx,
-                          int8_t *nbr,
-                          dpu_result_coord_t coord,
-                          reads_info_t *reads_info);
-
-/**
- * @brief Read the reference genome and create the index seed with it.
- */
-index_seed_t **get_index_seed_simulation();
-
-/**
  * @brief Write seed information in the structure representing the DPU list of requests.
  */
 void add_seed_to_simulation_requests(dispatch_request_t *requests,

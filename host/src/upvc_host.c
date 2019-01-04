@@ -578,14 +578,13 @@ static void reload_and_verify_mram_images(reads_info_t *reads_info)
         free_dpu(nb_dpu);
 }
 
-static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_ctx, backends_functions_t *backends_functions)
+static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_ctx)
 {
         genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
         index_seed_t **index_seed = index_genome(ref_genome,
                                                  get_nb_dpu(),
                                                  times_ctx,
-                                                 reads_info,
-                                                 backends_functions);
+                                                 reads_info);
         save_index_seeds(index_seed);
 
         free_genome(ref_genome);
@@ -723,24 +722,18 @@ int main(int argc, char *argv[])
                 backends_functions.free_backend = free_backend_simulation;
                 backends_functions.run_dpu = run_dpu_simulation;
                 backends_functions.add_seed_to_requests = add_seed_to_simulation_requests;
-                backends_functions.init_vmis = init_vmis_simulation;
-                backends_functions.free_vmis = free_vmis_simulation;
-                backends_functions.write_vmi = write_vmi_simulation;
                 backends_functions.load_mram = load_mram_simulation;
         } else {
                 backends_functions.init_backend = init_backend_dpu;
                 backends_functions.free_backend = free_backend_dpu;
                 backends_functions.run_dpu = run_on_dpu;
                 backends_functions.add_seed_to_requests = add_seed_to_dpu_requests;
-                backends_functions.init_vmis = init_vmis_dpu;
-                backends_functions.free_vmis = free_vmis_dpu;
-                backends_functions.write_vmi = write_vmi_dpu;
                 backends_functions.load_mram = load_mram_dpu;
         }
 
         switch(get_goal()) {
         case goal_index:
-                load_index_save_genome(&reads_info, &times_ctx, &backends_functions);
+                load_index_save_genome(&reads_info, &times_ctx);
                 break;
         case goal_check:
                 reload_and_verify_mram_images(&reads_info);

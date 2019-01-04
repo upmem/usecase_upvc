@@ -30,15 +30,15 @@ static unsigned int nb_dpus_per_run = 0;
 /**************************************************************************************/
 static void usage()
 {
-        ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> [-s | -n <nb_dpus_per_run> -t <type> -g <goal> -b <dpu_binary> ] \n"
+        ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> -g <goal> [-s | -n <nb_dpus_per_run> -t <type> -b <dpu_binary> ] \n"
                    "options:\n"
                    "\t-i\tInput prefix that will be used to find the inputs files\n"
                    "\t-d\tNumber of DPUs to use - value=128|256|2048|4096\n"
-                   "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
-                   "\t-t\tTarget type - values=hsim|fpga\n"
                    "\t-g\tGoal of the run - values=index|check|map\n"
-                   "\t-b\tDPU binary to use\n"
+                   "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
                    "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for hsim, 8 or more for fpga)"
+                   "\t-t\tTarget type - values=hsim|fpga\n"
+                   "\t-b\tDPU binary to use\n"
                    ,
                    prog_name);
 }
@@ -50,27 +50,25 @@ static void check_args()
             || input_fasta == NULL
             || input_pe1   == NULL
             || input_pe2   == NULL
+            || goal        == goal_unknown
             || nb_dpu      == nb_dpu_unknown) {
                 ERROR("missing option");
                 usage();
         } else if (simulation_mode
                    && (target_type        != target_type_unknown
                        || nb_dpus_per_run != 0
-                       || goal            != goal_unknown
                        || dpu_binary      != NULL)) {
                 ERROR("simulation mode is not compatible with -n -t -g and -b option");
                 usage();
         } else if (!simulation_mode
                    && (dpu_binary         == NULL
                        || nb_dpus_per_run == 0
-                       || target_type     == target_type_unknown
-                       || goal            == goal_unknown)) {
+                       || target_type     == target_type_unknown)) {
                 ERROR("missing option");
                 usage();
         }
 
         if (simulation_mode) {
-                goal = goal_map;
                 nb_dpus_per_run = nb_dpu;
         }
 }
@@ -153,9 +151,6 @@ static void validate_goal(const char *goal_str)
 {
         if (goal != goal_unknown) {
                 ERROR("goal option has been entered more than once");
-                usage();
-        } else if (simulation_mode) {
-                ERROR("goal is not compatible with simulation mode");
                 usage();
         } else if (strcmp(goal_str, "index") == 0) {
                 goal = goal_index;

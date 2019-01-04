@@ -18,10 +18,6 @@ typedef struct backends_functions_struct {
                         reads_info_t *);
         void (*add_seed_to_requests)(dispatch_request_t *, int, int, index_seed_t *, int8_t *, reads_info_t *);
 
-        vmi_t *(*init_vmis)(unsigned int);
-        void (*free_vmis)(vmi_t *, unsigned int, unsigned int *, reads_info_t *);
-        void (*write_vmi)(vmi_t *, unsigned int, unsigned int, int8_t *, dpu_result_coord_t, reads_info_t *);
-
         void (*init_backend)(unsigned int *,
                              devices_t **,
                              unsigned int,

@@ -16,49 +16,6 @@
 #include "common.h"
 #include "parse_args.h"
 
-vmi_t *init_vmis_dpu(unsigned int nb_dpu)
-{
-        vmi_t *vmis = (vmi_t *) calloc(nb_dpu, sizeof(vmi_t));
-        char vmi_name[8];
-        for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-                (void) sprintf(vmi_name, "%04u", dpuno);
-                vmi_create(vmi_name, vmis + dpuno);
-        }
-        return vmis;
-}
-
-static void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, unsigned int nb_dpu, reads_info_t *reads_info)
-{
-        mram_info_t *mram_image = (mram_info_t *)malloc(MRAM_SIZE);
-        printf("Creating MRAM images\n");
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-                vmi_t *this_vmi = vmis + each_dpu;
-                mram_copy_vmi(mram_image, this_vmi, nbr_counts[each_dpu], reads_info);
-                mram_save(mram_image, each_dpu);
-        }
-        free(mram_image);
-}
-
-void free_vmis_dpu(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbours, reads_info_t *reads_info)
-{
-        dump_mdpu_images_into_mram_files(vmis, nb_neighbours, nb_dpu, reads_info);
-        for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-                vmi_delete(vmis + dpuno);
-        }
-        free(vmis);
-}
-
-void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord, reads_info_t *reads_info)
-{
-        unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-        unsigned int out_len = ALIGN_DPU(sizeof(dpu_result_coord_t) + size_neighbour_in_bytes);
-        uint64_t temp_buff[out_len / sizeof(uint64_t)];
-        memset(temp_buff, 0, out_len);
-        temp_buff[0] = coord.coord;
-        memcpy(&temp_buff[1], nbr, (size_t) size_neighbour_in_bytes);
-        vmi_write(vmis + dpuno, k * out_len, temp_buff, out_len);
-}
-
 static void dispatch_request_add(dispatch_request_t *reads,
                                  unsigned int offset,
                                  unsigned int count,
