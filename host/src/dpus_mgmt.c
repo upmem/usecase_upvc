@@ -302,25 +302,52 @@ static void dpu_try_log(unsigned int rank_id,
                         (unsigned long long)compute_time[each_dpu],
                         (float)compute_time[each_dpu] / CLOCK_PER_SEC);
 #ifdef STATS_ON
+                dpu_tasklet_stats_t agreagated_stats =
+                        {
+                         .nb_reqs = 0,
+                         .nb_nodp_calls = 0,
+                         .nb_odpd_calls = 0,
+                         .nb_results = 0,
+                         .mram_data_load = 0,
+                         .mram_result_store = 0,
+                         .mram_load = 0,
+                         .mram_store = 0,
+                         .nodp_time = 0ULL,
+                         .odpd_time = 0ULL,
+                        };
                 for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
-                        /* TODO: show logs */
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u REQ=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_reqs);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u NODP=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_nodp_calls);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u ODPD=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_odpd_calls);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u RESULTS=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].nb_results);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u DATA_IN=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_data_load);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u RESULT_OUT=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_result_store);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u LOAD=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_load);
-                        fprintf(devices->log_file, "LOG DPU=%u TID=%u STORE=%u\n",
-                                this_dpu, each_tasklet, tasklet_stats[each_dpu][each_tasklet].mram_store);
+                        agreagated_stats.nb_reqs +=tasklet_stats[each_dpu][each_tasklet].nb_reqs;
+                        agreagated_stats.nb_nodp_calls +=tasklet_stats[each_dpu][each_tasklet].nb_nodp_calls;
+                        agreagated_stats.nb_odpd_calls +=tasklet_stats[each_dpu][each_tasklet].nb_odpd_calls;
+                        agreagated_stats.nodp_time +=(unsigned long long)tasklet_stats[each_dpu][each_tasklet].nodp_time;
+                        agreagated_stats.odpd_time +=(unsigned long long)tasklet_stats[each_dpu][each_tasklet].odpd_time;
+                        agreagated_stats.nb_results +=tasklet_stats[each_dpu][each_tasklet].nb_results;
+                        agreagated_stats.mram_data_load +=tasklet_stats[each_dpu][each_tasklet].mram_data_load;
+                        agreagated_stats.mram_result_store +=tasklet_stats[each_dpu][each_tasklet].mram_result_store;
+                        agreagated_stats.mram_load +=tasklet_stats[each_dpu][each_tasklet].mram_load;
+                        agreagated_stats.mram_store +=tasklet_stats[each_dpu][each_tasklet].mram_store;
                 }
+                fprintf(devices->log_file, "LOG DPU=%u REQ=%u\n",
+                        this_dpu, agreagated_stats.nb_reqs);
+                fprintf(devices->log_file, "LOG DPU=%u NODP=%u\n",
+                        this_dpu, agreagated_stats.nb_nodp_calls);
+                fprintf(devices->log_file, "LOG DPU=%u ODPD=%u\n",
+                        this_dpu, agreagated_stats.nb_odpd_calls);
+                fprintf(devices->log_file, "LOG DPU=%u NODP_TIME=%llu\n",
+                        this_dpu, (unsigned long long)agreagated_stats.nodp_time);
+                fprintf(devices->log_file, "LOG DPU=%u ODPD_TIME=%llu\n",
+                        this_dpu, (unsigned long long)agreagated_stats.odpd_time);
+                fprintf(devices->log_file, "LOG DPU=%u RESULTS=%u\n",
+                        this_dpu, agreagated_stats.nb_results);
+                fprintf(devices->log_file, "LOG DPU=%u DATA_IN=%u\n",
+                        this_dpu, agreagated_stats.mram_data_load);
+                fprintf(devices->log_file, "LOG DPU=%u RESULT_OUT=%u\n",
+                        this_dpu, agreagated_stats.mram_result_store);
+                fprintf(devices->log_file, "LOG DPU=%u LOAD=%u\n",
+                        this_dpu, agreagated_stats.mram_load);
+                fprintf(devices->log_file, "LOG DPU=%u STORE=%u\n",
+                        this_dpu, agreagated_stats.mram_store);
+
 #endif
                 log_dpu(devices->dpus[this_dpu], devices->log_file);
         }

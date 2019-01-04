@@ -96,19 +96,29 @@ static void compare_neighbours(sysname_t tasklet_id,
 {
         int score, score_nodp, score_odpd = -1;
         uint8_t *ref_nbr = cached_coords_and_nbr + COORDS_SIZE;
+        STATS_TIME_VAR(start, end, acc);
         DEBUG_RESULTS_VAR;
         DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len, mram_info.delta);
 
+        STATS_GET_START_TIME(start, acc, end);
+
         score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info.nbr_len, mram_info.delta, *mini);
+
+        STATS_GET_END_TIME(end, acc);
+        STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));
         STATS_INCR_NB_NODP_CALLS(*tasklet_stats);
 
         if (score_nodp == -1) {
+                STATS_GET_START_TIME(start, acc, end);
+
                 score_odpd = score = odpd(current_read_nbr,
                                           ref_nbr,
                                           *mini,
                                           NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta),
                                           tasklet_id);
 
+                STATS_GET_END_TIME(end, acc);
+                STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
                 STATS_INCR_NB_ODPD_CALLS(*tasklet_stats);
         }
         DEBUG_PROCESS_SCORES(mram_info.nbr_len,
@@ -119,29 +129,32 @@ static void compare_neighbours(sysname_t tasklet_id,
                              score_odpd,
                              *mutex_miscellaneous);
 
-        if (score <= *mini) {
-                if (score < *mini) {
-                        *mini = score;
-                        /* Get rid of previous results, we found a better one */
-                        dout_clear(dout);
-                }
-                if (dout->nb_results < MAX_RESULTS_PER_READ) {
-                        dout_add(dout, request->num, (unsigned int) score,
-                                 ((uint32_t *) cached_coords_and_nbr)[0],
-                                 ((uint32_t *) cached_coords_and_nbr)[1],
-                                 tasklet_stats);
-                        DEBUG_RESULTS_PRINT(tasklet_id,
-                                            request->num,
-                                            request->offset,
-                                            ((uint32_t *) cached_coords_and_nbr)[0],
-                                            ((uint32_t *) cached_coords_and_nbr)[1],
-                                            score);
-                } else {
-                        printf("WARNING! too many results for request!\n");
-                        /* Trigger a fault, since this should never happen. */
-                        halt();
-                }
+        if (score > *mini) {
+                return;
         }
+
+        if (score < *mini) {
+                *mini = score;
+                /* Get rid of previous results, we found a better one */
+                dout_clear(dout);
+        }
+
+        if (dout->nb_results >= MAX_RESULTS_PER_READ) {
+                printf("WARNING! too many results for request!\n");
+                /* Trigger a fault, since this should never happen. */
+                halt();
+        }
+
+        dout_add(dout, request->num, (unsigned int) score,
+                 ((uint32_t *) cached_coords_and_nbr)[0],
+                 ((uint32_t *) cached_coords_and_nbr)[1],
+                 tasklet_stats);
+        DEBUG_RESULTS_PRINT(tasklet_id,
+                            request->num,
+                            request->offset,
+                            ((uint32_t *) cached_coords_and_nbr)[0],
+                            ((uint32_t *) cached_coords_and_nbr)[1],
+                            score);
 }
 
 static void compute_request(sysname_t tasklet_id,
@@ -192,7 +205,9 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
                  .mram_data_load = 0,
                  .mram_result_store = 0,
                  .mram_load = 0,
-                 .mram_store = 0
+                 .mram_store = 0,
+                 .nodp_time = 0ULL,
+                 .odpd_time = 0ULL,
                 };
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
         dout_t *dout = &global_dout[tasklet_id];

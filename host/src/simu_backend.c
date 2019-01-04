@@ -15,6 +15,35 @@
 
 #include "common.h"
 
+/* #define PRINT_NODP_ODPD_TIME */
+#ifdef PRINT_NODP_ODPD_TIME
+
+#define TIME_VAR                                \
+        unsigned int nodp_call = 0;             \
+        unsigned int odpd_call = 0;             \
+        double tmp_time;                        \
+        double nodp_time = 0.0;                 \
+        double odpd_time = 0.0;
+#define GET_TIME do { tmp_time = my_clock(); } while(0)
+#define STORE_NODP_TIME do { nodp_time += (my_clock() - tmp_time); nodp_call++; } while(0)
+#define STORE_ODPD_TIME do { odpd_time += (my_clock() - tmp_time); odpd_call++; } while(0)
+#define WRITE_BACK_TIME(dpu_arg)                \
+        do {                                    \
+                dpu_arg->nodp_call = nodp_call; \
+                dpu_arg->odpd_call = odpd_call; \
+                dpu_arg->nodp_time = nodp_time; \
+                dpu_arg->odpd_time = odpd_time; \
+        } while(0)
+#else
+
+#define TIME_VAR
+#define GET_TIME
+#define STORE_NODP_TIME
+#define STORE_ODPD_TIME
+#define WRITE_BACK_TIME(dpu_arg)
+
+#endif
+
 #define MAX_SCORE        40
 
 /**
@@ -23,6 +52,10 @@
 typedef struct align_on_dpu_arg {
         reads_info_t reads_info;
         int numdpu;
+        double nodp_time;
+        double odpd_time;
+        unsigned int nodp_call;
+        unsigned int odpd_call;
 } align_on_dpu_arg_t;
 
 static int min (int a, int b)
@@ -224,6 +257,7 @@ static void *align_on_dpu(void *arg)
         mem_dpu_t *M = get_mem_dpu(numdpu);
         dpu_result_out_t *M_res = get_mem_dpu_res(numdpu);
         int current_read = 0;
+        TIME_VAR;
 
         M_res[nb_map].num = -1;
         while (M->num[current_read] != -1) {
@@ -231,16 +265,21 @@ static void *align_on_dpu(void *arg)
                 int min = MAX_SCORE;
                 int nb_map_start = nb_map;
                 for (int nb_neighbour = 0; nb_neighbour < M->count[current_read]; nb_neighbour++) {
+                        GET_TIME;
                         int score_noDP =noDP(&M->neighbour_read[current_read*size_neighbour],
                                              &M->neighbour_idx[(offset+nb_neighbour)*size_neighbour],
                                              min,
                                              reads_info);
+                        STORE_NODP_TIME;
+
                         int score = score_noDP;
                         if (score_noDP == -1) {
+                                GET_TIME;
                                 int score_ODPD = ODPD(&M->neighbour_read[current_read*size_neighbour],
                                                       &M->neighbour_idx[(offset+nb_neighbour)*size_neighbour],
                                                       min,
                                                       reads_info);
+                                STORE_ODPD_TIME;
                                 score = score_ODPD;
                         }
                         if (score <= min) {
@@ -262,6 +301,7 @@ static void *align_on_dpu(void *arg)
                 }
                 current_read++;
         }
+        WRITE_BACK_TIME(dpu_arg);
         return NULL;
 }
 
@@ -335,6 +375,12 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
                 thread_args[numdpu].reads_info = *reads_info;
                 thread_args[numdpu].numdpu = numdpu;
+#ifdef PRINT_NODP_ODPD_TIME
+                thread_args[numdpu].nodp_time = 0.0;
+                thread_args[numdpu].odpd_time = 0.0;
+                thread_args[numdpu].nodp_call = 0;
+                thread_args[numdpu].odpd_call = 0;
+#endif
         }
 
         for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
@@ -343,6 +389,22 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
         for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
                 pthread_join(thread_id[numdpu], NULL);
         }
+
+#ifdef PRINT_NODP_ODPD_TIME
+        double odpd_total_time = 0.0;
+        double nodp_total_time = 0.0;
+        unsigned int nodp_total_call = 0;
+        unsigned int odpd_total_call = 0;
+        for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+                odpd_total_time += thread_args[numdpu].odpd_time;
+                nodp_total_time += thread_args[numdpu].nodp_time;
+                nodp_total_call += thread_args[numdpu].nodp_call;
+                odpd_total_call += thread_args[numdpu].odpd_call;
+        }
+
+        printf("nodp time: %lf sec (%u call)\n", nodp_total_time, nodp_total_call);
+        printf("odpd time: %lf sec (%u call)\n", odpd_total_time, odpd_total_call);
+#endif
 
         sem_post(dispatch_free_sem);
 

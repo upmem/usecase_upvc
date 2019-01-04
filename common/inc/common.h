@@ -3,7 +3,7 @@
 
 #include "assert.h"
 
-#define STATS_ON
+/* #define STATS_ON */
 
 #define MRAM_SIZE (64 << 20)
 
@@ -105,12 +105,18 @@ typedef struct {
         uint32_t mram_result_store;
         uint32_t mram_load;
         uint32_t mram_store;
+        uint64_t nodp_time;
+        uint64_t odpd_time;
 } dpu_tasklet_stats_t;
 
 #define DPU_TASKLET_STATS_SIZE (sizeof(dpu_tasklet_stats_t) * NB_TASKLET_PER_DPU)
 #define DPU_TASKLET_STATS_ADDR (DPU_SWAP_RESULT_ADDR - DPU_TASKLET_STATS_SIZE)
-#define DPU_TASKLET_STATS_WRITE(res, addr) do { mram_write32(res, addr); } while(0)
-_Static_assert(sizeof(dpu_tasklet_stats_t) == 32,
+#ifdef STATS_ON
+#define DPU_TASKLET_STATS_WRITE(res, addr) do { mram_write48(res, addr); } while(0)
+#else
+#define DPU_TASKLET_STATS_WRITE(res, addr)
+#endif
+_Static_assert(sizeof(dpu_tasklet_stats_t) == 48,
                "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
 
 typedef uint64_t dpu_compute_time_t;
