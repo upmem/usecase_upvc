@@ -254,6 +254,8 @@ static void *align_on_dpu(void *arg)
         int numdpu = dpu_arg->numdpu;
         reads_info_t *reads_info = &(dpu_arg->reads_info);
         int size_neighbour = reads_info->size_neighbour_in_bytes;
+        int aligned_nbr_size = ALIGN_DPU(size_neighbour);
+        int size_nbr_coord = aligned_nbr_size + sizeof(dpu_result_coord_t);
         mem_dpu_t *M = get_mem_dpu(numdpu);
         dpu_result_out_t *M_res = get_mem_dpu_res(numdpu);
         int current_read = 0;
@@ -265,20 +267,19 @@ static void *align_on_dpu(void *arg)
                 int min = MAX_SCORE;
                 int nb_map_start = nb_map;
                 for (int nb_neighbour = 0; nb_neighbour < M->count[current_read]; nb_neighbour++) {
+                        dpu_result_coord_t curr_coord =
+                                *((dpu_result_coord_t *)(&M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord]));
+                        int8_t *curr_nbr = &M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(dpu_result_coord_t)];
+                        int8_t *curr_read = &M->neighbour_read[current_read * size_neighbour];
+
                         GET_TIME;
-                        int score_noDP =noDP(&M->neighbour_read[current_read*size_neighbour],
-                                             &M->neighbour_idx[(offset+nb_neighbour)*size_neighbour],
-                                             min,
-                                             reads_info);
+                        int score_noDP =noDP(curr_read, curr_nbr, min, reads_info);
                         STORE_NODP_TIME;
 
                         int score = score_noDP;
                         if (score_noDP == -1) {
                                 GET_TIME;
-                                int score_ODPD = ODPD(&M->neighbour_read[current_read*size_neighbour],
-                                                      &M->neighbour_idx[(offset+nb_neighbour)*size_neighbour],
-                                                      min,
-                                                      reads_info);
+                                int score_ODPD = ODPD(curr_read, curr_nbr, min, reads_info);
                                 STORE_ODPD_TIME;
                                 score = score_ODPD;
                         }
@@ -289,7 +290,7 @@ static void *align_on_dpu(void *arg)
                                 }
                                 if (nb_map < MAX_DPU_RESULTS-1) {
                                         M_res[nb_map].num = M->num[current_read];
-                                        M_res[nb_map].coord.coord = M->coordinate[offset+nb_neighbour];
+                                        M_res[nb_map].coord = curr_coord;
                                         M_res[nb_map].score = score;
                                         nb_map++;
                                         M_res[nb_map].num = -1;
@@ -317,11 +318,10 @@ void write_vmi_simulation(__attribute__((unused)) vmi_t *vmis,
                           unsigned int dpuno,
                           unsigned int align_idx,
                           int8_t *nbr,
-                          uint64_t coords,
+                          dpu_result_coord_t coord,
                           reads_info_t *reads_info)
 {
-        write_neighbour_idx(dpuno, align_idx, nbr, reads_info);
-        write_coordinate(dpuno, align_idx, coords);
+        write_neighbours_and_coordinates(dpuno, align_idx, nbr, coord, reads_info);
 }
 
 index_seed_t **get_index_seed_simulation(unsigned int nb_dpu,

@@ -23,7 +23,7 @@ void free_vmis_dpu(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbours
 /**
  * @brief Write data in a Virtual Memory Image.
  */
-void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, uint64_t coords, reads_info_t *reads_info);
+void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord, reads_info_t *reads_info);
 
 /**
  * @brief Add a seed to a request.

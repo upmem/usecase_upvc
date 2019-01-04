@@ -30,7 +30,7 @@ void write_vmi_simulation( vmi_t *vmis,
                           unsigned int dpuno,
                           unsigned int align_idx,
                           int8_t *nbr,
-                          uint64_t coords,
+                          dpu_result_coord_t coord,
                           reads_info_t *reads_info);
 
 /**

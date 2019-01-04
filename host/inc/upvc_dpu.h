@@ -15,9 +15,6 @@
  * @brief DPU memory layout
  *
  * @var neighbour_idx        datas : table of the neighbours of the seed from the reference genome in the DPU
- * @var coordinate           datas : [sequence id, offset in sequence] of each seed in the DPU
- * @var neighbour_idx_len    Size of neighbour_idx, in bytes
- * @var coordinate_len       Size of coordinate, in bytes
  * @var neighbour_read       datas : table of neighbours
  * @var offset               datas : address of the first neighbour
  * @var count                datas : number of neighbour for each read
@@ -25,10 +22,6 @@
  */
 typedef struct {
         int8_t *neighbour_idx;
-        long *coordinate;
-        unsigned int neighbour_idx_len;
-        unsigned int coordinate_len;
-
         int8_t *neighbour_read;
         int *offset;
         int *count;
@@ -74,9 +67,7 @@ void free_dpu_res();
 /**
  * @brief Write information of the DPU memory.
  */
-void write_neighbours_and_coordinates(int d, int nb_nbrs, long *nbrs, reads_info_t *reads_info);
-void write_neighbour_idx  (int num_dpu, int index_idx, int8_t *values, reads_info_t *reads_info);
-void write_coordinate     (int num_dpu, int read_idx, long value);
+void write_neighbours_and_coordinates(int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord, reads_info_t *reads_info);
 void write_neighbour_read (int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info);
 void write_count          (int num_dpu, int read_idx, int value);
 void write_offset         (int num_dpu, int read_idx, int value);
@@ -93,6 +84,6 @@ dpu_result_coord_t read_out_coord       (int num_dpu, int align_idx);
  * @brief Print information of the DPU memory.
  */
 void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *reads_info);
-void print_coordinates(int d, int offs, int l, FILE *out);
+void print_coordinates(int d, int offs, int l, FILE *out, reads_info_t *reads_info);
 
 #endif /* __UPVC_DPU_H__ */

@@ -252,7 +252,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                                                       seed->num_dpu,
                                                       align_idx,
                                                       buf_code_neighbour,
-                                                      coord_var.coord,
+                                                      coord_var,
                                                       reads_info);
                         nb_neighbours[seed->num_dpu]++;
 
@@ -294,7 +294,7 @@ void print_index_seeds(index_seed_t **index_seed, FILE *out, reads_info_t *reads
             fprintf(out, "\tPU %u @%u[%u]\n", seed->num_dpu, seed->offset, seed->nb_nbr);
             print_neighbour_idx(seed->num_dpu, seed->offset, seed->nb_nbr, out, reads_info);
             fprintf(out, "\t");
-            print_coordinates(seed->num_dpu, seed->offset, seed->nb_nbr, out);
+            print_coordinates(seed->num_dpu, seed->offset, seed->nb_nbr, out, reads_info);
             seed = seed->next;
         }
     }

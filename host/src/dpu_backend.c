@@ -48,13 +48,13 @@ void free_vmis_dpu(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbours
         free(vmis);
 }
 
-void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, uint64_t coords, reads_info_t *reads_info)
+void write_vmi_dpu(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord, reads_info_t *reads_info)
 {
         unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
-        unsigned int out_len = ALIGN_DPU(sizeof(uint64_t) + size_neighbour_in_bytes);
+        unsigned int out_len = ALIGN_DPU(sizeof(dpu_result_coord_t) + size_neighbour_in_bytes);
         uint64_t temp_buff[out_len / sizeof(uint64_t)];
         memset(temp_buff, 0, out_len);
-        temp_buff[0] = coords;
+        temp_buff[0] = coord.coord;
         memcpy(&temp_buff[1], nbr, (size_t) size_neighbour_in_bytes);
         vmi_write(vmis + dpuno, k * out_len, temp_buff, out_len);
 }
