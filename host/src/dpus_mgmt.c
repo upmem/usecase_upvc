@@ -137,15 +137,8 @@ void dpu_try_free(devices_t *devices)
 
 void dpu_try_run(unsigned int rank_id, devices_t *devices)
 {
-        if (DEBUG_DPU != -1) {
-                if (DEBUG_DPU / devices->nb_dpus_per_rank == rank_id) {
-                        dpu_api_status_t status = dpu_boot_individual(devices->dpus[DEBUG_DPU], ASYNCHRONOUS);
-                        assert(status == DPU_API_SUCCESS && "dpu_boot_individual failed");
-                }
-        } else {
-                dpu_api_status_t status = dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS);
-                assert(status == DPU_API_SUCCESS && "dpu_boot_all failed");
-        }
+        dpu_api_status_t status = dpu_boot_all(devices->ranks[rank_id], ASYNCHRONOUS);
+        assert(status == DPU_API_SUCCESS && "dpu_boot_all failed");
 }
 
 bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
@@ -155,21 +148,9 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
         unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
         unsigned int each_dpu = 0;
         uint32_t nb_dpus_running = 0;
-        if (DEBUG_DPU != -1) {
-                if (DEBUG_DPU / nb_dpus_per_rank == rank_id) {
-                        status = dpu_get_individual_status(devices->dpus[DEBUG_DPU], run_status);
-                        assert(status == DPU_API_SUCCESS && "dpu_get_individual_status failed");
-                        nb_dpus_running = run_status[0] == DPU_STATUS_RUNNING;
-                } else {
-                        run_status[0] = DPU_STATUS_IDLE;
-                        nb_dpus_running = 0;
-                }
-                each_dpu = 0;
-                nb_dpus_per_rank = 1;
-        } else {
-                status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
-                assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
-        }
+        status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
+        assert(status == DPU_API_SUCCESS && "dpu_get_all_status failed");
+
         for (; each_dpu < nb_dpus_per_rank; each_dpu++) {
                 switch (run_status[each_dpu]) {
                 case DPU_STATUS_IDLE:

@@ -417,9 +417,16 @@ void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset,
 {
         double t1, t2;
         mem_dpu_t *MDPU;
+        unsigned int nb_dpu = get_nb_dpu();
+        unsigned int first_dpu = 0;
         t1 = my_clock();
 
-        for (unsigned int each_dpu = 0; each_dpu < get_nb_dpu(); each_dpu++) {
+        if (DEBUG_DPU != -1) {
+                first_dpu = DEBUG_DPU;
+                nb_dpu = DEBUG_DPU + 1;
+        }
+
+        for (unsigned int each_dpu = first_dpu; each_dpu < nb_dpu; each_dpu++) {
                 MDPU = get_mem_dpu(each_dpu);
                 mram_load((mram_info_t *)(MDPU->neighbour_idx), each_dpu);
         }
