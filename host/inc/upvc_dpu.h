@@ -53,8 +53,10 @@ void malloc_dpu_res(int nb_dpu);
 void free_dpu(int nb_dpu);
 /**
  * @brief Free the structure used to store results information of DPUs.
+ *
+ * @param nb_dpu  Number of DPUs.
  */
-void free_dpu_res();
+void free_dpu_res(int nb_dpu);
 
 /**
  * @brief Write information of the DPU memory.

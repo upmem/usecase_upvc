@@ -40,7 +40,6 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
         assert(MDPU != NULL);
 
         for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
-                MDPU[num_dpu].neighbour_idx = NULL;
                 MDPU[num_dpu].neighbour_read =
                         (int8_t *) malloc(sizeof(int8_t) * reads_info->size_neighbour_in_bytes * MAX_DPU_REQUEST);
                 MDPU[num_dpu].count          = (int *)    malloc(sizeof(int) * MAX_DPU_REQUEST);
@@ -55,22 +54,24 @@ void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
         }
 }
 
-void free_dpu_res()
+void free_dpu_res(int nb_dpu)
 {
+        for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
+                free (MDPU_res[num_dpu]);
+        }
         free(MDPU_res);
 }
 
 void free_dpu(int nb_dpu)
 {
-        for (int num_dpu = 0; num_dpu<nb_dpu; num_dpu++) {
+        for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
                 free (MDPU[num_dpu].neighbour_idx);
                 free (MDPU[num_dpu].neighbour_read);
                 free (MDPU[num_dpu].count);
                 free (MDPU[num_dpu].offset);
                 free (MDPU[num_dpu].num);
-                free (MDPU_res[num_dpu]);
         }
-        free_dpu_res();
+        free_dpu_res(nb_dpu);
         free(MDPU);
 }
 

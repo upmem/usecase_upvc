@@ -644,7 +644,6 @@ static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_
 
         free_genome(ref_genome);
         free_index(index_seed);
-        free_dpu(get_nb_dpu());
 }
 
 static void do_mapping(backends_functions_t *backends_functions, reads_info_t *reads_info, times_ctx_t *times_ctx)

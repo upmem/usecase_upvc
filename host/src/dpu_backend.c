@@ -153,10 +153,10 @@ void init_backend_dpu(unsigned int *nb_rank,
         *nb_rank = (*devices)->nb_ranks_per_run;
 }
 
-void free_backend_dpu(devices_t *devices, __attribute__((unused)) unsigned int nb_dpu)
+void free_backend_dpu(devices_t *devices, unsigned int nb_dpu)
 {
         dpu_try_free(devices);
-        free_dpu_res();
+        free_dpu_res(nb_dpu);
 }
 
 void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx)
