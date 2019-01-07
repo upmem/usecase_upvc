@@ -36,7 +36,7 @@ static void usage()
                    "\t-d\tNumber of DPUs to use - value=128|256|2048|4096\n"
                    "\t-g\tGoal of the run - values=index|check|map\n"
                    "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
-                   "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for hsim, 8 or more for fpga)"
+                   "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for hsim, 8 or more for fpga)\n"
                    "\t-t\tTarget type - values=hsim|fpga\n"
                    "\t-b\tDPU binary to use\n"
                    ,
