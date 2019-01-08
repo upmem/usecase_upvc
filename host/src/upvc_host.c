@@ -26,7 +26,8 @@
 #include "dpu_backend.h"
 
 #define MAX_NB_PASS (4096)
-#define NB_READS_BUFFER (8)
+#define NB_READS_BUFFER (4)
+
 
 static volatile unsigned int global_thread_process_each_pass_mod_start;
 
@@ -85,14 +86,16 @@ void *thread_get_reads(void *arg)
                         nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx, reads_info);
                         PRINT_TIME_GET_READS(times_ctx, each_pass);
 
-                        sem_post(dispatch_free_sem);
 
                         if (DEBUG_PASS != -1) {
                                 if (each_pass == (DEBUG_PASS + 1)) {
                                         nb_read[each_pass_mod] = 0;
                                 }
                         }
+                        sem_post(dispatch_free_sem);
                 }
+                fseek(fipe1, 0, SEEK_SET);
+                fseek(fipe2, 0, SEEK_SET);
                 each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
         }
 
@@ -290,7 +293,7 @@ void *thread_acc(void *arg)
                 for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
                         sem_wait(&exec_rank_wait_sem[each_rank]);
                 }
-                while (nb_read[each_pass] != 0) {
+                while (nb_read[each_pass_mod] != 0) {
 
                         if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
                                 PRINT_TIME_ACC_READ(times_ctx, each_pass);
