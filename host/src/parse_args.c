@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #define _POSIX_C_SOURCE 200809L

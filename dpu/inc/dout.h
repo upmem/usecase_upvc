@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __DOUT_H__
@@ -12,14 +12,13 @@
  * @brief Management of the output data produced by tasklets.
  *
  * One tasklet can produce up to MAX_RESULTS_PER_READ for one request. Empirically, we observe that the
- * value can be up to more than 500 results. Given that a result is 16 bytes (type result_out_t),
+ * value can be up to more than 500 results. Given that a result is 16 bytes (type dpu_result_out_t),
  * this represents an amount of almost 512x16x16=128KB, which does not give enough space
  * to the rest of the application.
  *
  * As a consequence, the production of results is relayed by a swapping system, to store data into MRAM.
  * The MRAM holds a buffer before the output area, which can contain up to 1024 results, representing
- * 1024x16x16=256KB. This "swap area" sits in the 256KB preceding the output area,
- * i.e. 64MB-16xMAX_DPU_RESULTS-256K.
+ * 1024x16x16=256KB.
  *
  * The "data out" (dout) module manages both the local caching of results and the swapping.
  */
@@ -29,7 +28,7 @@
 #define LOCAL_RESULTS_PAGE_READ(addr, val) do { mram_read512(addr, val); } while(0)
 #define LOCAL_RESULTS_PAGE_WRITE(res, addr) do { mram_write512(res, addr); } while(0)
 _Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
-               "LOCAL_RESULTS_PAGE_SIZE chaged (make sure that LOCAL_RESULTS_PAGE_READ/WRITE changed as well)");
+               "LOCAL_RESULTS_PAGE_SIZE changed (make sure that LOCAL_RESULTS_PAGE_READ/WRITE changed as well)");
 
 /**
  * @brief The results produces by one tasklet when processing one read.
@@ -64,7 +63,7 @@ void dout_clear(dout_t *dout);
 void dout_init(unsigned int tid, dout_t *dout);
 
 /**
- * @brief Tecords a new result
+ * @brief Records a new result
  *
  * @param dout     Data output.
  * @param num      Request number.

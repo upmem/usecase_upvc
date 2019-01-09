@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #ifndef __BACKENDS_FUNCTIONS_H__
 #define __BACKENDS_FUNCTIONS_H__
 

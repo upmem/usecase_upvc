@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #include <mram.h>
 #include <alloc.h>
 #include <defs.h>

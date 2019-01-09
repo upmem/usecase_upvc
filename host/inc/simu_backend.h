@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #ifndef __SIMU_BACKEND_H__
 #define __SIMU_BACKEND_H__
 
@@ -49,7 +53,7 @@ void init_backend_simulation(unsigned int *nb_rank,
 void free_backend_simulation(devices_t *devices, unsigned int nb_dpu);
 
 /**
- * @brief Does nothing in sumation mode.
+ * @brief Load mram in structure that will represente the DPUs.
  */
 void load_mram_simulation(unsigned int dpu_offset,
                           unsigned int rank_id,

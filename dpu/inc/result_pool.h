@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #ifndef __RESULT_POOL_H__
 #define __RESULT_POOL_H__
 

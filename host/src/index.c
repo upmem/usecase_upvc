@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #include <stdlib.h>
@@ -206,7 +206,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         }
 
         /* Create and initialize and link together all the seed */
-        printf("\tCreate and initialize and link together all the seed\n");
+        printf("\tCreate, initialize and link together all the seed\n");
         for (int i = 0; i < NB_SEED; i++) {
                 int nb_index_needed = (seed_counter[i].nb_seed / MAX_SIZE_IDX_SEED) + 1;
                 int nb_neighbour_per_index = (seed_counter[i].nb_seed / nb_index_needed) + 1;

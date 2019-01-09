@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __DISPATCH_H__
@@ -33,7 +33,7 @@ typedef struct {
  * @param dispatch_requests  Table of dispatch_request_t to store the dispatching between the DPUs.
  * @param times_ctx        Times information for the whole application.
  * @param reads_info       Information on the size of the seed and the neighbour.
- * @param simulation_mode  Indicate if we have DPUs (fpga of hsim) to compute or only the host.
+ * @param backends_functions  Functions to be use by the dispatcher depending on the backend.
  *
  * @return The dispatcher result.
  */

@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -25,7 +25,7 @@
 #include "simu_backend.h"
 #include "dpu_backend.h"
 
-#define MAX_NB_PASS (4096)
+#define MAX_NB_PASS (1600 / (MAX_READS_BUFFER / (1024*1024ULL))) /* Whole genomee is less than 1600 pass of 1Mreq. */
 #define NB_READS_BUFFER (4)
 
 

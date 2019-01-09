@@ -1,15 +1,15 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
-#include <defs.h>
+#include <string.h>
 #include <stdint.h>
+
+#include <defs.h>
 #include <mram.h>
 #include <mutex.h>
 #include <barrier.h>
 #include <alloc.h>
-#include <string.h>
-#include <mbox.h>
 #include <perfcounter.h>
 
 #define NB_BYTES_TO_SYMS(len, delta) (((len) - (delta)) << 2)
@@ -30,7 +30,9 @@
  */
 #define MAX_SCORE (40)
 
-#define COORDS_SIZE (8)
+/**
+ * @brief Number of reference read to be fetch per mram read
+ */
 #define NB_REF_PER_READ (8)
 
 /**
@@ -95,7 +97,7 @@ static void compare_neighbours(sysname_t tasklet_id,
                                mutex_t *mutex_miscellaneous)
 {
         int score, score_nodp, score_odpd = -1;
-        uint8_t *ref_nbr = cached_coords_and_nbr + COORDS_SIZE;
+        uint8_t *ref_nbr = cached_coords_and_nbr + sizeof(dpu_result_coord_t);
         STATS_TIME_VAR(start, end, acc);
         DEBUG_RESULTS_VAR;
         DEBUG_REQUESTS_VAR;
@@ -213,7 +215,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
         mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
         dout_t *dout = &global_dout[tasklet_id];
         unsigned int nbr_len_aligned = ALIGN_DPU(mram_info.nbr_len);
-        unsigned int coords_nbr_len = COORDS_SIZE + nbr_len_aligned;
+        unsigned int coords_nbr_len = sizeof(dpu_result_coord_t) + nbr_len_aligned;
         uint8_t *cached_coords_and_nbr = mem_alloc_dma(coords_nbr_len * NB_REF_PER_READ);
         uint8_t *request_buffer = mem_alloc_dma(sizeof(dpu_request_t) + nbr_len_aligned);
         uint8_t *current_read_nbr = request_buffer + sizeof(dpu_request_t);

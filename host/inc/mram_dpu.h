@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __INTEGRATION_MDPU_H__
@@ -39,12 +39,14 @@ bool mram_copy_vmi(mram_info_t *mram, vmi_t *vmi, unsigned int nb_nbr, reads_inf
  *
  * @param mram   the MRAM image
  * @param dpu_id index of the DPU
+ *
  * @return false if the snapshot could not be created
  */
 bool mram_save(mram_info_t *mram, unsigned int dpu_id);
 
 /**
  * @brief Loads an MRAM file into an MRAM image.
+ *
  * @param mram the MRAM image
  * @param dpu_id index of the DPU
  */
@@ -52,6 +54,7 @@ void mram_load(mram_info_t *mram, unsigned int dpu_id);
 
 /**
  * @brief Loads an MRAM file info into an MRAM image.
+ *
  * @param mram the MRAM image
  * @param dpu_id index of the DPU
  */

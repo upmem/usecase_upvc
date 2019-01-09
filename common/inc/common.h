@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
@@ -67,6 +71,9 @@ typedef struct {
 #define MRAM_INFO_READ(addr, mram_info) do { mram_read16(addr, mram_info); } while(0)
 _Static_assert(sizeof(mram_info_t) == 16 ,"mram_info_t size changed (make sure that MRAM_INFO_READ changed as well)");
 
+/**
+ * @brief Coordonates of the read that matched in the reference genome.
+ */
 typedef struct {
         union {
                 uint64_t coord;
@@ -76,8 +83,13 @@ typedef struct {
                 };
         };
 } dpu_result_coord_t;
+
 /**
  * @brief One result produced for one read
+ *
+ * @var num  Number that associate an input read with a request.
+ * @var score Best score of the read with a read of the reference genome.
+ * @var coord Coordinate of the read that matched in the reference genome.
  */
 typedef struct {
         int32_t num;

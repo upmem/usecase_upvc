@@ -1,9 +1,11 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __INTEGRATION_NODP_H__
 #define __INTEGRATION_NODP_H__
+
+#include <stdint.h>
 
 /**
  * @brief Compares two sequences of symbols to assign a score, based on the number of substitutions and INDELs
@@ -21,4 +23,4 @@
  */
 int noDP(uint8_t *s1, uint8_t *s2, unsigned int nbr_len, unsigned int delta, int max_score);
 
-#endif //INTEGRATION_NODP_H
+#endif /* __INTEGRATION_NODP_H__ */

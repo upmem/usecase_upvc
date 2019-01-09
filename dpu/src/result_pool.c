@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #include <mram.h>
 #include <alloc.h>
 #include <defs.h>
@@ -42,7 +46,7 @@ void result_pool_init()
 
 void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
-        unsigned int ii = 0;
+        unsigned int each_result = 0;
         unsigned int pageno;
 
         mutex_lock(result_pool.mutex);
@@ -69,16 +73,16 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
                 result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
         }
 
-        while ((ii < results->nb_cached_out) && (result_pool.wridx < (MAX_DPU_RESULTS - 1))) {
+        while ((each_result < results->nb_cached_out) && (result_pool.wridx < (MAX_DPU_RESULTS - 1))) {
                 /* Ensure that the size of a result out structure is two longs. */
-                ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[ii]), sizeof(dpu_result_out_t));
+                ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[each_result]), sizeof(dpu_result_out_t));
                 STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
                 STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
-                DPU_RESULT_WRITE((void *)&(results->outs[ii]), result_pool.cur_write);
+                DPU_RESULT_WRITE((void *)&(results->outs[each_result]), result_pool.cur_write);
 
                 result_pool.wridx++;
                 result_pool.cur_write += sizeof(dpu_result_out_t);
-                ii++;
+                each_result++;
         }
         if (result_pool.wridx >= (MAX_DPU_RESULTS - 1)) {
                 printf("WARNING! too many result in DPU! (from local)\n");

@@ -1,7 +1,12 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
+#include <string.h>
+
 #include <mram.h>
 #include <mutex.h>
 #include <alloc.h>
-#include <string.h>
 #include <defs.h>
 
 #include "mutex_def.h"

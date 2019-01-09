@@ -1,10 +1,8 @@
-#include <stdint.h>
-
 /**
- * @brief Compare two sets of symbols to produce a score.
- *
- * This version is a fast comparison of two sequences.
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
+
+#include <stdint.h>
 
 #define COST_SUB (10)
 

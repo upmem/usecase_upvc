@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __UPVC_DPU_H__
@@ -28,7 +28,14 @@ typedef struct {
         int *num;
 } mem_dpu_t;
 
+/**
+ * @brief Get buffer representing a DPU where we store the reference reads.
+ */
 mem_dpu_t *get_mem_dpu(unsigned int dpu_number);
+
+/**
+ * @brief Get the buffer representing the output area of a DPU.
+ */
 dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number);
 
 /**

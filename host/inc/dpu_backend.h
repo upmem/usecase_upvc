@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #ifndef __DPU_BACKEND_H__
 #define __DPU_BACKEND_H__
 

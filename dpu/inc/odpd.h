@@ -1,18 +1,11 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __INTEGRATION_ODPD_H__
 #define __INTEGRATION_ODPD_H__
 
 #include <stdint.h>
-
-/**
- * @brief Compare two sets of symbols to produce a score.
- *
- * The module implements a version of Smith&Waterman algorithm. It first requires initializing
- * memory resources, before invoking the comparison function odpd.
- */
 
 /**
  * @brief Sets up an operating environment for the comparator to run on several tasklets in parallel.

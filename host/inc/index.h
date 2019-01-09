@@ -1,11 +1,11 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __INDEX_H__
 #define __INDEX_H__
 
-#define NB_SEED (1 << (SIZE_SEED << 1))
+#define NB_SEED (1 << (SIZE_SEED << 1)) /* NB_SEED = 4 ^ (SIZE_SEED) */
 
 #define SEED_FILE_LOG ("seeds.log")
 

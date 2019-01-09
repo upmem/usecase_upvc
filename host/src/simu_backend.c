@@ -1,3 +1,7 @@
+/**
+ * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <pthread.h>
