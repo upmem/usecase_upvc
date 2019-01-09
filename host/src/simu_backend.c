@@ -395,13 +395,12 @@ void init_backend_simulation(unsigned int *nb_rank,
                              __attribute__((unused)) unsigned int nb_dpu_per_run,
                              __attribute__((unused)) const char *dpu_binary,
                              index_seed_t ***index_seed,
-                             unsigned int nb_dpu,
                              reads_info_t *reads_info)
 {
-        malloc_dpu(reads_info, nb_dpu);
-
-        *nb_rank = 1;
         *index_seed = load_index_seeds();
+        *nb_rank = 1;
+
+        malloc_dpu(reads_info, get_nb_dpu());
 }
 
 void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigned int nb_dpu)

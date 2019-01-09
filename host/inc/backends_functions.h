@@ -23,7 +23,6 @@ typedef struct backends_functions_struct {
                              unsigned int,
                              const char *,
                              index_seed_t ***,
-                             unsigned int,
                              reads_info_t *);
         void (*free_backend)(devices_t *, unsigned int);
         void (*load_mram)(unsigned int, unsigned int, devices_t *, reads_info_t *, times_ctx_t *);

@@ -41,41 +41,59 @@ static int cmp_seed_counter(void const *a, void const *b)
 
 index_seed_t **load_index_seeds()
 {
-    FILE *f = fopen(SEED_FILE, "r");
-    index_seed_t **index_seed;
+        FILE *f = fopen(SEED_FILE, "r");
+        index_seed_t **index_seed;
+        unsigned int max_dpu = 0;
+        double t1, t2;
 
-    assert(f != NULL);
+        assert(f != NULL);
 
-    index_seed = (index_seed_t **) calloc(NB_SEED, sizeof(index_seed_t *));
+        printf("Loading index seeds\n");
+        t1 = my_clock();
 
-    { /* First line is just a comment, skip */
-            char line[512];
-            assert(fgets(line, sizeof(line), f) != NULL);
-    }
+        index_seed = (index_seed_t **) calloc(NB_SEED, sizeof(index_seed_t *));
 
-    {
-            unsigned int seed_id = 0, dpu = 0, offset = 0, nb_nbr = 0;
-            while (fscanf(f, "%u %u %u %u", &seed_id, &dpu, &offset, &nb_nbr) == 4) {
-                    index_seed_t *seed = index_seed[seed_id];
-                    if (seed == NULL) {
-                            index_seed[seed_id] = seed = (index_seed_t *) malloc(sizeof(index_seed_t));
-                    } else {
-                            while (seed->next != NULL) {
-                                    seed = seed->next;
-                            }
-                            seed->next = (index_seed_t *) malloc(sizeof(index_seed_t));
-                            seed = seed->next;
-                    }
+        { /* First line is just a comment, skip */
+                char line[512];
+                assert(fgets(line, sizeof(line), f) != NULL);
+        }
 
-                    seed->num_dpu = dpu;
-                    seed->nb_nbr = nb_nbr;
-                    seed->offset = offset;
-                    seed->next = NULL;
-            }
-    }
+        {
+                unsigned int seed_id = 0, dpu = 0, offset = 0, nb_nbr = 0;
+                while (fscanf(f, "%u %u %u %u", &seed_id, &dpu, &offset, &nb_nbr) == 4) {
+                        index_seed_t *seed = index_seed[seed_id];
+                        if (seed == NULL) {
+                                index_seed[seed_id] = seed = (index_seed_t *) malloc(sizeof(index_seed_t));
+                        } else {
+                                while (seed->next != NULL) {
+                                        seed = seed->next;
+                                }
+                                seed->next = (index_seed_t *) malloc(sizeof(index_seed_t));
+                                seed = seed->next;
+                        }
 
-    fclose(f);
-    return index_seed;
+                        if (dpu > max_dpu) {
+                                max_dpu = dpu;
+                        }
+                        seed->num_dpu = dpu;
+                        seed->nb_nbr = nb_nbr;
+                        seed->offset = offset;
+                        seed->next = NULL;
+                }
+        }
+
+        set_nb_dpu(max_dpu + 1);
+        if (get_simulation_mode()) {
+                set_nb_dpus_per_run(max_dpu + 1);
+        }
+        printf(" - nb_dpu: %u\n", max_dpu + 1);
+
+        fclose(f);
+
+        t2 = my_clock();
+        printf(" - time: %lf\n", t2 - t1);
+
+        return index_seed;
 }
 
 void save_index_seeds(index_seed_t **index_seed)

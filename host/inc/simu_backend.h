@@ -41,7 +41,6 @@ void init_backend_simulation(unsigned int *nb_rank,
                              unsigned int nb_dpu_per_run,
                              const char *dpu_binary,
                              index_seed_t ***index_seed,
-                             unsigned int nb_dpu,
                              reads_info_t *reads_info);
 
 /**

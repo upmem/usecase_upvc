@@ -33,7 +33,7 @@ static void usage()
         ERROR_EXIT(24, "\nusage: %s -i <input_prefix> -d <number_of_dpus> -g <goal> [-s | -n <nb_dpus_per_run> -t <type> -b <dpu_binary> ] \n"
                    "options:\n"
                    "\t-i\tInput prefix that will be used to find the inputs files\n"
-                   "\t-d\tNumber of DPUs to use - value=128|256|2048|4096\n"
+                   "\t-d\tNumber of DPUs to use - value=128|256|2048|4096 (only when indexing)\n"
                    "\t-g\tGoal of the run - values=index|check|map\n"
                    "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
                    "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for hsim, 8 or more for fpga)\n"
@@ -50,8 +50,7 @@ static void check_args()
             || input_fasta == NULL
             || input_pe1   == NULL
             || input_pe2   == NULL
-            || goal        == goal_unknown
-            || nb_dpu      == nb_dpu_unknown) {
+            || goal        == goal_unknown) {
                 ERROR("missing option");
                 usage();
         } else if (simulation_mode
@@ -68,8 +67,12 @@ static void check_args()
                 usage();
         }
 
-        if (simulation_mode) {
-                nb_dpus_per_run = nb_dpu;
+        if (goal == goal_index && nb_dpu == nb_dpu_unknown) {
+                ERROR("missing option (number of dpus)");
+                usage();
+        } else if (goal != goal_index && nb_dpu != nb_dpu_unknown) {
+                ERROR("number of dpus in only for indexing");
+                usage();
         }
 }
 
@@ -179,6 +182,7 @@ static void validate_nb_dpus_per_run(const char *nb_dpus_per_run_str)
 
 
 unsigned int get_nb_dpus_per_run() { return nb_dpus_per_run;}
+void set_nb_dpus_per_run(unsigned int val) { nb_dpus_per_run = val;}
 
 /**************************************************************************************/
 /**************************************************************************************/
@@ -202,6 +206,7 @@ static void validate_nb_dpu(const char *nb_dpu_str)
 }
 
 nb_dpu_t get_nb_dpu() { return nb_dpu;}
+void set_nb_dpu(nb_dpu_t val) { nb_dpu = val;}
 
 /**************************************************************************************/
 /**************************************************************************************/

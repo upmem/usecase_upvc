@@ -155,11 +155,10 @@ void init_backend_dpu(unsigned int *nb_rank,
                       unsigned int nb_dpu_per_run,
                       const char *dpu_binary,
                       index_seed_t ***index_seed,
-                      unsigned int nb_dpu,
                       __attribute__((unused)) reads_info_t *reads_info)
 {
-        malloc_dpu_res(nb_dpu);
         *index_seed = load_index_seeds();
+        malloc_dpu_res(get_nb_dpu());
         *devices = dpu_try_alloc_for(nb_dpu_per_run, dpu_binary);
         *nb_rank = (*devices)->nb_ranks_per_run;
 }

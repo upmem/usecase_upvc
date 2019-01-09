@@ -649,7 +649,7 @@ static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_
 
 static void do_mapping(backends_functions_t *backends_functions, reads_info_t *reads_info, times_ctx_t *times_ctx)
 {
-        unsigned int nb_dpu = get_nb_dpu();
+        unsigned int nb_dpu;
         unsigned int nb_rank;
         index_seed_t **index_seed;
         char *input_prefix = get_input_path();
@@ -660,15 +660,17 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
 
         int8_t *mapping_coverage = (int8_t *) calloc(sizeof(int8_t), ref_genome->fasta_file_size);
         int *substitution_list = (int *) calloc(sizeof(int), ref_genome->fasta_file_size);
-        dispatch_request_t *dispatch_requests = dispatch_create(nb_dpu, reads_info);
+        dispatch_request_t *dispatch_requests;
 
         backends_functions->init_backend(&nb_rank,
                                          &devices,
                                          get_nb_dpus_per_run(),
                                          get_dpu_binary(),
                                          &index_seed,
-                                         nb_dpu,
                                          reads_info);
+
+        nb_dpu = get_nb_dpu();
+        dispatch_requests = dispatch_create(nb_dpu, reads_info);
 
         sprintf(filename, "%s_time.csv", input_prefix);
         times_ctx->time_file = fopen(filename, "w");
