@@ -26,9 +26,9 @@ static int print_variant_tree(variant_tree_t *variant_tree, int8_t *mapping_cove
         variant = variant_tree->vars;
         if (variant->depth > 6) {
                 fprintf(vcf_file,
-                        "%s\t%d\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d\n",
+                        "%s\t%llu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d\n",
                         variant->chr,
-                        variant->pos + 1 - variant->offset,
+                        (unsigned long long)((uint64_t)(variant->pos + 1) - variant->offset),
                         variant->ref,
                         variant->alt,
                         variant->depth,
@@ -38,9 +38,9 @@ static int print_variant_tree(variant_tree_t *variant_tree, int8_t *mapping_cove
 
         if (variant->depth > 2) {
                 fprintf(variant_file,
-                        "%s\t%d\t%s\t%s\ttDEPTH=%d\tCOV=%d\n",
+                        "%s\t%llu\t%s\t%s\ttDEPTH=%d\tCOV=%d\n",
                         variant->chr,
-                        variant->pos + 1 - variant->offset,
+                        (unsigned long long)((uint64_t)(variant->pos + 1) - variant->offset),
                         variant->ref,
                         variant->alt,
                         variant->depth,
@@ -99,12 +99,12 @@ void create_vcf(char *chromosome_name,
 
         /* insert substitution variant in the variant_t tree */
         /* for each sequence in the genome */
-        for (int seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
-                int start_position = ref_genome->pt_seq[seq_number];
+        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+                uint64_t start_position = ref_genome->pt_seq[seq_number];
                 /* for each position in the sequence */
-                for (int seq_position = 0; seq_position < (int64_t)ref_genome->len_seq[seq_number]; seq_position++) {
+                for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
                         /* get the substitution at the `start_position+seq_position`th position in the genome */
-                        int current_position = start_position + seq_position;
+                        uint64_t current_position = start_position + seq_position;
                         int substitution = substitution_list[current_position];
                         for (int i = 0; i < 4; i++) {
                                 /* get number of substitutions for the base nt[i] at that position */

@@ -35,7 +35,7 @@ genome_t *get_genome(char* fasta_file, times_ctx_t *times_ctx)
         genome->nb_seq = 0;
 
         {
-                unsigned long long current_data_idx = 0;
+                uint64_t current_data_idx = 0;
                 while (fgets(genome_file_line, MAX_BUF_SIZE, genome_file) != NULL) {
                         if (genome_file_line[0] == '>') { /* Commentary line with metadata */
                                 genome->pt_seq[genome->nb_seq] = current_data_idx;
@@ -70,7 +70,7 @@ genome_t *get_genome(char* fasta_file, times_ctx_t *times_ctx)
 
 void free_genome(genome_t *genome)
 {
-        for (int i = 0; i < genome->nb_seq; i++) {
+        for (uint32_t i = 0; i < genome->nb_seq; i++) {
                 free(genome->seq_name[i]);
         }
         free(genome->fasta_file_name);

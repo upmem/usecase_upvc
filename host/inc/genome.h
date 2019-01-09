@@ -22,10 +22,10 @@
  */
 typedef struct {
         int8_t *data;
-        int nb_seq;
+        uint32_t nb_seq;
         uint64_t pt_seq[MAX_SEQ_GEN];
         uint64_t len_seq[MAX_SEQ_GEN];
-        long fasta_file_size;
+        uint64_t fasta_file_size;
         char *seq_name[MAX_SEQ_GEN];
         char *fasta_file_name;
 } genome_t;

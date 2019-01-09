@@ -73,7 +73,7 @@ static int check_pair(dpu_result_out_t A1, dpu_result_out_t A2, reads_info_t *re
  * The code is return in "code" as a table of int8_t
  */
 
-static int code_alignment(int8_t *code, int score, int8_t *gen, int8_t *read, reads_info_t *reads_info)
+static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, reads_info_t *reads_info)
 {
         int code_idx, computed_score, backtrack_idx;
         int size_read = reads_info->size_read;
@@ -154,11 +154,11 @@ static void set_variant(dpu_result_out_t result_match,
                         int8_t *mapping_coverage,
                         reads_info_t *reads_info)
 {
-        int code_result_idx;
-        int8_t code_result_tab[256];
+        uint32_t code_result_idx;
+        uint8_t code_result_tab[256];
         int8_t *read;
         char nucleotide[4] = {'A','C','T','G'};
-        int genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
+        uint64_t genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
         int size_read = reads_info->size_read;
 
         /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
@@ -173,8 +173,8 @@ static void set_variant(dpu_result_out_t result_match,
         code_result_idx = 0;
         while (code_result_tab[code_result_idx] != CODE_END) {
                 int code_result = code_result_tab[code_result_idx];
-                int pos_variant_read = code_result_tab[code_result_idx + 1];
-                int pos_variant_genome = genome_pos + pos_variant_read;
+                int64_t pos_variant_read = code_result_tab[code_result_idx + 1];
+                int64_t pos_variant_genome = genome_pos + pos_variant_read;
                 if (code_result == CODE_SUB) {
                         /* SNP = 0,1,2,3  (code A,C,T,G) */
                         int snp = code_result_tab[code_result_idx + 2];
@@ -184,8 +184,8 @@ static void set_variant(dpu_result_out_t result_match,
 
                         code_result_idx += 3;
                 } else if (code_result == CODE_INS) {
-                        int ps_var_genome = pos_variant_genome;
-                        int ps_var_read = pos_variant_read;
+                        int64_t ps_var_genome = pos_variant_genome;
+                        int64_t ps_var_read = pos_variant_read;
                         variant_t *newvar = (variant_t*) malloc(sizeof(variant_t));
 
                         newvar->offset = ref_genome->pt_seq[result_match.coord.seq_nr];
@@ -221,8 +221,8 @@ static void set_variant(dpu_result_out_t result_match,
                                 insert_variants(variant_list, newvar);
                         }
                 } else if (code_result == CODE_DEL) {
-                        int ps_var_genome = pos_variant_genome;
-                        int ps_var_read = pos_variant_read;
+                        int64_t ps_var_genome = pos_variant_genome;
+                        int64_t ps_var_read = pos_variant_read;
                         variant_t *newvar = (variant_t*) malloc(sizeof(variant_t));
 
                         newvar->offset = ref_genome->pt_seq[result_match.coord.seq_nr];

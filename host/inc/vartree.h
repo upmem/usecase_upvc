@@ -7,9 +7,11 @@
 
 #define MAX_SIZE_ALLELE 10
 
+#include <stdint.h>
+
 typedef struct variant {
         char* chr;
-        int offset;
+        uint64_t offset;
         int pos;
         char ref[MAX_SIZE_ALLELE];
         char alt[MAX_SIZE_ALLELE];

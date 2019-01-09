@@ -175,7 +175,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
                 seed_counter[i].nb_seed = 0;
                 seed_counter[i].seed_code = i;
         }
-        for (int i = 0; i < ref_genome->nb_seq; i++) {
+        for (uint32_t i = 0; i < ref_genome->nb_seq; i++) {
                 uint64_t sequence_start_idx = ref_genome->pt_seq[i];
                 for (uint64_t sequence_idx = 0;
                      sequence_idx < ref_genome->len_seq[i] - size_neighbour - SIZE_SEED + 1;
@@ -254,7 +254,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
         /* Writing data in DPUs memories */
         printf("\tWriting data in DPUs memories\n");
         memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
-        for (int seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
                 uint64_t sequence_start_idx = ref_genome->pt_seq[seq_number];
                 for (uint64_t sequence_idx = 0;
                      sequence_idx < ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1;
