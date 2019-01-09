@@ -98,6 +98,7 @@ static void compare_neighbours(sysname_t tasklet_id,
         uint8_t *ref_nbr = cached_coords_and_nbr + COORDS_SIZE;
         STATS_TIME_VAR(start, end, acc);
         DEBUG_RESULTS_VAR;
+        DEBUG_REQUESTS_VAR;
         DEBUG_REQUESTS_PRINT_REF(ref_nbr, mram_info.nbr_len, mram_info.delta);
 
         STATS_GET_START_TIME(start, acc, end);

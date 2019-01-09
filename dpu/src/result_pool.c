@@ -71,7 +71,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
 
         while ((ii < results->nb_cached_out) && (result_pool.wridx < (MAX_DPU_RESULTS - 1))) {
                 /* Ensure that the size of a result out structure is two longs. */
-                ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[i]), sizeof(dpu_result_out_t));
+                ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[ii]), sizeof(dpu_result_out_t));
                 STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
                 STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
                 DPU_RESULT_WRITE((void *)&(results->outs[ii]), result_pool.cur_write);
