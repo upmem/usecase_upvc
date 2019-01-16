@@ -9,6 +9,8 @@
 
 #define SEED_FILE_LOG ("seeds.log")
 
+#include <stdint.h>
+
 /**
  * @brief Structure of a list of index of neighbour that shared the same seed.
  *
@@ -18,9 +20,9 @@
  * @var next     Needed to have a linked-list of index.
  */
 typedef struct index_seed {
-        int nb_nbr;
-        int offset;
-        int num_dpu;
+        uint32_t nb_nbr;
+        uint32_t offset;
+        uint32_t num_dpu;
         struct index_seed *next;
 } index_seed_t;
 

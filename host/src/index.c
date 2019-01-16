@@ -53,33 +53,21 @@ index_seed_t **load_index_seeds()
 
         index_seed = (index_seed_t **) calloc(NB_SEED, sizeof(index_seed_t *));
 
-        { /* First line is just a comment, skip */
-                char line[512];
-                assert(fgets(line, sizeof(line), f) != NULL);
-        }
-
         {
-                unsigned int seed_id = 0, dpu = 0, offset = 0, nb_nbr = 0;
-                while (fscanf(f, "%u %u %u %u", &seed_id, &dpu, &offset, &nb_nbr) == 4) {
-                        index_seed_t *seed = index_seed[seed_id];
-                        if (seed == NULL) {
-                                index_seed[seed_id] = seed = (index_seed_t *) malloc(sizeof(index_seed_t));
-                        } else {
-                                while (seed->next != NULL) {
-                                        seed = seed->next;
-                                }
-                                seed->next = (index_seed_t *) malloc(sizeof(index_seed_t));
-                                seed = seed->next;
-                        }
+                uint32_t seed_id = 0;
+                index_seed_t *new_seed = (index_seed_t *) malloc(sizeof(index_seed_t));
+                while (fread(&seed_id, sizeof(uint32_t), 1, f) == 1) {/*fscanf(f, "%u %u %u %u", &seed_id, &dpu, &offset, &nb_nbr) == 4) {*/
+                        size_t read_nmemb = fread(new_seed, sizeof(uint32_t), 3, f);
+                        assert(read_nmemb == 3);
+                        new_seed->next = index_seed[seed_id];
+                        index_seed[seed_id] = new_seed;
 
-                        if (dpu > max_dpu) {
-                                max_dpu = dpu;
+                        if (new_seed->num_dpu > max_dpu) {
+                                max_dpu = new_seed->num_dpu;
                         }
-                        seed->num_dpu = dpu;
-                        seed->nb_nbr = nb_nbr;
-                        seed->offset = offset;
-                        seed->next = NULL;
+                        new_seed = (index_seed_t *)malloc(sizeof(index_seed_t));
                 }
+                free(new_seed);
         }
 
         set_nb_dpu(max_dpu + 1);
@@ -98,20 +86,20 @@ index_seed_t **load_index_seeds()
 
 void save_index_seeds(index_seed_t **index_seed)
 {
-    index_seed_t *seed;
-    FILE *f = fopen(SEED_FILE, "w");
-    assert(f != NULL);
+        index_seed_t *seed;
+        FILE *f = fopen(SEED_FILE, "w");
+        assert(f != NULL);
 
-    fprintf(f, "# seed dpu offset nb_nbr\n");
-    for (int i = 0; i < NB_SEED; i++) {
-        seed = index_seed[i];
-        while (seed != NULL) {
-            fprintf(f, "%u %u %u %u\n", i, seed->num_dpu, seed->offset, seed->nb_nbr);
-            seed = seed->next;
+        for (unsigned int i = 0; i < NB_SEED; i++) {
+                seed = index_seed[i];
+                while (seed != NULL) {
+                        fwrite(&i, sizeof(uint32_t), 1, f);
+                        fwrite(seed, sizeof(uint32_t), 3, f);
+                        seed = seed->next;
+                }
         }
-    }
 
-    fclose(f);
+        fclose(f);
 }
 
 static vmi_t *init_vmis(unsigned int nb_dpu)
@@ -293,7 +281,7 @@ index_seed_t **index_genome(genome_t *ref_genome,
 
                         seed = index_seed[seed_code];
                         while (seed != NULL) {
-                                if (seed_counter[seed_code].nb_seed < seed->nb_nbr + total_nb_neighbour)
+                                if (seed_counter[seed_code].nb_seed < (int)seed->nb_nbr + total_nb_neighbour)
                                         break;
                                 total_nb_neighbour += seed->nb_nbr;
                                 seed = seed->next;
