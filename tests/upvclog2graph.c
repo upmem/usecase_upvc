@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <sys/queue.h>
+#include <limits.h>
 
 #define STRING_MAX_SIZE (1024)
 
@@ -12,6 +13,8 @@ typedef struct dpu {
         unsigned int req;
         unsigned int nodp;
         unsigned int odpd;
+        unsigned long long nodp_time;
+        unsigned long long odpd_time;
         unsigned int results;
         unsigned int data_in;
         unsigned int result_out;
@@ -33,11 +36,10 @@ static bool read_new_line(FILE *fp, char *str, bool *end_of_file)
 
 #define LOG_PREFIX "LOG DPU="
 #define GET_DPU_ID_FORMAT LOG_PREFIX "%u"
-#define TID_FORMAT " TID=%u"
 static bool read_dpu(FILE *fp, char *str, struct dpu_head *rank, bool *end_of_file)
 {
         unsigned int curr_dpu_id;
-        unsigned int dpu_id, tid, req, nodp, odpd, results, data_in, result_out, load, store;
+        unsigned int dpu_id, req, nodp, odpd, nodp_time, odpd_time, results, data_in, result_out, load, store;
         unsigned long long cycle;
         float time;
         dpu_t *new_dpu;
@@ -54,21 +56,25 @@ static bool read_dpu(FILE *fp, char *str, struct dpu_head *rank, bool *end_of_fi
         do {
                 if (sscanf(str, GET_DPU_ID_FORMAT" TIME=%llu SEC=%f", &dpu_id, &cycle, &time) == 3) {
                         new_dpu->cycle = cycle;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " REQ=%u", &dpu_id, &tid, &req) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " REQ=%u", &dpu_id, &req) == 2) {
                         new_dpu->req += req;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " NODP=%u", &dpu_id, &tid, &nodp) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " NODP=%u", &dpu_id, &nodp) == 2) {
                         new_dpu->nodp += nodp;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " ODPD=%u", &dpu_id, &tid, &odpd) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " ODPD=%u", &dpu_id, &odpd) == 2) {
                         new_dpu->odpd += odpd;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " RESULTS=%u", &dpu_id, &tid, &results) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " NODP_TIME=%llu", &dpu_id, &nodp_time) == 2) {
+                        new_dpu->nodp_time += nodp_time;
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " ODPD_TIME=%llu", &dpu_id, &odpd_time) == 2) {
+                        new_dpu->odpd_time += odpd_time;
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " RESULTS=%u", &dpu_id, &results) == 2) {
                         new_dpu->results += results;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " DATA_IN=%u", &dpu_id, &tid, &data_in) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " DATA_IN=%u", &dpu_id, &data_in) == 2) {
                         new_dpu->data_in += data_in;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " RESULT_OUT=%u", &dpu_id, &tid, &result_out) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " RESULT_OUT=%u", &dpu_id, &result_out) == 2) {
                         new_dpu->result_out += result_out;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " LOAD=%u", &dpu_id, &tid, &load) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " LOAD=%u", &dpu_id, &load) == 2) {
                         new_dpu->load += load;
-                } else if (sscanf(str, GET_DPU_ID_FORMAT TID_FORMAT " STORE=%u", &dpu_id, &tid, &store) == 3) {
+                } else if (sscanf(str, GET_DPU_ID_FORMAT " STORE=%u", &dpu_id, &store) == 2) {
                         new_dpu->store += store;
                 } else {
                         return false;
@@ -108,20 +114,22 @@ static void free_rank(struct dpu_head *rank)
 static void export_rank(FILE *fp, char *str, struct dpu_head *rank)
 {
         dpu_t *dpu;
-#if defined EXPORT_MAX || EXPORT_MOY
+#if defined EXPORT_MAX || defined EXPORT_MOY
         unsigned long long cycle = 0ULL;
-        unsigned long long req = 0ULL, nodp = 0ULL, odpd = 0ULL, results = 0ULL, data_in = 0ULL, result_out = 0ULL, load = 0ULL, store = 0ULL;
+        unsigned long long req = 0ULL, nodp = 0ULL, odpd = 0ULL, results = 0ULL, data_in = 0ULL, result_out = 0ULL, load = 0ULL, store = 0ULL, nodp_time = 0ULL, odpd_time = 0ULL;
 #ifdef EXPORT_MOY
         unsigned int nb_dpu = 0;
 #endif
 #endif
         SLIST_FOREACH(dpu, rank, next) {
 #ifdef EXPORT_ALL
-                sprintf(str, "%llu, %u, %u, %u, %u, %u, %u, %u, %u\n",
+                sprintf(str, "%llu, %u, %u, %u, %llu, %llu, %u, %u, %u, %u, %u\n",
                         dpu->cycle,
                         dpu->req,
                         dpu->nodp,
                         dpu->odpd,
+                        dpu->nodp_time,
+                        dpu->odpd_time,
                         dpu->results,
                         dpu->data_in,
                         dpu->result_out,
@@ -129,10 +137,10 @@ static void export_rank(FILE *fp, char *str, struct dpu_head *rank)
                         dpu->store);
                 fwrite(str, sizeof(char), strlen(str), fp);
 #else
-#if defined EXPORT_MAX || EXPORT_MOY
+#if defined EXPORT_MAX || defined EXPORT_MOY
 #ifdef EXPORT_MAX
 #define FCT(a, b) a = b > a ? b : a
-#elif EXPORT_MOY
+#elif defined EXPORT_MOY
 #define FCT(a, b) a += b
                 nb_dpu++;
 #endif
@@ -140,6 +148,8 @@ static void export_rank(FILE *fp, char *str, struct dpu_head *rank)
                 FCT(req, dpu->req);
                 FCT(nodp, dpu->nodp);
                 FCT(odpd, dpu->odpd);
+                FCT(nodp_time, dpu->nodp_time);
+                FCT(odpd_time, dpu->odpd_time);
                 FCT(results, dpu->results);
                 FCT(data_in, dpu->data_in);
                 FCT(result_out, dpu->result_out);
@@ -149,29 +159,35 @@ static void export_rank(FILE *fp, char *str, struct dpu_head *rank)
 #endif
         }
 #ifdef EXPORT_MAX
-        sprintf(str, "%llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu\n",
+        sprintf(str, "%llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu\n",
                 cycle,
                 req,
                 nodp,
                 odpd,
+                nodp_time,
+                odpd_time,
                 results,
                 data_in,
                 result_out,
                 load,
                 store);
         fwrite(str, sizeof(char), strlen(str), fp);
-#elif EXPORT_MOY
-        sprintf(str, "%llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu\n",
-                cycle / nb_dpu,
-                req / nb_dpu,
-                nodp / nb_dpu,
-                odpd / nb_dpu,
-                results / nb_dpu,
-                data_in / nb_dpu,
-                result_out / nb_dpu,
-                load / nb_dpu,
-                store / nb_dpu);
-        fwrite(str, sizeof(char), strlen(str), fp);
+#elif defined EXPORT_MOY
+        if (nb_dpu != 0) {
+                sprintf(str, "%llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu\n",
+                        cycle / nb_dpu,
+                        req / nb_dpu,
+                        nodp / nb_dpu,
+                        odpd / nb_dpu,
+                        nodp_time / nb_dpu,
+                        odpd_time / nb_dpu,
+                        results / nb_dpu,
+                        data_in / nb_dpu,
+                        result_out / nb_dpu,
+                        load / nb_dpu,
+                        store / nb_dpu);
+                fwrite(str, sizeof(char), strlen(str), fp);
+        }
 #endif
 }
 
@@ -189,7 +205,7 @@ int main(__attribute((unused)) int argc, char **argv)
         sprintf(str, "%s.csv", argv[1]);
         fp_out = fopen(str, "w");
 
-        sprintf(str, "cycle, req, nodp, odpd, results, data_in, result_out, load, store\n");
+        sprintf(str, "cycle, req, nodp, odpd, nodp_time, odpd_time, results, data_in, result_out, load, store\n");
         fwrite(str, sizeof(char), strlen(str), fp_out);
 
         while (!end_of_file) {
