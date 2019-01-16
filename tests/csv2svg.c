@@ -146,6 +146,8 @@ static void generate_svg(FILE *fp,
                  [type_read_result] = "grey",
                  [type_map_read] = "pink",
                 };
+        double acc[nb_type] = {0.0};
+        unsigned int nb_it[nb_type] = {0};
         line_t *current_line;
         sprintf(str, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         fwrite(str, sizeof(char), strlen(str), fp);
@@ -153,6 +155,8 @@ static void generate_svg(FILE *fp,
         fwrite(str, sizeof(char), strlen(str), fp);
 
         SLIST_FOREACH(current_line, line_list, next) {
+                acc[current_line->type] += (current_line->x2 - current_line->x1);
+                nb_it[current_line->type] ++;
                 sprintf(str,
                         "\t<line x1=\"%lf\" y1=\"%lf\" x2=\"%lf\" y2=\"%lf\" stroke=\"%s\" stroke-width=\"%lf\"/>\n",
                         current_line->x1*ZOOM,
@@ -163,6 +167,11 @@ static void generate_svg(FILE *fp,
                         0.01*ZOOM);
                 fwrite(str, sizeof(char), strlen(str), fp);
         }
+
+        printf("get reads: %lfs\n", acc[type_get_reads] / nb_it[type_get_reads]);
+        printf("dispatch: %lfs\n", acc[type_dispatch] / nb_it[type_dispatch]);
+        printf("accumulate_read: %lfs\n", acc[type_accumulate_read] / nb_it[type_accumulate_read]);
+        printf("process_read: %lfs\n", acc[type_process_read] / nb_it[type_process_read]);
 
         sprintf(str, "</svg>");
         fwrite(str, sizeof(char), strlen(str), fp);
