@@ -12,14 +12,14 @@
 typedef struct variant {
         char* chr;
         uint64_t offset;
-        int pos;
+        int64_t pos;
         char ref[MAX_SIZE_ALLELE];
         char alt[MAX_SIZE_ALLELE];
         int depth;
 } variant_t;
 
 typedef struct variant_tree {
-        int pos;
+        int64_t pos;
         variant_t* vars;
         struct variant_tree* right;
         struct variant_tree* left;

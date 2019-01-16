@@ -243,7 +243,7 @@ static void set_variant(dpu_result_out_t result_match,
                         }
 
                         newvar->pos = pos_variant_genome;
-                        newvar->alt[0] = nucleotide[ref_genome->data[pos_variant_genome]];
+                        newvar->alt[0] = nucleotide[ref_genome->data[pos_variant_genome]&3];
                         newvar->alt[1] = '\0';
 
                         {

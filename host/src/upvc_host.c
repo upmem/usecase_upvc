@@ -715,7 +715,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
                                 int k = 0;
                                 fprintf(res_file, "dpu %i\n", numdpu);
                                 while (read_out_num(numdpu, k) != -1) {
-                                        fprintf(res_file, "R: %u %u %llu\n",
+                                        fprintf(res_file, "R: %u %u %llx\n",
                                                 read_out_num(numdpu, k),
                                                 read_out_score(numdpu, k),
                                                 (unsigned long long)read_out_coord(numdpu, k).coord);
