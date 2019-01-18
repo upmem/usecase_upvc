@@ -102,7 +102,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
                 t3 = my_clock();
                 PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
 
-                if (DEBUG_DPU != -1) {
+                if (DEBUG_DPU == -1) {
                         sem_wait(acc_wait_sem);
                 }
                 /* Gather results and free DPUs */
