@@ -772,7 +772,7 @@ int main(int argc, char *argv[])
         printf("Information\n");
         printf(" - read size: %d\n", reads_info.size_read);
 
-        setup_dpus_for_target_type(get_target_type());
+        /* setup_dpus_for_target_type(get_target_type()); */
 
         if (get_simulation_mode()) {
                 backends_functions.init_backend = init_backend_simulation;
@@ -780,13 +780,13 @@ int main(int argc, char *argv[])
                 backends_functions.run_dpu = run_dpu_simulation;
                 backends_functions.add_seed_to_requests = add_seed_to_simulation_requests;
                 backends_functions.load_mram = load_mram_simulation;
-        } else {
-                backends_functions.init_backend = init_backend_dpu;
-                backends_functions.free_backend = free_backend_dpu;
-                backends_functions.run_dpu = run_on_dpu;
-                backends_functions.add_seed_to_requests = add_seed_to_dpu_requests;
-                backends_functions.load_mram = load_mram_dpu;
-        }
+        } /* else { */
+        /*         backends_functions.init_backend = init_backend_dpu; */
+        /*         backends_functions.free_backend = free_backend_dpu; */
+        /*         backends_functions.run_dpu = run_on_dpu; */
+        /*         backends_functions.add_seed_to_requests = add_seed_to_dpu_requests; */
+        /*         backends_functions.load_mram = load_mram_dpu; */
+        /* } */
 
         switch(get_goal()) {
         case goal_index:

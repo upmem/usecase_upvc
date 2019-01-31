@@ -5,12 +5,12 @@
 #ifndef __UPVC_H__
 #define __UPVC_H__
 
-#define DEBUG_ROUND (-1)
+#define DEBUG_ROUND (0)
 #define DEBUG_PASS (-1)
 #define DEBUG_DPU (-1)
 
 #define VERSION           "VERSION 1.5"
-#define SIZE_SEED         12
+#define SIZE_SEED         14
 #define MAX_READS_BUFFER  1048576    /* Maximum number of read by round        */
 
 #define COST_SUB         10

@@ -5,8 +5,8 @@
 #ifndef __INTEGRATION_DPUS_H__
 #define __INTEGRATION_DPUS_H__
 
-#include <dpu.h>
-#include <dpulog.h>
+/* #include <dpu.h> */
+/* #include <dpulog.h> */
 
 #include "parse_args.h"
 #include "upvc.h"
@@ -20,9 +20,9 @@
 typedef struct {
         unsigned int nb_dpus_per_rank;
         unsigned int nb_ranks_per_run;
-        dpu_rank_t *ranks;
+        /* dpu_rank_t *ranks; */
         unsigned int nb_dpus;
-        dpu_t *dpus;
+        /* dpu_t *dpus; */
         mram_info_t *mram_info;
         pthread_mutex_t log_mutex;
         FILE *log_file;
