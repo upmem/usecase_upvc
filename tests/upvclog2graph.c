@@ -39,8 +39,9 @@ static bool read_new_line(FILE *fp, char *str, bool *end_of_file)
 static bool read_dpu(FILE *fp, char *str, struct dpu_head *rank, bool *end_of_file)
 {
         unsigned int curr_dpu_id;
-        unsigned int dpu_id, req, nodp, odpd, nodp_time, odpd_time, results, data_in, result_out, load, store;
+        unsigned int dpu_id, req, nodp, odpd, results, data_in, result_out, load, store;
         unsigned long long cycle;
+        unsigned long long odpd_time, nodp_time;
         float time;
         dpu_t *new_dpu;
 
@@ -109,7 +110,7 @@ static void free_rank(struct dpu_head *rank)
         }
 }
 
-#define EXPORT_MAX
+#define EXPORT_MOY
 
 static void export_rank(FILE *fp, char *str, struct dpu_head *rank)
 {
