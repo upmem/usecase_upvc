@@ -7,3 +7,5 @@ tasklet add 0..15 2048 main 0
 //  - 2: miscellaneous
 mutex 3
 barrier add 0 16
+save
+quit
