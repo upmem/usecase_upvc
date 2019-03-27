@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "debug.h"
-#include "mutex_def.h"
 #include "dout.h"
 #include "stats.h"
 
@@ -36,10 +35,11 @@ typedef struct {
  * @brief The result pool shared by tasklets.
  */
 __attribute__((aligned(8))) static result_pool_t result_pool;
+DECLARE_MUTEX(result_pool_mutex);
 
 void result_pool_init()
 {
-        result_pool.mutex = mutex_get(MUTEX_RESULT_POOL);
+        result_pool.mutex = MUTEX(result_pool_mutex);
         result_pool.wridx = 0;
         result_pool.cur_write = DPU_RESULT_ADDR;
 }

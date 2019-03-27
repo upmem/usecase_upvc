@@ -18,12 +18,19 @@
 #include "odpd.h"
 #include "nodp.h"
 #include "dout.h"
-#include "mutex_def.h"
 #include "request_pool.h"
 #include "result_pool.h"
 #include "stats.h"
 
 #include "common.h"
+
+DECLARE_MUTEX(miscellaneous_mutex);
+DECLARE_BARRIER(init_barrier, NB_RUNNING_TASKLETS);
+
+#define TASKLETS_INITIALIZER \
+        TASKLETS(16, main, 256, 0)
+_Static_assert(16 == NB_TASKLET_PER_DPU, "NB_TASKLET_PER_DPU does not match the number of tasklets declare in rt.h");
+#include <rt.h>
 
 /**
  * @brief Maximum score allowed.
@@ -212,7 +219,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
                  .nodp_time = 0ULL,
                  .odpd_time = 0ULL,
                 };
-        mutex_t mutex_miscellaneous = mutex_get(MUTEX_MISCELLANEOUS);
+        mutex_t mutex_miscellaneous = MUTEX(miscellaneous_mutex);
         dout_t *dout = &global_dout[tasklet_id];
         unsigned int nbr_len_aligned = ALIGN_DPU(mram_info.nbr_len);
         unsigned int coords_nbr_len = sizeof(dpu_result_coord_t) + nbr_len_aligned;
@@ -268,7 +275,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 int main()
 {
         sysname_t tasklet_id = me();
-        barrier_t barrier = barrier_get(0);
+        barrier_t barrier = BARRIER(init_barrier);
         perfcounter_t start_time, current_time;
         dpu_compute_time_t accumulate_time;
 

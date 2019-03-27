@@ -9,7 +9,6 @@
 #include <alloc.h>
 #include <defs.h>
 
-#include "mutex_def.h"
 #include "debug.h"
 #include "request_pool.h"
 #include "dout.h"
@@ -41,12 +40,13 @@ typedef struct {
  * @brief Common request pool, shared by every tasklet.
  */
 static request_pool_t request_pool;
+DECLARE_MUTEX(request_pool_mutex);
 
 void request_pool_init(mram_info_t *mram_info)
 {
         __attribute__((aligned(8))) request_info_t io_data;
 
-        request_pool.mutex = mutex_get(MUTEX_REQUEST_POOL);
+        request_pool.mutex = MUTEX(request_pool_mutex);
 
         REQUEST_INFO_READ(DPU_REQUEST_INFO_ADDR(mram_info), &io_data);
         request_pool.nb_reads = io_data.nb_reads;
