@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #define NB_THREAD (16)
 #define MAX_STRING_SIZE (512)
@@ -12,9 +13,6 @@
 #define EXPECTED_MATCH_CALL (1)
 #define RET_FORMAT ("\tret 0x%x\n")
 #define EXPECTED_MATCH_RET (1)
-
-#define CALL_ADDR_TO_TRACK (0x35)
-/* #define CALL_ADDR_TO_TRACK (0x1d3) */
 
 static bool goto_thread_info(char *str, unsigned int thread_id, FILE *input_fp)
 {
@@ -33,6 +31,7 @@ static bool goto_thread_info(char *str, unsigned int thread_id, FILE *input_fp)
 }
 
 static bool save_thread_info(char *str,
+                             unsigned int call_addr_to_track,
                              unsigned int thread_id,
                              unsigned int *contain_call,
                              FILE *input_fp,
@@ -78,7 +77,7 @@ static bool save_thread_info(char *str,
                         assert(blob_size < MAX_BLOB_SIZE);
 
                         nb_match = sscanf(str, CALL_FORMAT, &addr);
-                        if (nb_match == EXPECTED_MATCH_CALL && addr == CALL_ADDR_TO_TRACK) {
+                        if (nb_match == EXPECTED_MATCH_CALL && addr == call_addr_to_track) {
                                 if (*contain_call == 0) {
                                         fprintf(output_fp, "################################\n");
                                 }
@@ -106,7 +105,7 @@ static bool save_thread_info(char *str,
         }
 }
 
-static void extract_thread(unsigned int thread_id, FILE *input_fp, FILE *output_fp)
+static void extract_thread(unsigned int call_addr_to_track, unsigned int thread_id, FILE *input_fp, FILE *output_fp)
 {
         char str[MAX_STRING_SIZE];
         unsigned contain_call = 0;
@@ -114,7 +113,7 @@ static void extract_thread(unsigned int thread_id, FILE *input_fp, FILE *output_
                 if (!goto_thread_info(str, thread_id, input_fp)) {
                         break;
                 }
-                if (!save_thread_info(str, thread_id, &contain_call, input_fp, output_fp)) {
+                if (!save_thread_info(str, call_addr_to_track, thread_id, &contain_call, input_fp, output_fp)) {
                         break;
                 }
         }
@@ -122,7 +121,7 @@ static void extract_thread(unsigned int thread_id, FILE *input_fp, FILE *output_
 
 int main(__attribute__((unused)) int argc, char **argv)
 {
-        for (unsigned int i = 1; i < NB_THREAD + 1; i++) {
+        for (unsigned int i = 0; i < NB_THREAD; i++) {
                 char output_file[MAX_STRING_SIZE];
                 FILE *input_fp = fopen(argv[1], "r");
 
@@ -131,7 +130,7 @@ int main(__attribute__((unused)) int argc, char **argv)
                 sprintf(output_file, "%s.%u", argv[1], i);
                 FILE *output_fp = fopen(output_file, "w");
 
-                extract_thread(i, input_fp, output_fp);
+                extract_thread(atoi(argv[2]), i, input_fp, output_fp);
 
                 fclose(output_fp);
                 fclose(input_fp);
