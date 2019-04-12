@@ -281,6 +281,7 @@ int main()
 
         if (tasklet_id == 0) {
                 accumulate_time = 0ULL;
+                mem_reset();
                 perfcounter_config(COUNT_CYCLES, true);
                 current_time = start_time = perfcounter_get();
 
