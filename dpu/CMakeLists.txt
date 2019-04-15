@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(dpu C ASM)
 
+set(CMAKE_C_FLAGS -O2)
+
 INCLUDE_DIRECTORIES(inc)
 INCLUDE_DIRECTORIES(../common/inc/)
 
