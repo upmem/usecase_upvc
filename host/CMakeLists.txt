@@ -15,6 +15,19 @@ target_include_directories(upvc PUBLIC ${UPMEM_HOME}/usr/share/upmem/include/hos
 target_link_libraries(upvc pthread dpu dpucni)
 
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
+
+add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map -n 2 -t hsim -b ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu_task
+        DEPENDS upvc
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
+
+add_custom_target(check diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE1.fasta ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE1.fasta.ref
+        COMMAND diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE1.fasta ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE1.fasta.ref
+        COMMAND diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE1.fasta ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE1.fasta.ref
+        COMMAND diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta.ref
+        COMMAND diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta.ref
+        COMMAND diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta.ref
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
+
 include(ExternalProject)
 ExternalProject_Add(
         dpu_task
