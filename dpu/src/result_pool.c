@@ -26,7 +26,7 @@
  */
 typedef struct {
         uint8_t cache[LOCAL_RESULTS_PAGE_SIZE];
-        mutex_t mutex;
+        mutex_id_t mutex;
         unsigned int wridx;
         mram_addr_t cur_write;
 } result_pool_t;
@@ -35,11 +35,11 @@ typedef struct {
  * @brief The result pool shared by tasklets.
  */
 __attribute__((aligned(8))) static result_pool_t result_pool;
-DECLARE_MUTEX(result_pool_mutex);
+MUTEX_INIT(result_pool_mutex);
 
 void result_pool_init()
 {
-        result_pool.mutex = MUTEX(result_pool_mutex);
+        result_pool.mutex = MUTEX_GET(result_pool_mutex);
         result_pool.wridx = 0;
         result_pool.cur_write = DPU_RESULT_ADDR;
 }

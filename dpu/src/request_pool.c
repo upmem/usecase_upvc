@@ -29,7 +29,7 @@
  * @var request_size  Size of a request and the neighbour corresponding.
  */
 typedef struct {
-        mutex_t mutex;
+        mutex_id_t mutex;
         unsigned int nb_reads;
         unsigned int rdidx;
         mram_addr_t cur_read;
@@ -40,13 +40,13 @@ typedef struct {
  * @brief Common request pool, shared by every tasklet.
  */
 static request_pool_t request_pool;
-DECLARE_MUTEX(request_pool_mutex);
+MUTEX_INIT(request_pool_mutex);
 
 void request_pool_init(mram_info_t *mram_info)
 {
         __attribute__((aligned(8))) request_info_t io_data;
 
-        request_pool.mutex = MUTEX(request_pool_mutex);
+        request_pool.mutex = MUTEX_GET(request_pool_mutex);
 
         REQUEST_INFO_READ(DPU_REQUEST_INFO_ADDR(mram_info), &io_data);
         request_pool.nb_reads = io_data.nb_reads;

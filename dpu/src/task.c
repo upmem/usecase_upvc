@@ -24,8 +24,8 @@
 
 #include "common.h"
 
-DECLARE_MUTEX(miscellaneous_mutex);
-DECLARE_BARRIER(init_barrier, NB_RUNNING_TASKLETS);
+MUTEX_INIT(miscellaneous_mutex);
+BARRIER_INIT(init_barrier, NB_RUNNING_TASKLETS);
 
 #define TASKLETS_INITIALIZER \
         TASKLETS(16, main, 256, 0)
@@ -101,7 +101,7 @@ static void compare_neighbours(sysname_t tasklet_id,
                                dpu_request_t *request,
                                dout_t *dout,
                                dpu_tasklet_stats_t *tasklet_stats,
-                               mutex_t *mutex_miscellaneous)
+                               mutex_id_t *mutex_miscellaneous)
 {
         int score, score_nodp, score_odpd = -1;
         uint8_t *ref_nbr = cached_coords_and_nbr + sizeof(dpu_result_coord_t);
@@ -174,7 +174,7 @@ static void compute_request(sysname_t tasklet_id,
                             dpu_request_t *request,
                             dout_t *dout,
                             dpu_tasklet_stats_t *tasklet_stats,
-                            mutex_t *mutex_miscellaneous)
+                            mutex_id_t *mutex_miscellaneous)
 {
         int mini = MAX_SCORE;
         for (unsigned int idx = 0; idx < request->count; idx += NB_REF_PER_READ) {
@@ -219,7 +219,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
                  .nodp_time = 0ULL,
                  .odpd_time = 0ULL,
                 };
-        mutex_t mutex_miscellaneous = MUTEX(miscellaneous_mutex);
+        mutex_id_t mutex_miscellaneous = MUTEX_GET(miscellaneous_mutex);
         dout_t *dout = &global_dout[tasklet_id];
         unsigned int nbr_len_aligned = ALIGN_DPU(mram_info.nbr_len);
         unsigned int coords_nbr_len = sizeof(dpu_result_coord_t) + nbr_len_aligned;
@@ -275,7 +275,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 int main()
 {
         sysname_t tasklet_id = me();
-        barrier_t barrier = BARRIER(init_barrier);
+        barrier_id_t barrier = BARRIER_GET(init_barrier);
         perfcounter_t start_time, current_time;
         dpu_compute_time_t accumulate_time;
 
