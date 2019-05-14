@@ -34,7 +34,6 @@ index_seed_t **load_index_seeds(char *seed_file)
 {
         FILE *f = fopen(seed_file, "r");
         index_seed_t **index_seed;
-        double t1, t2;
 
         assert(f != NULL);
 

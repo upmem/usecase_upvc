@@ -41,9 +41,8 @@ static bool read_write_dpu(FILE *fp, char *str, unsigned int dpu_nb, char *file_
         return true;
 }
 
-int main(int argc, char **argv)
+int main(__attribute__((unused)) int argc, char **argv)
 {
-        unsigned int exit_nb = 1;
         unsigned int dpu_nb = 0;
         char str[STRING_MAX_SIZE];
         FILE *fp = fopen(argv[1], "r");
