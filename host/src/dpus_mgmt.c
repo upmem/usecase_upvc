@@ -15,8 +15,6 @@
 
 #include "upvc_dpu.h"
 
-#define DPU_SLICE_SIZE (8)
-
 /* #define LOG_DPUS */
 #ifdef LOG_DPUS
 static dpu_logging_config_t logging_config = {
@@ -105,10 +103,8 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, mram_info_t **
         status = dpu_transfer_matrix_allocate(rank, &matrix);
         assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                status = dpu_transfer_matrix_add_dpu(rank,
+                status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix,
-                                                     each_dpu/DPU_SLICE_SIZE,
-                                                     each_dpu%DPU_SLICE_SIZE,
                                                      mram[each_dpu],
                                                      sizeof(mram_info_t) + mram[each_dpu]->total_nbr_size,
                                                      MRAM_INFO_ADDR,
@@ -197,19 +193,15 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
                                    "*** will exceed MRAM limit if writing reads on DPU number %u - aborting!",
                                    each_dpu + dpu_offset);
                 }
-                status = dpu_transfer_matrix_add_dpu(rank,
+                status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix_header,
-                                                     each_dpu/DPU_SLICE_SIZE,
-                                                     each_dpu%DPU_SLICE_SIZE,
                                                      &io_header[each_dpu],
                                                      sizeof(request_info_t),
                                                      (mram_addr_t) DPU_REQUEST_INFO_ADDR(mram),
                                                      0);
                 assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
-                status = dpu_transfer_matrix_add_dpu(rank,
+                status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix_reads,
-                                                     each_dpu/DPU_SLICE_SIZE,
-                                                     each_dpu%DPU_SLICE_SIZE,
                                                      dispatch[each_dpu + dpu_offset].reads_area,
                                                      io_len[each_dpu],
                                                      (mram_addr_t) DPU_REQUEST_ADDR(mram),
@@ -239,10 +231,8 @@ static void dpu_try_log(unsigned int rank_id,
         unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
         dpu_compute_time_t compute_time[nb_dpus_per_rank];
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                status = dpu_transfer_matrix_add_dpu(rank,
+                status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix,
-                                                     each_dpu/DPU_SLICE_SIZE,
-                                                     each_dpu%DPU_SLICE_SIZE,
                                                      &compute_time[each_dpu],
                                                      sizeof(dpu_compute_time_t),
                                                      (mram_addr_t) DPU_COMPUTE_TIME_ADDR,
@@ -258,10 +248,8 @@ static void dpu_try_log(unsigned int rank_id,
         dpu_tasklet_stats_t tasklet_stats[nb_dpus_per_rank][NB_TASKLET_PER_DPU];
         for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
                 for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                        status = dpu_transfer_matrix_add_dpu(rank,
+                        status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                              matrix,
-                                                             each_dpu/DPU_SLICE_SIZE,
-                                                             each_dpu%DPU_SLICE_SIZE,
                                                              &tasklet_stats[each_dpu][each_tasklet],
                                                              sizeof(dpu_tasklet_stats_t),
                                                              (mram_addr_t)
@@ -345,10 +333,8 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
         status = dpu_transfer_matrix_allocate(rank, &matrix);
         assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-                status = dpu_transfer_matrix_add_dpu(rank,
+                status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix,
-                                                     each_dpu/DPU_SLICE_SIZE,
-                                                     each_dpu%DPU_SLICE_SIZE,
                                                      result_buffer[each_dpu],
                                                      DPU_RESULT_SIZE,
                                                      (mram_addr_t) DPU_RESULT_ADDR,
