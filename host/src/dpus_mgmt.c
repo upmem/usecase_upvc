@@ -337,7 +337,7 @@ static void dpu_try_log(unsigned int rank_id,
         pthread_mutex_unlock(&devices->log_mutex);
 }
 
-void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)
+void dpu_try_get_results_and_log(unsigned int round, unsigned int pass, unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)
 {
         dpu_api_status_t status;
         dpu_rank_t rank = devices->ranks[rank_id];
@@ -356,6 +356,20 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
         }
         status = dpu_copy_from_dpus(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
+
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
+                char str[512];
+                sprintf(str, "res/result_round_%u_pass_%u_rank_%u_offset_%u_dpu_%lu.txt", round, pass, rank_id, dpu_offset, devices->dpus[each_dpu + rank_id * nb_dpus_per_rank]);
+                FILE *fp = fopen(str, "w");
+
+                for (unsigned int each_result = 0; each_result < MAX_DPU_RESULTS; each_result ++) {
+                        dpu_result_out_t *res = &(result_buffer[each_dpu][each_result]);
+                        if (res->num == -1)
+                                break;
+                        fprintf(fp, "%i - %i %u %u %u\n", each_result, res->num, res->score, res->coord.seed_nr, res->coord.seq_nr);
+                }
+                fclose(fp);
+        }
 
         dpu_try_log(rank_id, dpu_offset, devices, matrix);
 

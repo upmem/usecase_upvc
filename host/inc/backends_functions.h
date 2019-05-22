@@ -16,6 +16,7 @@ typedef struct backends_functions_struct {
                         unsigned int,
                         unsigned int,
                         unsigned int,
+                        unsigned int,
                         sem_t *,
                         sem_t *,
                         times_ctx_t *,

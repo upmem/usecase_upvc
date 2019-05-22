@@ -331,6 +331,7 @@ void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t 
 void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch,
                         __attribute__((unused)) devices_t *devices,
                         __attribute__((unused)) unsigned int dpu_offset,
+                        __attribute__((unused)) unsigned round,
                         __attribute__((unused)) unsigned rank_id,
                         __attribute__((unused)) unsigned int nb_pass,
                         sem_t *dispatch_free_sem,

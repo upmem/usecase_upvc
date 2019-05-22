@@ -108,6 +108,7 @@ typedef struct {
         sem_t *acc_wait_sem;
         sem_t *acc_free_sem;
         unsigned int rank_id;
+        unsigned int round;
         int *nb_read;
         devices_t *devices;
         dispatch_request_t *dispatch_requests;
@@ -131,6 +132,7 @@ void *thread_exec_rank(void *arg)
         backends_functions_t *backends_functions = args->backends_functions;
         times_ctx_t *times_ctx = args->times_ctx;
         reads_info_t *reads_info = args->reads_info;
+        unsigned int round = args->round;
 
         unsigned int nb_dpu = get_nb_dpu();
         unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
@@ -158,6 +160,7 @@ void *thread_exec_rank(void *arg)
                                                             devices,
                                                             dpu_offset,
                                                             rank_id,
+                                                            round,
                                                             each_pass,
                                                             dispatch_free_sem,
                                                             acc_wait_sem,
@@ -500,6 +503,7 @@ static void exec_round(unsigned int round,
                         exec_rank_arg[each_rank].backends_functions = backends_functions;
                         exec_rank_arg[each_rank].times_ctx = times_ctx;
                         exec_rank_arg[each_rank].reads_info = reads_info;
+                        exec_rank_arg[each_rank].round = round;
                 }
                 thread_dispatch_arg_t dispatch_arg =
                         {

@@ -112,7 +112,7 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
  * @param devices  List of available devices.
  * @param result_buffer The table of DPU results to store the results (last one having a request number equal to -1).
  */
-void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
+void dpu_try_get_results_and_log(unsigned int round, unsigned int pass, unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
 
 /**
  * @brief Makes a snapshot of an MRAM into a given file.

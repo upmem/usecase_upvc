@@ -57,6 +57,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int dpu_offset,
                 unsigned int rank_id,
+                unsigned int round,
                 unsigned int nb_pass,
                 sem_t *dispatch_free_sem,
                 sem_t *acc_wait_sem,
@@ -98,7 +99,7 @@ void run_on_dpu(dispatch_request_t *dispatch,
                         unsigned int this_dpu = rank_id * nb_dpus_per_rank + dpu_offset + each_dpu;
                         results[each_dpu] = get_mem_dpu_res(this_dpu);
                 }
-                dpu_try_get_results_and_log(rank_id, dpu_offset, devices, results);
+                dpu_try_get_results_and_log(round, nb_pass, rank_id, dpu_offset, devices, results);
 
                 PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
 
