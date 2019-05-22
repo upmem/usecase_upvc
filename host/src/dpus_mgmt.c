@@ -15,10 +15,13 @@
 
 #include "upvc_dpu.h"
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
 /* #define LOG_DPUS */
 #ifdef LOG_DPUS
 static dpu_logging_config_t logging_config = {
-                                              .source = KTRACE,
+                                              .source = PRINTF,
                                               .destination_directory_name = "."
 };
 #define p_logging_config &logging_config
@@ -88,6 +91,12 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
                 assert(status == DPU_API_SUCCESS && "dpu_load_all failed");
         }
 
+        dpu_t one_dpu = dpu_get_id(devices->ranks[0], 0);
+        dpu_get_mram_symbol(one_dpu, DPU_MRAM_HEAP_POINTER_NAME, &devices->mram_available_addr, NULL);
+        dpu_get_mram_symbol(one_dpu, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time_addr, &devices->mram_compute_time_size);
+        dpu_get_mram_symbol(one_dpu, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats_addr, NULL);
+        dpu_get_mram_symbol(one_dpu, XSTR(DPU_RESULT_VAR), &devices->mram_result_addr, &devices->mram_result_size);
+
         pthread_mutex_init(&devices->log_mutex, NULL);
         devices->log_file = fopen("upvc_log.txt", "w");
 
@@ -107,7 +116,7 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, mram_info_t **
                                                      matrix,
                                                      mram[each_dpu],
                                                      sizeof(mram_info_t) + mram[each_dpu]->total_nbr_size,
-                                                     MRAM_INFO_ADDR,
+                                                     devices->mram_available_addr,
                                                      0);
                 assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
         }
@@ -188,7 +197,10 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
                 io_header[each_dpu].nb_reads = nb_reads;
                 io_header[each_dpu].magic = 0xcdefabcd;
 
-                if ((DPU_REQUEST_ADDR(mram) - DPU_INPUTS_ADDR + io_len[each_dpu]) > DPU_INPUTS_SIZE) {
+                if ((DPU_REQUEST_ADDR(mram, devices->mram_available_addr)
+                     - DPU_INPUTS_ADDR(devices->mram_available_addr)
+                     + io_len[each_dpu])
+                    > DPU_INPUTS_SIZE(devices->mram_available_addr)) {
                         ERROR_EXIT(12,
                                    "*** will exceed MRAM limit if writing reads on DPU number %u - aborting!",
                                    each_dpu + dpu_offset);
@@ -197,14 +209,14 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
                                                      matrix_header,
                                                      &io_header[each_dpu],
                                                      sizeof(request_info_t),
-                                                     (mram_addr_t) DPU_REQUEST_INFO_ADDR(mram),
+                                                     (mram_addr_t) DPU_REQUEST_INFO_ADDR(mram, devices->mram_available_addr),
                                                      0);
                 assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
                 status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix_reads,
                                                      dispatch[each_dpu + dpu_offset].reads_area,
                                                      io_len[each_dpu],
-                                                     (mram_addr_t) DPU_REQUEST_ADDR(mram),
+                                                     (mram_addr_t) DPU_REQUEST_ADDR(mram, devices->mram_available_addr),
                                                      0);
                 assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
         }
@@ -235,7 +247,7 @@ static void dpu_try_log(unsigned int rank_id,
                                                      matrix,
                                                      &compute_time[each_dpu],
                                                      sizeof(dpu_compute_time_t),
-                                                     (mram_addr_t) DPU_COMPUTE_TIME_ADDR,
+                                                     devices->mram_compute_time_addr,
                                                      0);
                 assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
         }
@@ -253,7 +265,8 @@ static void dpu_try_log(unsigned int rank_id,
                                                              &tasklet_stats[each_dpu][each_tasklet],
                                                              sizeof(dpu_tasklet_stats_t),
                                                              (mram_addr_t)
-                                                             (DPU_TASKLET_STATS_ADDR + each_tasklet * sizeof(dpu_tasklet_stats_t)),
+                                                             (devices->mram_tasklet_stats_addr
+                                                              + each_tasklet * sizeof(dpu_tasklet_stats_t)),
                                                              0);
                         assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
                 }
@@ -336,8 +349,8 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, 
                 status = dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank],
                                                      matrix,
                                                      result_buffer[each_dpu],
-                                                     DPU_RESULT_SIZE,
-                                                     (mram_addr_t) DPU_RESULT_ADDR,
+                                                     devices->mram_result_size,
+                                                     devices->mram_result_addr,
                                                      0);
                 assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_add_dpu failed");
         }

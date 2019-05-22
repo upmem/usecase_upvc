@@ -42,16 +42,19 @@ typedef struct {
 static request_pool_t request_pool;
 MUTEX_INIT(request_pool_mutex);
 
+#define REQUEST_INFO_READ(addr, request_info) do { mram_read8(addr, request_info); } while(0)
+_Static_assert(sizeof(request_info_t) == 8, "request_info_t size changed (make sure that REQUEST_INFO_READ changed as well)");
+
 void request_pool_init(mram_info_t *mram_info)
 {
         __attribute__((aligned(8))) request_info_t io_data;
 
         request_pool.mutex = MUTEX_GET(request_pool_mutex);
 
-        REQUEST_INFO_READ(DPU_REQUEST_INFO_ADDR(mram_info), &io_data);
+        REQUEST_INFO_READ(DPU_REQUEST_INFO_ADDR(mram_info, DPU_MRAM_HEAP_POINTER), &io_data);
         request_pool.nb_reads = io_data.nb_reads;
         request_pool.rdidx = 0;
-        request_pool.cur_read = (mram_addr_t) DPU_REQUEST_ADDR(mram_info);
+        request_pool.cur_read = (mram_addr_t) DPU_REQUEST_ADDR(mram_info, DPU_MRAM_HEAP_POINTER);
         request_pool.request_size = DPU_REQUEST_SIZE(mram_info->nbr_len);
         DEBUG_REQUESTS_PRINT_POOL(request_pool);
 }

@@ -9,6 +9,8 @@
 #include "dout.h"
 #include "stats.h"
 
+__mram dpu_result_out_t m_dpu_swap_result[NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ];
+
 void dout_clear(dout_t *dout)
 {
         dout->nb_results = 0;
@@ -18,7 +20,7 @@ void dout_clear(dout_t *dout)
 
 void dout_init(unsigned int tid, dout_t *dout)
 {
-        dout->mram_base = DPU_SWAP_RESULT_ADDR + (tid * MAX_RESULTS_PER_READ * sizeof(dpu_result_out_t));
+        dout->mram_base = (mram_addr_t)&m_dpu_swap_result[tid * MAX_RESULTS_PER_READ];
         dout_clear(dout);
 }
 

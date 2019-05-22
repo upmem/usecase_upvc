@@ -6,6 +6,7 @@
 #define __INTEGRATION_DEBUG_H__
 
 #include "common.h"
+#include <stdio.h>
 
 /* Define DEBUG to get plain-text traces */
 /* #define DEBUG */
@@ -33,14 +34,6 @@
 /* #define DEBUG_PROCESS */
 
 
-
-
-#ifdef DEBUG
-#include <ktrace.h>
-#define printf ktrace
-#else /* DEBUG */
-#define printf(...)
-#endif /* DEBUG */
 
 
 
@@ -104,15 +97,15 @@
                         halt();                                         \
                 }                                                       \
                 if (((unsigned int) (wram_addr) + (len)) > ASSERT_DMA_ADDR_ALIGNMENT_WRAM_SIZE) { \
-                        printf("WRAM buffer [%x,%x[ does not fit in WRAM!\n", (wram_addr), (wram_addr) + (len)); \
+                        printf("WRAM buffer [%p,%p[ does not fit in WRAM!\n", (wram_addr), (wram_addr) + (len)); \
                         halt();                                         \
                 }                                                       \
                 if (((mram_addr) & 7) != 0) {                           \
-                        printf("MRAM address %x is not aligned on longs!\n", (mram_addr)); \
+                        printf("MRAM address 0x%x is not aligned on longs!\n", (mram_addr)); \
                         halt();                                         \
                 }                                                       \
                 if ((((unsigned int) (wram_addr)) & 7) != 0) {          \
-                        printf("WRAM address %x is not aligned on longs!\n", (wram_addr)); \
+                        printf("WRAM address %p is not aligned on longs!\n", (wram_addr)); \
                         halt();                                         \
                 }                                                       \
         } while(0)

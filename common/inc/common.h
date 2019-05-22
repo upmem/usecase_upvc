@@ -21,38 +21,6 @@
 #define MAX_RESULTS_PER_READ (1 << 10)
 
 /**
- * DPU MRAM Memory Layout
- *
- * 0 MRAM_INFO_ADDR
- * | sizeof(mram_info_t)
- * |
- * | DPU_INPUTS_ADDR
- * | mram_info.total_nbr_size
- * |
- * | DPU_REQUEST_INFO_ADDR
- * | sizeof(request_info_t)
- * |
- * | DPU_REQUEST_ADDR
- * | MAX_DPU_REQUEST * DPU_REQUEST_SIZE
- * |
- * | EMPTY SPACE
- * |
- * | DPU_TASKLET_COMPUTE_TIME_ADDR
- * | DPU_TASKLET_COMPUTE_TIME_SIZE
- * |
- * | DPU_TASKLET_STATS_ADDR
- * | DPU_TASKLET_STATS_SIZE
- * |
- * | DPU_SWAP_RESULT_ADDR
- * | DPU_SWAP_RESULT_SIZE
- * |
- * | DPU_RESULT_ADDR
- * | DPU_RESULT_SIZE
- * MRAM_SIZE
- *
- */
-
-/**
  * @brief A snapshot of the MRAM.
  *
  * @var total_nbr_size  Size of all the reads of the reference genome.
@@ -66,9 +34,8 @@ typedef struct {
         uint32_t nbr_len;
         uint32_t delta;
 } mram_info_t;
-
-#define MRAM_INFO_ADDR ((mram_addr_t)0)
-#define MRAM_INFO_READ(addr, mram_info) do { mram_read16(addr, mram_info); } while(0)
+#define MRAM_INFO_ADDR(mram_offset) (ALIGN_DPU(mram_offset))
+#define MRAM_INFO_READ(mram_info, mram_offset) do { mram_read16(MRAM_INFO_ADDR(mram_offset), mram_info); } while (0)
 _Static_assert(sizeof(mram_info_t) == 16 ,"mram_info_t size changed (make sure that MRAM_INFO_READ changed as well)");
 
 /**
@@ -96,14 +63,7 @@ typedef struct {
         uint32_t score;
         dpu_result_coord_t coord;
 } dpu_result_out_t;
-
-#define DPU_RESULT_SIZE (MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
-#define DPU_RESULT_ADDR (MRAM_SIZE - DPU_RESULT_SIZE)
-#define DPU_RESULT_WRITE(res, addr) do { mram_write16(res, addr); } while(0)
-_Static_assert(sizeof(dpu_result_out_t) == 16, "dpu_result_out_t size changed (make sure that DPU_RESULT_WRITE changed as well)");
-
-#define DPU_SWAP_RESULT_SIZE (NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ * sizeof(dpu_result_out_t))
-#define DPU_SWAP_RESULT_ADDR (DPU_RESULT_ADDR - DPU_SWAP_RESULT_SIZE)
+#define DPU_RESULT_VAR m_dpu_result
 
 /**
  * @brief stats reported by every tasklet
@@ -120,26 +80,14 @@ typedef struct {
         uint64_t nodp_time;
         uint64_t odpd_time;
 } dpu_tasklet_stats_t;
+#define DPU_TASKET_STATS_VAR m_dpu_tasklet_stats
 
-#define DPU_TASKLET_STATS_SIZE (sizeof(dpu_tasklet_stats_t) * NB_TASKLET_PER_DPU)
-#define DPU_TASKLET_STATS_ADDR (DPU_SWAP_RESULT_ADDR - DPU_TASKLET_STATS_SIZE)
-#ifdef STATS_ON
-#define DPU_TASKLET_STATS_WRITE(res, addr) do { mram_write48(res, addr); } while(0)
-#else
-#define DPU_TASKLET_STATS_WRITE(res, addr)
-#endif
-_Static_assert(sizeof(dpu_tasklet_stats_t) == 48,
-               "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
 
 typedef uint64_t dpu_compute_time_t;
-#define DPU_COMPUTE_TIME_SIZE (sizeof(dpu_compute_time_t))
-#define DPU_COMPUTE_TIME_ADDR (DPU_TASKLET_STATS_ADDR - DPU_COMPUTE_TIME_SIZE)
-#define DPU_COMPUTE_TIME_WRITE(res, addr) do { mram_write8(res, addr); } while(0)
-_Static_assert(sizeof(dpu_compute_time_t) == 8,
-               "dpu_compute_time_t size changed (make sure that DPU_COMPUTE_TIME_WRITE changed as well)");
+#define DPU_COMPUTE_TIME_VAR m_dpu_compute_time
 
-#define DPU_INPUTS_ADDR (ALIGN_DPU(MRAM_INFO_ADDR + sizeof(mram_info_t)))
-#define DPU_INPUTS_SIZE (DPU_COMPUTE_TIME_ADDR - DPU_INPUTS_ADDR)
+#define DPU_INPUTS_ADDR(mram_offset) (ALIGN_DPU(MRAM_INFO_ADDR(mram_offset) + sizeof(mram_info_t)))
+#define DPU_INPUTS_SIZE(mram_offset) (MRAM_SIZE - DPU_INPUTS_ADDR(mram_offset))
 
 /**
  * @brief Information on the requests reads to a DPU.
@@ -149,10 +97,7 @@ typedef struct {
         uint32_t magic;
 } request_info_t;
 
-#define DPU_REQUEST_INFO_ADDR(mram_info) (ALIGN_DPU(DPU_INPUTS_ADDR + (mram_info)->total_nbr_size))
-
-#define REQUEST_INFO_READ(addr, request_info) do { mram_read8(addr, request_info); } while(0)
-_Static_assert(sizeof(request_info_t) == 8, "request_info_t size changed (make sure that REQUEST_INFO_READ changed as well)");
+#define DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) (ALIGN_DPU(DPU_INPUTS_ADDR(mram_offset) + (mram_info)->total_nbr_size))
 
 /**
  * @brief Structure representing one request to a DPU, resulting from the dispatching of reads.
@@ -169,7 +114,8 @@ typedef struct {
         uint32_t num;
 } dpu_request_t;
 
-#define DPU_REQUEST_ADDR(mram_info) (ALIGN_DPU(ALIGN_DPU(DPU_INPUTS_ADDR + (mram_info)->total_nbr_size) + sizeof(request_info_t)))
+#define DPU_REQUEST_ADDR(mram_info, mram_offset)                        \
+        (ALIGN_DPU(DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) + sizeof(request_info_t)))
 #define DPU_REQUEST_SIZE(size_nbr) (ALIGN_DPU(sizeof(dpu_request_t) + (size_nbr)))
 
 #endif /* __COMMON_H__ */

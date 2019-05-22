@@ -34,14 +34,22 @@ typedef struct {
 /**
  * @brief The result pool shared by tasklets.
  */
-__attribute__((aligned(8))) static result_pool_t result_pool;
+__dma_aligned static result_pool_t result_pool;
 MUTEX_INIT(result_pool_mutex);
+
+/**
+ * @brief The buffer of result in mram.
+ */
+__mram dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
+
+#define DPU_RESULT_WRITE(res, addr) do { mram_write16(res, addr); } while(0)
+_Static_assert(sizeof(dpu_result_out_t) == 16, "dpu_result_out_t size changed (make sure that DPU_RESULT_WRITE changed as well)");
 
 void result_pool_init()
 {
         result_pool.mutex = MUTEX_GET(result_pool_mutex);
         result_pool.wridx = 0;
-        result_pool.cur_write = DPU_RESULT_ADDR;
+        result_pool.cur_write = (mram_addr_t)DPU_RESULT_VAR;
 }
 
 void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)

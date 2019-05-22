@@ -26,6 +26,8 @@ typedef struct {
         mram_info_t *mram_info;
         pthread_mutex_t log_mutex;
         FILE *log_file;
+        mram_addr_t mram_compute_time_addr, mram_result_addr, mram_tasklet_stats_addr, mram_available_addr;
+        mram_size_t mram_compute_time_size, mram_result_size;
 } devices_t;
 
 /**

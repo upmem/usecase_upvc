@@ -33,6 +33,26 @@ _Static_assert(16 == NB_TASKLET_PER_DPU, "NB_TASKLET_PER_DPU does not match the 
 #include <rt.h>
 
 /**
+ * @brief The statistic of each tasklet in the mram.
+ */
+__mram dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NB_TASKLET_PER_DPU];
+#ifdef STATS_ON
+#define DPU_TASKLET_STATS_WRITE(res, addr) do { mram_write48(res, addr); } while(0)
+#else
+#define DPU_TASKLET_STATS_WRITE(res, addr)
+#endif
+_Static_assert(sizeof(dpu_tasklet_stats_t) == 48,
+               "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
+
+/**
+ * @brief The compute time performance value store in mram.
+ */
+__mram dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
+#define DPU_COMPUTE_TIME_WRITE(res) do { mram_write8(res, (mram_addr_t)&DPU_COMPUTE_TIME_VAR); } while(0)
+_Static_assert(sizeof(dpu_compute_time_t) == 8,
+               "dpu_compute_time_t size changed (make sure that DPU_COMPUTE_TIME_WRITE changed as well)");
+
+/**
  * @brief Maximum score allowed.
  */
 #define MAX_SCORE (40)
@@ -76,7 +96,7 @@ static void load_reference_multiple_nbr_and_coords_at(unsigned int base,
         /* The input starts with coordinates (8 bytes), followed by the neighbour. Structure is aligned
          * on 8 bytes boundary.
          */
-        mram_addr_t coords_nbr_address = (mram_addr_t) (DPU_INPUTS_ADDR + (base + idx) * coords_nbr_len);
+        mram_addr_t coords_nbr_address = (mram_addr_t) (DPU_INPUTS_ADDR(DPU_MRAM_HEAP_POINTER) + (base + idx) * coords_nbr_len);
         unsigned int coords_nbr_len_total = coords_nbr_len * NB_REF_PER_READ;
         ASSERT_DMA_ADDR(coords_nbr_address, cache, coords_nbr_len_total);
         ASSERT_DMA_LEN(coords_nbr_len_total);
@@ -262,7 +282,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 
         DEBUG_STATS_PRINT(tasklet_stats, mutex_miscellaneous);
 
-        DPU_TASKLET_STATS_WRITE(&tasklet_stats, DPU_TASKLET_STATS_ADDR + tasklet_id * sizeof(dpu_tasklet_stats_t));
+        DPU_TASKLET_STATS_WRITE(&tasklet_stats, (mram_addr_t)(&DPU_TASKLET_STATS_VAR[tasklet_id]));
 
         result_pool_finish(&tasklet_stats);
 }
@@ -285,7 +305,7 @@ int main()
                 perfcounter_config(COUNT_CYCLES, true);
                 current_time = start_time = perfcounter_get();
 
-                MRAM_INFO_READ(MRAM_INFO_ADDR, &mram_info);
+                MRAM_INFO_READ(&mram_info, DPU_MRAM_HEAP_POINTER);
                 DEBUG_MRAM_INFO_PRINT(&mram_info);
 
                 request_pool_init(&mram_info);
@@ -311,8 +331,7 @@ int main()
         if (tasklet_id == 0) {
                 get_time_and_accumulate(&accumulate_time, &current_time);
                 accumulate_time = (accumulate_time + current_time) - start_time;
-                DPU_COMPUTE_TIME_WRITE(&accumulate_time,
-                                       DPU_COMPUTE_TIME_ADDR);
+                DPU_COMPUTE_TIME_WRITE(&accumulate_time);
         }
 
         return 0;

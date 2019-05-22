@@ -53,19 +53,6 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests,
                              reads_info);
 }
 
-static void check_memory_layout(mram_info_t *mram_info, reads_info_t *reads_info)
-{
-        assert((MRAM_INFO_ADDR + sizeof(mram_info_t)) <= DPU_INPUTS_ADDR);
-        assert((DPU_INPUTS_ADDR + mram_info->total_nbr_size) <= DPU_REQUEST_INFO_ADDR(mram_info));
-        assert((DPU_REQUEST_INFO_ADDR(mram_info) + sizeof(request_info_t)) <= DPU_REQUEST_ADDR(mram_info));
-        assert((DPU_REQUEST_ADDR(mram_info) + MAX_DPU_REQUEST * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes))
-               <= DPU_COMPUTE_TIME_ADDR);
-        assert((DPU_COMPUTE_TIME_ADDR + DPU_COMPUTE_TIME_SIZE) <= DPU_TASKLET_STATS_ADDR);
-        assert((DPU_TASKLET_STATS_ADDR + DPU_TASKLET_STATS_SIZE) <= DPU_SWAP_RESULT_ADDR);
-        assert((DPU_SWAP_RESULT_ADDR + DPU_SWAP_RESULT_SIZE) <= DPU_RESULT_ADDR);
-        assert((DPU_RESULT_SIZE + DPU_RESULT_ADDR) <= MRAM_SIZE);
-}
-
 void run_on_dpu(dispatch_request_t *dispatch,
                 devices_t *devices,
                 unsigned int dpu_offset,
@@ -170,7 +157,6 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, devices_t *dev
                         unsigned int this_dpu = dpu_offset + each_dpu + rank_id * nb_dpus_per_rank;
                         mram_load(mram[each_dpu], this_dpu);
                         mram[each_dpu]->delta = reads_info->delta_neighbour_in_bytes;
-                        check_memory_layout(mram[each_dpu], reads_info);
                 }
                 dpu_try_write_mram(rank_id, devices, mram);
 
