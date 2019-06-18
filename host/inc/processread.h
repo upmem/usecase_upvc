@@ -5,12 +5,12 @@
 #ifndef __PROCESSREAD_H__
 #define __PROCESSREAD_H__
 
+#include "common.h"
+#include "genome.h"
+#include "upvc.h"
+#include "vartree.h"
 #include <stdint.h>
 #include <stdio.h>
-#include "genome.h"
-#include "vartree.h"
-#include "upvc.h"
-#include "common.h"
 
 /**
  * @brief Add each read that matched into the variant list.
@@ -32,18 +32,9 @@
  *
  * @return The number of reads that matched.
  */
-unsigned int process_read(genome_t *ref_genome,
-                          int8_t *reads_buffer,
-                          variant_tree_t **variant_list,
-                          int *substitution_list,
-                          int8_t *mapping_coverage,
-                          dpu_result_out_t *result_tab,
-                          unsigned int result_tab_nb_read,
-                          FILE *fpe1,
-                          FILE *fpe2,
-                          int round,
-                          times_ctx_t *times_ctx,
-                          reads_info_t *reads_info);
+unsigned int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **variant_list, int *substitution_list,
+    int8_t *mapping_coverage, dpu_result_out_t *result_tab, unsigned int result_tab_nb_read, FILE *fpe1, FILE *fpe2, int round,
+    times_ctx_t *times_ctx, reads_info_t *reads_info);
 
 /**
  * @brief Accumulate read in result_tab in ordre to be process when the pass will have been execute on each DPUs.
@@ -55,9 +46,7 @@ unsigned int process_read(genome_t *ref_genome,
  *
  * @return The number of reads accumulated.
  */
-unsigned int accumulate_read(dpu_result_out_t **result_tab,
-                             unsigned int *result_tab_nb_read,
-                             unsigned int dpu_offset,
-                             times_ctx_t *times_ctx);
+unsigned int accumulate_read(
+    dpu_result_out_t **result_tab, unsigned int *result_tab_nb_read, unsigned int dpu_offset, times_ctx_t *times_ctx);
 
 #endif /* __PROCESSREAD_H__ */

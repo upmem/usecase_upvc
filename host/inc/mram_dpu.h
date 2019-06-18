@@ -12,9 +12,9 @@
  */
 #include <stdbool.h>
 
-#include "vmi.h"
-#include "upvc.h"
 #include "index.h"
+#include "upvc.h"
+#include "vmi.h"
 
 #include "common.h"
 

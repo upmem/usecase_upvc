@@ -22,8 +22,8 @@
  * @brief A virtual memory image descriptor.
  */
 typedef struct {
-        char *file_name;
-        size_t mem_size;
+    char *file_name;
+    size_t mem_size;
 } vmi_t;
 
 /**
@@ -50,9 +50,7 @@ void vmi_delete(vmi_t *vmi);
  *
  * @return The current memory size, in bytes.
  */
-static inline size_t vmi_size(const vmi_t *vmi) {
-        return vmi->mem_size;
-}
+static inline size_t vmi_size(const vmi_t *vmi) { return vmi->mem_size; }
 
 /**
  * @brief Pushes a buffer at the end of a VMI

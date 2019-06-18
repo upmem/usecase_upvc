@@ -5,7 +5,8 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#include "assert.h"
+#include <assert.h>
+#include <stdint.h>
 
 /* #define STATS_ON */
 
@@ -16,8 +17,8 @@
 
 #define ALIGN_DPU(val) (((val) + 7) & ~7)
 
-#define MAX_DPU_REQUEST      (1 << 16)
-#define MAX_DPU_RESULTS      (1 << 16)
+#define MAX_DPU_REQUEST (1 << 16)
+#define MAX_DPU_RESULTS (1 << 16)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
 /**
@@ -29,26 +30,29 @@
  * @var delta           Delta to apply to nodp and odpd comparison depending on the round.
  */
 typedef struct {
-        uint32_t total_nbr_size;
-        uint32_t nb_nbr;
-        uint32_t nbr_len;
-        uint32_t delta;
+    uint32_t total_nbr_size;
+    uint32_t nb_nbr;
+    uint32_t nbr_len;
+    uint32_t delta;
 } mram_info_t;
 #define MRAM_INFO_ADDR(mram_offset) (ALIGN_DPU(mram_offset))
-#define MRAM_INFO_READ(mram_info, mram_offset) do { mram_read16(MRAM_INFO_ADDR(mram_offset), mram_info); } while (0)
-_Static_assert(sizeof(mram_info_t) == 16 ,"mram_info_t size changed (make sure that MRAM_INFO_READ changed as well)");
+#define MRAM_INFO_READ(mram_info, mram_offset)                                                                                   \
+    do {                                                                                                                         \
+        mram_read16(MRAM_INFO_ADDR(mram_offset), mram_info);                                                                     \
+    } while (0)
+_Static_assert(sizeof(mram_info_t) == 16, "mram_info_t size changed (make sure that MRAM_INFO_READ changed as well)");
 
 /**
  * @brief Coordonates of the read that matched in the reference genome.
  */
 typedef struct {
-        union {
-                uint64_t coord;
-                struct {
-                        uint32_t seed_nr;
-                        uint32_t seq_nr;
-                };
+    union {
+        uint64_t coord;
+        struct {
+            uint32_t seed_nr;
+            uint32_t seq_nr;
         };
+    };
 } dpu_result_coord_t;
 
 /**
@@ -59,9 +63,9 @@ typedef struct {
  * @var coord Coordinate of the read that matched in the reference genome.
  */
 typedef struct {
-        int32_t num;
-        uint32_t score;
-        dpu_result_coord_t coord;
+    int32_t num;
+    uint32_t score;
+    dpu_result_coord_t coord;
 } dpu_result_out_t;
 #define DPU_RESULT_VAR m_dpu_result
 
@@ -69,19 +73,18 @@ typedef struct {
  * @brief stats reported by every tasklet
  */
 typedef struct {
-        uint32_t nb_reqs;
-        uint32_t nb_nodp_calls;
-        uint32_t nb_odpd_calls;
-        uint32_t nb_results;
-        uint32_t mram_data_load;
-        uint32_t mram_result_store;
-        uint32_t mram_load;
-        uint32_t mram_store;
-        uint64_t nodp_time;
-        uint64_t odpd_time;
+    uint32_t nb_reqs;
+    uint32_t nb_nodp_calls;
+    uint32_t nb_odpd_calls;
+    uint32_t nb_results;
+    uint32_t mram_data_load;
+    uint32_t mram_result_store;
+    uint32_t mram_load;
+    uint32_t mram_store;
+    uint64_t nodp_time;
+    uint64_t odpd_time;
 } dpu_tasklet_stats_t;
 #define DPU_TASKET_STATS_VAR m_dpu_tasklet_stats
-
 
 typedef uint64_t dpu_compute_time_t;
 #define DPU_COMPUTE_TIME_VAR m_dpu_compute_time
@@ -93,8 +96,8 @@ typedef uint64_t dpu_compute_time_t;
  * @brief Information on the requests reads to a DPU.
  */
 typedef struct {
-        uint32_t nb_reads;
-        uint32_t magic;
+    uint32_t nb_reads;
+    uint32_t magic;
 } request_info_t;
 
 #define DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) (ALIGN_DPU(DPU_INPUTS_ADDR(mram_offset) + (mram_info)->total_nbr_size))
@@ -109,13 +112,13 @@ typedef struct {
  * @var num     A reference number to the original request.
  */
 typedef struct {
-        uint32_t offset;
-        uint32_t count;
-        uint32_t num;
+    uint32_t offset;
+    uint32_t count;
+    uint32_t num;
 } dpu_request_t;
 
-#define DPU_REQUEST_ADDR(mram_info, mram_offset)                        \
-        (ALIGN_DPU(DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) + sizeof(request_info_t)))
+#define DPU_REQUEST_ADDR(mram_info, mram_offset)                                                                                 \
+    (ALIGN_DPU(DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) + sizeof(request_info_t)))
 #define DPU_REQUEST_SIZE(size_nbr) (ALIGN_DPU(sizeof(dpu_request_t) + (size_nbr)))
 
 #endif /* __COMMON_H__ */

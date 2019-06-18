@@ -20,10 +20,10 @@
  * @var next     Needed to have a linked-list of index.
  */
 typedef struct index_seed {
-        uint32_t nb_nbr;
-        uint32_t offset;
-        uint32_t num_dpu;
-        struct index_seed *next;
+    uint32_t nb_nbr;
+    uint32_t offset;
+    uint32_t num_dpu;
+    struct index_seed *next;
 } index_seed_t;
 
 /**
@@ -40,11 +40,12 @@ void save_index_seeds(index_seed_t **index_seed);
  */
 index_seed_t **load_index_seeds();
 
-#include "upvc.h"
-#include "genome.h"
 #include "dispatch.h"
 #include "dpus_mgmt.h"
+#include "genome.h"
+#include "upvc.h"
 #include "vmi.h"
+
 #include "backends_functions.h"
 
 /**
@@ -57,10 +58,7 @@ index_seed_t **load_index_seeds();
  *
  * @return The Table of list of index created.
  */
-index_seed_t **index_genome(genome_t *ref_genome,
-                            int nb_dpu,
-                            times_ctx_t *times_ctx,
-                            reads_info_t *reads_info);
+index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times_ctx, reads_info_t *reads_info);
 
 /**
  * @brief Free the table of linked-list of index.

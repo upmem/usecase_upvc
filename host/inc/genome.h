@@ -21,13 +21,13 @@
  * @var fasta_file_name  Name of the original file.
  */
 typedef struct {
-        int8_t *data;
-        uint32_t nb_seq;
-        uint64_t pt_seq[MAX_SEQ_GEN];
-        uint64_t len_seq[MAX_SEQ_GEN];
-        uint64_t fasta_file_size;
-        char *seq_name[MAX_SEQ_GEN];
-        char *fasta_file_name;
+    int8_t *data;
+    uint32_t nb_seq;
+    uint64_t pt_seq[MAX_SEQ_GEN];
+    uint64_t len_seq[MAX_SEQ_GEN];
+    uint64_t fasta_file_size;
+    char *seq_name[MAX_SEQ_GEN];
+    char *fasta_file_name;
 } genome_t;
 
 #include "upvc.h"
@@ -40,7 +40,7 @@ typedef struct {
  *
  * @return The structure holding the informatino on the reference genome.
  */
-genome_t *get_genome(char* filename_prefix, times_ctx_t *times_ctx);
+genome_t *get_genome(char *filename_prefix, times_ctx_t *times_ctx);
 
 /**
  * @brief Free a "genome_t" structure.

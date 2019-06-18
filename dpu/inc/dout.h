@@ -25,10 +25,16 @@
 
 #define MAX_LOCAL_RESULTS_PER_READ 32
 #define LOCAL_RESULTS_PAGE_SIZE (MAX_LOCAL_RESULTS_PER_READ * sizeof(dpu_result_out_t))
-#define LOCAL_RESULTS_PAGE_READ(addr, val) do { mram_read512(addr, val); } while(0)
-#define LOCAL_RESULTS_PAGE_WRITE(res, addr) do { mram_write512(res, addr); } while(0)
+#define LOCAL_RESULTS_PAGE_READ(addr, val)                                                                                       \
+    do {                                                                                                                         \
+        mram_read512(addr, val);                                                                                                 \
+    } while (0)
+#define LOCAL_RESULTS_PAGE_WRITE(res, addr)                                                                                      \
+    do {                                                                                                                         \
+        mram_write512(res, addr);                                                                                                \
+    } while (0)
 _Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
-               "LOCAL_RESULTS_PAGE_SIZE changed (make sure that LOCAL_RESULTS_PAGE_READ/WRITE changed as well)");
+    "LOCAL_RESULTS_PAGE_SIZE changed (make sure that LOCAL_RESULTS_PAGE_READ/WRITE changed as well)");
 
 /**
  * @brief The results produces by one tasklet when processing one read.
@@ -40,11 +46,11 @@ _Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
  * @var nb_page_out    Number of pages of MAX_LOCAL_RESULTS_PER_READ put into the swap area.
  */
 typedef struct {
-        __attribute__((aligned(8))) dpu_result_out_t outs[MAX_LOCAL_RESULTS_PER_READ];
-        unsigned int nb_results;
-        mram_addr_t mram_base;
-        unsigned int nb_cached_out;
-        unsigned int nb_page_out;
+    __attribute__((aligned(8))) dpu_result_out_t outs[MAX_LOCAL_RESULTS_PER_READ];
+    unsigned int nb_results;
+    mram_addr_t mram_base;
+    unsigned int nb_cached_out;
+    unsigned int nb_page_out;
 } dout_t;
 
 /**

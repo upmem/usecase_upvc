@@ -5,8 +5,8 @@
 #ifndef __COMPARE_H__
 #define __COMPARE_H__
 
-#include <stdint.h>
 #include "upvc.h"
+#include <stdint.h>
 
 /**
  * @brief Structure to store the backtrack to be used after DPD algorithm.
@@ -16,9 +16,9 @@
  * @var jx    Y axis index of the path.
  */
 typedef struct {
-        int type;
-        int ix;
-        int jx;
+    int type;
+    int ix;
+    int jx;
 } backtrack_t;
 
 /**

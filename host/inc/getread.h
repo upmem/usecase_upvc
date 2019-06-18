@@ -5,9 +5,9 @@
 #ifndef __GETREAD_H__
 #define __GETREAD_H__
 
+#include "upvc.h"
 #include <stdint.h>
 #include <stdio.h>
-#include "upvc.h"
 
 /**
  * @brief Fill "reads_buffer" with pairs of read.
@@ -29,6 +29,6 @@ int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_c
  *
  * @return The size of one read.
  */
-int  get_read_size(char *input_pe1_file);
+int get_read_size(char *input_pe1_file);
 
 #endif /* __GETREAD_H__ */

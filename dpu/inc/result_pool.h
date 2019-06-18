@@ -5,8 +5,8 @@
 #ifndef __RESULT_POOL_H__
 #define __RESULT_POOL_H__
 
-#include "dout.h"
 #include "common.h"
+#include "dout.h"
 
 /**
  * @brief Pushes a bunch of results.

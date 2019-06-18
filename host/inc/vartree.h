@@ -10,20 +10,20 @@
 #include <stdint.h>
 
 typedef struct variant {
-        char* chr;
-        uint64_t offset;
-        int64_t pos;
-        char ref[MAX_SIZE_ALLELE];
-        char alt[MAX_SIZE_ALLELE];
-        int depth;
+    char *chr;
+    uint64_t offset;
+    int64_t pos;
+    char ref[MAX_SIZE_ALLELE];
+    char alt[MAX_SIZE_ALLELE];
+    int depth;
 } variant_t;
 
 typedef struct variant_tree {
-        int64_t pos;
-        variant_t* vars;
-        struct variant_tree* right;
-        struct variant_tree* left;
-        int height;
+    int64_t pos;
+    variant_t *vars;
+    struct variant_tree *right;
+    struct variant_tree *left;
+    int height;
 } variant_tree_t;
 
 /**
@@ -32,7 +32,7 @@ typedef struct variant_tree {
  * @param variant_list  List (tree) of result variant.
  * @param var           Variant to be added in the list.
  */
-void insert_variants(variant_tree_t **variant_list, variant_t* var);
+void insert_variants(variant_tree_t **variant_list, variant_t *var);
 
 /**
  * @brief Free all the variant in the list.

@@ -8,9 +8,9 @@
 #include <dpu.h>
 #include <dpu_log.h>
 
+#include "dispatch.h"
 #include "parse_args.h"
 #include "upvc.h"
-#include "dispatch.h"
 
 #include "common.h"
 
@@ -18,16 +18,16 @@
  * @brief General structure describing the DPUs involved in a run.
  */
 typedef struct {
-        unsigned int nb_dpus_per_rank;
-        unsigned int nb_ranks_per_run;
-        struct dpu_rank_t **ranks;
-        unsigned int nb_dpus;
-        struct dpu_t **dpus;
-        mram_info_t *mram_info;
-        pthread_mutex_t log_mutex;
-        FILE *log_file;
-        mram_addr_t mram_compute_time_addr, mram_result_addr, mram_tasklet_stats_addr, mram_available_addr;
-        mram_size_t mram_compute_time_size, mram_result_size;
+    unsigned int nb_dpus_per_rank;
+    unsigned int nb_ranks_per_run;
+    struct dpu_rank_t **ranks;
+    unsigned int nb_dpus;
+    struct dpu_t **dpus;
+    mram_info_t *mram_info;
+    pthread_mutex_t log_mutex;
+    FILE *log_file;
+    mram_addr_t mram_compute_time_addr, mram_result_addr, mram_tasklet_stats_addr, mram_available_addr;
+    mram_size_t mram_compute_time_size, mram_result_size;
 } devices_t;
 
 /**
@@ -56,9 +56,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program);
  * @param devices      Available devices.
  * @param mram         The mram content.
  */
-void dpu_try_write_mram(unsigned int rank_id,
-                        devices_t *devices,
-                        mram_info_t **mram);
+void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, mram_info_t **mram);
 
 /**
  * @brief Frees the allocated DPUs.
@@ -97,11 +95,8 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices);
  * @param dispatch    The structure containing the dispatching of the reads into the DPUs.
  * @param reads_info  Information on the size of the seed and the neighbour.
  */
-void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
-                                      unsigned int dpu_offset,
-                                      devices_t *devices,
-                                      dispatch_request_t *dispatch,
-                                      reads_info_t *reads_info);
+void dpu_try_write_dispatch_into_mram(
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch, reads_info_t *reads_info);
 
 /**
  * @brief Reads the result area of a DPU, raises an exception if something went wrong with the DPU.
@@ -112,7 +107,8 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id,
  * @param devices  List of available devices.
  * @param result_buffer The table of DPU results to store the results (last one having a request number equal to -1).
  */
-void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
+void dpu_try_get_results_and_log(
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
 
 /**
  * @brief Makes a snapshot of an MRAM into a given file.

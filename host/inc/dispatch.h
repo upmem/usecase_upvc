@@ -14,14 +14,15 @@
  * @var reads     A table of nb_reads requests. Since the read size is not fixed, the table is a raw byte stream.
  */
 typedef struct {
-        uint32_t nb_reads;
-        int8_t *reads_area;
+    uint32_t nb_reads;
+    int8_t *reads_area;
 } dispatch_request_t;
 
+#include "dpus_mgmt.h"
+#include "index.h"
 #include "upvc.h"
 #include "vmi.h"
-#include "index.h"
-#include "dpus_mgmt.h"
+
 #include "backends_functions.h"
 
 /**
@@ -37,13 +38,8 @@ typedef struct {
  *
  * @return The dispatcher result.
  */
-void dispatch_read(index_seed_t **index_seed,
-                   int8_t *read_buffer,
-                   int nb_read,
-                   dispatch_request_t *dispatch_requests,
-                   times_ctx_t *times_ctx,
-                   reads_info_t *reads_info,
-                   backends_functions_t *backends_functions);
+void dispatch_read(index_seed_t **index_seed, int8_t *read_buffer, int nb_read, dispatch_request_t *dispatch_requests,
+    times_ctx_t *times_ctx, reads_info_t *reads_info, backends_functions_t *backends_functions);
 
 /**
  * @brief Create a table of requests to be filled with dispatch_read

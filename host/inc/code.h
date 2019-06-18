@@ -5,8 +5,8 @@
 #ifndef __CODE_H__
 #define __CODE_H__
 
-#include <stdint.h>
 #include "upvc.h"
+#include <stdint.h>
 
 /**
  * @brief Compute the code of a seed of size SIZE_SEED.

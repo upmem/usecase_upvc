@@ -5,9 +5,9 @@
 #ifndef __UPVC_DPU_H__
 #define __UPVC_DPU_H__
 
-#include <stdio.h>
-#include <stdint.h>
 #include "upvc.h"
+#include <stdint.h>
+#include <stdio.h>
 
 #include "common.h"
 
@@ -21,11 +21,11 @@
  * @var num                  datas : reads id
  */
 typedef struct {
-        int8_t *neighbour_idx;
-        int8_t *neighbour_read;
-        int *offset;
-        int *count;
-        int *num;
+    int8_t *neighbour_idx;
+    int8_t *neighbour_read;
+    int *offset;
+    int *count;
+    int *num;
 } mem_dpu_t;
 
 /**
@@ -68,18 +68,19 @@ void free_dpu_res(int nb_dpu);
 /**
  * @brief Write information of the DPU memory.
  */
-void write_neighbours_and_coordinates(int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord, reads_info_t *reads_info);
-void write_neighbour_read (int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info);
-void write_count          (int num_dpu, int read_idx, int value);
-void write_offset         (int num_dpu, int read_idx, int value);
-void write_num            (int num_dpu, int read_idx, int value);
+void write_neighbours_and_coordinates(
+    int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord, reads_info_t *reads_info);
+void write_neighbour_read(int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info);
+void write_count(int num_dpu, int read_idx, int value);
+void write_offset(int num_dpu, int read_idx, int value);
+void write_num(int num_dpu, int read_idx, int value);
 
 /**
  * @brief Read information of the DPU memory.
  */
-int read_out_num          (int num_dpu, int align_idx);
-int read_out_score        (int num_dpu, int align_idx);
-dpu_result_coord_t read_out_coord       (int num_dpu, int align_idx);
+int read_out_num(int num_dpu, int align_idx);
+int read_out_score(int num_dpu, int align_idx);
+dpu_result_coord_t read_out_coord(int num_dpu, int align_idx);
 
 /**
  * @brief Print information of the DPU memory.
