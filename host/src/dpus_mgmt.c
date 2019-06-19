@@ -48,8 +48,17 @@ void setup_dpus_for_target_type(target_type_t target_type)
 devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_program)
 {
     dpu_api_status_t status;
+    uint32_t nb_dpus;
     devices_t *devices = (devices_t *)malloc(sizeof(devices_t));
     assert(devices != NULL);
+
+    status = dpu_alloc_dpus(&param, nb_dpus_per_run, &devices->ranks, &devices->nb_ranks_per_run, &nb_dpus);
+    assert(status == DPU_API_SUCCESS && "dpu_alloc_dpus failed");
+
+    if (nb_dpus_per_run == DPU_ALLOCATE_ALL)
+        nb_dpus_per_run = nb_dpus;
+    else if (nb_dpus < nb_dpus_per_run)
+        ERROR_EXIT(5, "Only %u dpus available for %u requested\n", nb_dpus, nb_dpus_per_run);
 
     devices->nb_dpus = nb_dpus_per_run;
     status = dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank));
@@ -65,12 +74,8 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
         ERROR_EXIT(5, "*** number of DPUs per run is not a multiple of the DPUs in a rank - aborting");
     }
     devices->nb_ranks_per_run = nb_dpus_per_run / devices->nb_dpus_per_rank;
-    devices->ranks = (struct dpu_rank_t **)calloc(devices->nb_ranks_per_run, sizeof(struct dpu_rank_t *));
-    assert(devices->ranks != NULL);
 
     for (unsigned int each_rank = 0, each_dpu = 0; each_dpu < nb_dpus_per_run; each_rank++) {
-        status = dpu_alloc(&param, &(devices->ranks[each_rank]));
-        assert(status == DPU_API_SUCCESS && "dpu_alloc failed");
         struct dpu_t *each_dpu_ptr;
         DPU_FOREACH(devices->ranks[each_rank], each_dpu_ptr)
         {

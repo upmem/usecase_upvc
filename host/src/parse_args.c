@@ -11,6 +11,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "dpu.h"
+
 #include "parse_args.h"
 #include "upvc.h"
 
@@ -24,7 +26,7 @@ static bool simulation_mode = false;
 static target_type_t target_type = target_type_unknown;
 static goal_t goal = goal_unknown;
 static nb_dpu_t nb_dpu = nb_dpu_unknown;
-static unsigned int nb_dpus_per_run = 0;
+static unsigned int nb_dpus_per_run = DPU_ALLOCATE_ALL;
 
 /**************************************************************************************/
 /**************************************************************************************/
@@ -38,6 +40,7 @@ static void usage()
         "\t-g\tGoal of the run - values=index|check|map\n"
         "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
         "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for hsim, 8 or more for fpga)\n"
+        "\t  \tdefault: use all dpus available (1 for hsim)"
         "\t-t\tTarget type - values=hsim|fpga\n"
         "\t-b\tDPU binary to use\n",
         prog_name);
@@ -45,14 +48,17 @@ static void usage()
 
 static void check_args()
 {
+    if (simulation_mode && target_type == target_type_hsim && nb_dpus_per_run == DPU_ALLOCATE_ALL)
+        nb_dpus_per_run = 1;
     if (prog_name == NULL || input_path == NULL || input_fasta == NULL || input_pe1 == NULL || input_pe2 == NULL
         || goal == goal_unknown) {
         ERROR("missing option");
         usage();
-    } else if (simulation_mode && (target_type != target_type_unknown || nb_dpus_per_run != 0 || dpu_binary != NULL)) {
+    } else if (simulation_mode
+        && (target_type != target_type_unknown || nb_dpus_per_run != DPU_ALLOCATE_ALL || dpu_binary != NULL)) {
         ERROR("simulation mode is not compatible with -n -t -g and -b option");
         usage();
-    } else if (!simulation_mode && (dpu_binary == NULL || nb_dpus_per_run == 0 || target_type == target_type_unknown)) {
+    } else if (!simulation_mode && (dpu_binary == NULL || target_type == target_type_unknown)) {
         ERROR("missing option");
         usage();
     }
@@ -160,7 +166,7 @@ goal_t get_goal() { return goal; }
 /**************************************************************************************/
 static void validate_nb_dpus_per_run(const char *nb_dpus_per_run_str)
 {
-    if (nb_dpus_per_run != 0) {
+    if (nb_dpus_per_run != DPU_ALLOCATE_ALL) {
         ERROR("number of DPUs per run option has been entered more than once");
         usage();
     }

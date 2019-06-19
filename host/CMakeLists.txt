@@ -16,15 +16,19 @@ target_link_libraries(upvc dpu pthread)
 
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 
-if(NOT NB_DPU)
-        set(NB_DPU "2")
-endif()
-
 if(NOT DPU_TARGET)
         set(DPU_TARGET "hsim")
+        if(NOT NB_DPU)
+                set(NB_DPU "2")
+        endif()
 endif()
 
-add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map -n ${NB_DPU} -t ${DPU_TARGET} -b ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu_task
+set(NB_DPU_MARK)
+if (NB_DPU)
+        set(NB_DPU_MARK "-n")
+endif()
+
+add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU} -t ${DPU_TARGET} -b ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu_task
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
