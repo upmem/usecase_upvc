@@ -56,7 +56,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     assert(status == DPU_API_SUCCESS && "dpu_alloc_dpus failed");
 
     if (nb_dpus_per_run == DPU_ALLOCATE_ALL)
-        nb_dpus_per_run = nb_dpus;
+        set_nb_dpus_per_run(nb_dpus_per_run = nb_dpus);
     else if (nb_dpus < nb_dpus_per_run)
         ERROR_EXIT(5, "Only %u dpus available for %u requested\n", nb_dpus, nb_dpus_per_run);
 
