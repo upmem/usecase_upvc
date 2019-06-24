@@ -45,12 +45,74 @@ void setup_dpus_for_target_type(target_type_t target_type)
     }
 }
 
+#include <gelf.h>
+typedef struct _elf_fd {
+    int fd;
+    Elf *elf;
+    Elf_Kind ek;
+    size_t shnum;
+    size_t shstrndx;
+    size_t phnum;
+    unsigned int symtab_index;
+    unsigned int strtab_index;
+    /* Preload the symbol maps, so that we do not need to browse all the symbols each time. The table is indexed
+     * by section number. */
+    dpuelf_symbols_t *symbol_maps;
+} *elf_fd;
+
+static dpuelf_status_t fetch_content(elf_fd info, GElf_Phdr *phdr, uint8_t **content) {
+    dpuelf_status_t status;
+
+    if ((*content = calloc(1, phdr->p_memsz)) == NULL) {
+        status = DPUELF_INTERNAL_ERROR;
+        goto end;
+    }
+
+    char *raw_ptr;
+    size_t size;
+    if ((raw_ptr = elf_rawfile(info->elf, &size)) == NULL) {
+        status = DPUELF_INTERNAL_ERROR;
+        goto free_content;
+    }
+
+    memcpy(*content, raw_ptr + phdr->p_offset, phdr->p_filesz);
+
+    return DPUELF_STATUS_OK;
+
+    free_content:
+    free(*content);
+    end:
+    return status;
+}
+
+static uint32_t g_addr_program;
+static uint32_t g_size_program;
+static uint8_t *g_content_program;
 devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_program)
 {
     dpu_api_status_t status;
     uint32_t nb_dpus;
     devices_t *devices = (devices_t *)malloc(sizeof(devices_t));
     assert(devices != NULL);
+
+    elf_fd elf_info;
+    struct dpu_runtime_context_t *runtime_context = malloc(sizeof(struct dpu_runtime_context_t));
+    runtime_context->reference_count = 0;
+    dpu_extract_information_from_elf_file((void **)&elf_info, opt_program, runtime_context);
+    size_t phdrnum = elf_info->phnum;
+    for (unsigned int each_phdr = 0; each_phdr < phdrnum; ++each_phdr) {
+        GElf_Phdr phdr;
+        if (gelf_getphdr((elf_info)->elf, each_phdr, &phdr) != &phdr) {
+            status = DPU_API_ELF_ERROR;
+            ERROR_EXIT(5, "problem");
+        }
+
+        if (phdr.p_type == PT_LOAD && (phdr.p_vaddr & 0x80000000)) {
+            g_addr_program = (phdr.p_vaddr & (~0x80000000) ) >> 3;
+            g_size_program = phdr.p_memsz >> 3;
+            fetch_content(elf_info, &phdr, &g_content_program);
+        }
+    }
 
     status = dpu_alloc_dpus(&param, nb_dpus_per_run, &devices->ranks, &devices->nb_ranks_per_run, &nb_dpus);
     assert(status == DPU_API_SUCCESS && "dpu_alloc_dpus failed");
@@ -164,6 +226,9 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
             ERROR_EXIT(11, "*** could not get DPU %u status %u - aborting", each_dpu, run_status[each_dpu]);
         }
     }
+
+    status = dpu_copy_to_iram_for_rank(
+        devices->ranks[rank_id], g_addr_program, (const dpuinstruction_t *)g_content_program, (iram_size_t)g_size_program);
     return (nb_dpus_running == 0);
 }
 

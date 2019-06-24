@@ -12,7 +12,7 @@ file(GLOB_RECURSE SOURCES src/*.c)
 add_executable(upvc ${SOURCES})
 
 target_include_directories(upvc PUBLIC ${UPMEM_HOME}/usr/share/upmem/include/host inc/ ../common/inc/)
-target_link_libraries(upvc dpu pthread)
+target_link_libraries(upvc dpu pthread elf)
 
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 
