@@ -8,7 +8,7 @@
 #include <semaphore.h>
 
 /**
- * @brief Specific function whether the application run on simulation or on DPU (hsim of fpga).
+ * @brief Specific function whether the application run on simulation or on DPU (fsim of fpga).
  */
 typedef struct backends_functions_struct {
     void (*run_dpu)(dispatch_request_t *, devices_t *, unsigned int, unsigned int, unsigned int, sem_t *, sem_t *, times_ctx_t *,

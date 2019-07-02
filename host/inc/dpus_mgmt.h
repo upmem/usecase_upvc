@@ -33,7 +33,7 @@ typedef struct {
 /**
  * @brief Preliminary setup operation that defines the profile of allocated DPUs according to the target type.
  *
- * @param target_type  The type of targeted DPUs (hsim or fpga).
+ * @param target_type  The type of targeted DPUs (fsim or fpga).
  */
 void setup_dpus_for_target_type(target_type_t target_type);
 

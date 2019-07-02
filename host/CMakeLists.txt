@@ -17,7 +17,7 @@ target_link_libraries(upvc dpu pthread)
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 
 if(NOT DPU_TARGET)
-        set(DPU_TARGET "hsim")
+        set(DPU_TARGET "fsim")
         if(NOT NB_DPU)
                 set(NB_DPU "2")
         endif()

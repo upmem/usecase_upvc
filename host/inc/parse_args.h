@@ -7,7 +7,7 @@
 
 #include <stdbool.h>
 
-typedef enum { target_type_unknown, target_type_hsim, target_type_fpga } target_type_t;
+typedef enum { target_type_unknown, target_type_fsim, target_type_fpga } target_type_t;
 typedef enum { goal_unknown, goal_index, goal_check, goal_map } goal_t;
 typedef enum { nb_dpu_unknown, nb_dpu_128 = 128, nb_dpu_256 = 256, nb_dpu_2048 = 2048, nb_dpu_4096 = 4096 } nb_dpu_t;
 
