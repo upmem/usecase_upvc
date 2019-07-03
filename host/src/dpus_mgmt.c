@@ -77,8 +77,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
 
     for (unsigned int each_rank = 0, each_dpu = 0; each_dpu < nb_dpus_per_run; each_rank++) {
         struct dpu_t *each_dpu_ptr;
-        DPU_FOREACH(devices->ranks[each_rank], each_dpu_ptr)
-        {
+        DPU_FOREACH (devices->ranks[each_rank], each_dpu_ptr) {
             devices->dpus[each_dpu] = each_dpu_ptr;
             each_dpu++;
         }
