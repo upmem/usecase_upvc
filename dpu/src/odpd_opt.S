@@ -18,23 +18,22 @@
 #define p1off       (  8*4 )
 #define q1off       ( 10*4 )
 
-#define s1          %r0
-#define s2          %r1
-#define mxScore     %r2
-#define len         %r3
-#define me          %r4
-#define matrix      %r4
-#define mpp         %r5
-#define mlp         %r6
-#define i           %r7
-#define j           %r8
-#define cost        %r9
-#define v99         %r10
-#define v1          %r11
-#define QP          %r17
-#define t0          %r18
-#define t1          %r19
-#define mnScore     %r21
+#define mnScore     r0
+#define s1          r4
+#define s2          r1
+#define mxScore     r2
+#define len         r3
+#define matrix      r5
+#define mpp         r6
+#define mlp         r7
+#define i           r8
+#define j           r9
+#define cost        r10
+#define v99         r11
+#define v1          r12
+#define QP          r13
+#define t0          r14
+#define t1          r15
 
 .text
 
@@ -47,20 +46,14 @@
 //  - r1 = uint8_t *s2
 //  - r2 = int max_score
 //  - r3 = unsigned int nbr_sym_len
-//  - r4 = tasklet id
 
 odpd:
-save_registers:
-    sd         %r22,    +0,      %d0
-    sd         %r22,    +8,      %d4
-    sd         %r22,    +16,     %d6
-    sd         %r22,    +24,     %d8
-    sd         %r22,    +32,     %d10
-
+    sd         r22,     0,       d14
+    move       s1,      r0
 get_tasklet_matrix:                                                 // matrix = __M + 8 * tid * 3 * (len + 2)
     move       t0,      +3                                          // Number of buffers (P, Q & D) = 3
     add        t1,      len,     +2                                 // local matrix depth (len + 2)
-    mul_ul_ul  t0,      t0,      me                                 // 3 * tid
+    mul_ul_ul  t0,      id,      t0                                 // 3 * tid
     mul_ul_ul  t0,      t0,      t1                                 // 3 * tid * (len + 2)
     lsl        t0,      t0,      +3                                 // 3 * tid * (len + 2) * 8
     lw         matrix,  %zero,   __M                                // load __M
@@ -332,9 +325,5 @@ phase4_jnext:
     jleu       j,       len,     phase4_jloop                       // Next iteration
 
 restore_registers:
-    ld         %d0,     %r22,    +0
-    ld         %d4,     %r22,    +8
-    ld         %d6,     %r22,    +16
-    ld         %d8,     %r22,    +24
-    ld         %d10,    %r22,    +32
-    jump       %r23
+    ld         d14,     r22,     0
+    jump       r23

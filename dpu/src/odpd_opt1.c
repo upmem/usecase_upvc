@@ -37,7 +37,7 @@ static inline int *get_matrix_for_tasklet(unsigned int tid, unsigned int nbr_sym
 #define p1off 8
 #define q1off 10
 
-int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len, unsigned int tid)
+int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len)
 {
     /* Loop variables */
     int *_M = get_matrix_for_tasklet(tid, nbr_sym_len);
@@ -46,6 +46,7 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
     /* local variables */
     int cost;
     unsigned int d, QP;
+    unsigned int tid = me();
 
     cost = 0;
     for (_Mpp = _M, _Mlp = _M + (NB_DIAGS / 2 + 1) * LINE_SIZE; _Mpp <= _Mlp; _Mpp += LINE_SIZE) {

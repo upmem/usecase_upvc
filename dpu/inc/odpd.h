@@ -25,10 +25,9 @@ void odpd_init(unsigned int nb_tasklets, unsigned int nbr_sym_len);
  * @param s2           The second vector
  * @param max_score    Any score above this threshold is good
  * @param nbr_sym_len  The number of symbols in s1 and s2
- * @param tid          Sysname of the invoking tasklet
  * @return A score
  */
-int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len, unsigned int tid);
+int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len);
 
 #define NB_ITEMS_PER_MATRIX(nbr_sym_len) ((nbr_sym_len + 2) << 1)
 #define SIZEOF_MATRIX(nbr_sym_len) (NB_ITEMS_PER_MATRIX(nbr_sym_len) << 2)

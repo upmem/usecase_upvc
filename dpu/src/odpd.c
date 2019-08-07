@@ -60,11 +60,12 @@ static inline int *_at(int *M, int x, int y, int nbr_sym_len)
 #define P(x, y) *_at(_P, x, y, nbr_sym_len)
 #define Q(x, y) *_at(_Q, x, y, nbr_sym_len)
 
-int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len, unsigned int tid)
+int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len)
 {
     int *_D = get_matrix_for_tasklet(__D, tid, nbr_sym_len);
     int *_P = get_matrix_for_tasklet(__P, tid, nbr_sym_len);
     int *_Q = get_matrix_for_tasklet(__Q, tid, nbr_sym_len);
+    unsigned int tid = me();
 
     int i, j, d, lp, pp, QP, min_score;
 

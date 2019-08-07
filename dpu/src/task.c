@@ -138,7 +138,7 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, uint8_t *cached_
         STATS_GET_START_TIME(start, acc, end);
 
         score_odpd = score
-            = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta), tasklet_id);
+            = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta));
 
         STATS_GET_END_TIME(end, acc);
         STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
