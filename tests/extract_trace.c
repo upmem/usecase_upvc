@@ -7,7 +7,7 @@
 #define NB_THREAD (16)
 #define MAX_STRING_SIZE (512)
 #define MAX_BLOB_SIZE (1000000)
-#define PC_FORMAT ("  PC=0x%x TID=%u\n")
+#define PC_FORMAT ("  PC=0x%x(%u) TID=%u CYCLE=%u\n")
 #define EXPECTED_MATCH_PC (2)
 #define CALL_FORMAT ("\tcall 0x%x\n")
 #define EXPECTED_MATCH_CALL (1)
@@ -20,10 +20,11 @@ static bool goto_thread_info(char *str, unsigned int thread_id, FILE *input_fp)
                 int nb_match;
                 unsigned int pc_addr;
                 unsigned int tid;
+                __attribute__((unused)) unsigned int unused1, unused2;
                 if (fgets(str, MAX_STRING_SIZE, input_fp) == NULL) {
                         return false;
                 }
-                nb_match = sscanf(str, PC_FORMAT, &pc_addr, &tid);
+                nb_match = sscanf(str, PC_FORMAT, &pc_addr, &unused1, &tid, &unused2);
                 if (nb_match == EXPECTED_MATCH_PC && tid == thread_id) {
                         return true;
                 }
@@ -48,6 +49,7 @@ static bool save_thread_info(char *str,
                 int nb_match;
                 unsigned int pc_addr;
                 unsigned int tid;
+                __attribute__((unused)) unsigned int unused1, unused2;
                 if (fgets(str, MAX_STRING_SIZE, input_fp) == NULL) {
                         if (*contain_call) {
                                 fwrite(blob, sizeof(char), blob_size, output_fp);
@@ -55,7 +57,7 @@ static bool save_thread_info(char *str,
                         return false;
                 }
 
-                nb_match = sscanf(str, PC_FORMAT, &pc_addr, &tid);
+                nb_match = sscanf(str, PC_FORMAT, &pc_addr, &unused1, &tid, &unused2);
 
                 if (nb_match == EXPECTED_MATCH_PC && tid != thread_id) {
                         if (*contain_call) {
