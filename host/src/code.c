@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2019 - Dominique Lavenier & UPMEM
+ * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
 #include "upvc.h"

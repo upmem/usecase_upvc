@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+// Copyright 2016-2018 - Dominique Lavenier & UPMEM
 //
 
 #define NB_DIAGS    15

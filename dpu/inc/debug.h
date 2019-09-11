@@ -1,5 +1,5 @@
 /**
- * @Copyright (c) 2016-2018 - Dominique Lavenier & UPMEM
+ * Copyright 2016-2018 - Dominique Lavenier & UPMEM
  */
 
 #ifndef __INTEGRATION_DEBUG_H__
