@@ -41,3 +41,8 @@ Then run:
 ```
 
 Result are in ``<dataset_prefix>_upvc.vcf``
+
+Paper link
+----------
+
+https://drive.google.com/open?id=1NJYijXnVzEpsVQdHgtMZ7RoL4d_BW-CJ
