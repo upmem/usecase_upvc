@@ -1,4 +1,4 @@
-Common work Dominique Lavenier (INRIA) and uPmem.
+Common work Dominique Lavenier (INRIA) and UPMEM.
 =================================================
 
 Installation
