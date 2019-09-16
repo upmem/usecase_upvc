@@ -40,4 +40,4 @@ Then run:
 ./build/host/upvc -i <dataset_prefix> -g map -n <number_of_physical_dpus_available> -t <target=fsim|fpga> -b <dpu_binary>
 ```
 
-Result are in <dataset_prefix>_upvc.vcf
+Result are in ``<dataset_prefix>_upvc.vcf``
