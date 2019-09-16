@@ -5,10 +5,8 @@ Installation
 ------------
 
 ```
-cd <genomee>
-mkdir build
+cmake -B build
 cd build
-cmake ..
 make
 ```
 
@@ -23,7 +21,7 @@ make check
 Run on other dataset
 --------------------
 
-Data must consist of 3 files:
+Data-set must consist of 3 files:
   - ``<dataset_prefix>.fasta`` the reference genomee (or part of genomee)
   - ``<dataset_prefix>_PE1.fastq`` the PE1 of the input to compare to the reference
   - ``<dataset_prefix>_PE2.fastq`` the PE2 of the input to compare to the reference
