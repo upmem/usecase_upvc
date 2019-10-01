@@ -20,27 +20,21 @@
 
 /* #define LOG_DPUS */
 #ifdef LOG_DPUS
-static struct dpu_logging_config_t logging_config = { .source = PRINTF, .destination_directory_name = "." };
-#define p_logging_config &logging_config
 #define log_dpu(dpu, out) dpulog_read_for_dpu(dpu, out)
 #else
-#define p_logging_config NULL
-#define log_dpu(dpu, log)                                                                                                        \
-    do {                                                                                                                         \
-    } while (0)
+#define log_dpu(dpu, log)
 #endif /* LOG_DPUS */
 
-static struct dpu_param_t param
-    = { .type = FUNCTIONAL_SIMULATOR, .profile = "cycleAccurate=true", .on_boot = NULL, .logging_config = p_logging_config };
+static char *profile;
 
 void setup_dpus_for_target_type(target_type_t target_type)
 {
     switch (target_type) {
-    case target_type_fpga:
-        param.type = HW;
+    case target_type_hw:
+        profile = "backend=hw,cycleAccurate=true";
         break;
     default:
-        param.type = FUNCTIONAL_SIMULATOR;
+        profile = "backend=simulator";
         break;
     }
 }
@@ -52,7 +46,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     devices_t *devices = (devices_t *)malloc(sizeof(devices_t));
     assert(devices != NULL);
 
-    status = dpu_alloc_dpus(&param, nb_dpus_per_run, &devices->ranks, &devices->nb_ranks_per_run, &nb_dpus);
+    status = dpu_alloc_dpus(profile, nb_dpus_per_run, &devices->ranks, &devices->nb_ranks_per_run, &nb_dpus);
     assert(status == DPU_API_SUCCESS && "dpu_alloc_dpus failed");
 
     if (nb_dpus_per_run == DPU_ALLOCATE_ALL)
@@ -61,7 +55,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
         ERROR_EXIT(5, "Only %u dpus available for %u requested\n", nb_dpus, nb_dpus_per_run);
 
     devices->nb_dpus = nb_dpus_per_run;
-    status = dpu_get_nr_of_dpus_for(&param, &(devices->nb_dpus_per_rank));
+    status = dpu_get_nr_of_dpus_for(profile, &(devices->nb_dpus_per_rank));
     assert(status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_for failed");
 
     devices->dpus = (struct dpu_t **)calloc(nb_dpus_per_run, sizeof(struct dpu_t *));

@@ -23,7 +23,7 @@ target_link_libraries(upvc ${DPU_HOST_LIBRARIES} pthread)
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 
 if(NOT DPU_TARGET)
-        set(DPU_TARGET "fsim")
+        set(DPU_TARGET "simulator")
         if(NOT NB_DPU)
                 set(NB_DPU "2")
         endif()

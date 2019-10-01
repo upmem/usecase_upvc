@@ -41,14 +41,14 @@ static void usage()
         "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
         "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for fsim, 8 or more for fpga)\n"
         "\t  \tdefault: use all dpus available (1 for fsim)"
-        "\t-t\tTarget type - values=fsim|fpga\n"
+        "\t-t\tTarget type - values=simulator|hw\n"
         "\t-b\tDPU binary to use\n",
         prog_name);
 }
 
 static void check_args()
 {
-    if (simulation_mode && target_type == target_type_fsim && nb_dpus_per_run == DPU_ALLOCATE_ALL)
+    if (simulation_mode && target_type == target_type_simulator && nb_dpus_per_run == DPU_ALLOCATE_ALL)
         nb_dpus_per_run = 1;
     if (prog_name == NULL || input_path == NULL || input_fasta == NULL || input_pe1 == NULL || input_pe2 == NULL
         || goal == goal_unknown) {
@@ -129,10 +129,10 @@ static void validate_target_type(const char *target_type_str)
     if (target_type != target_type_unknown) {
         ERROR("target type option has been entered more than once");
         usage();
-    } else if (strcmp(target_type_str, "fpga") == 0) {
-        target_type = target_type_fpga;
-    } else if (strcmp(target_type_str, "fsim") == 0) {
-        target_type = target_type_fsim;
+    } else if (strcmp(target_type_str, "hw") == 0) {
+        target_type = target_type_hw;
+    } else if (strcmp(target_type_str, "simulator") == 0) {
+        target_type = target_type_simulator;
     } else {
         ERROR("unknown target type value");
         usage();
