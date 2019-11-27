@@ -8,14 +8,6 @@
 #include <stdint.h>
 
 /**
- * @brief Sets up an operating environment for the comparator to run on several tasklets in parallel.
- *
- * @param nb_tasklets  How many tasklets will work.
- * @param nbr_sym_len  Size of a neighbour, in number of symbols.
- */
-void odpd_init(unsigned int nb_tasklets, unsigned int nbr_sym_len);
-
-/**
  * @brief Compares two sequences of symbols to assign a score.
  *
  * Optimal Dynamic Programming Diagonal. The sequences are expressed a byte streams, i.e. 4
@@ -29,6 +21,7 @@ void odpd_init(unsigned int nb_tasklets, unsigned int nbr_sym_len);
  */
 int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_sym_len);
 
+#define NB_BYTES_TO_SYMS(len, delta) (((len) - (delta)) << 2)
 #define NB_ITEMS_PER_MATRIX(nbr_sym_len) ((nbr_sym_len + 2) << 1)
 #define SIZEOF_MATRIX(nbr_sym_len) (NB_ITEMS_PER_MATRIX(nbr_sym_len) << 2)
 

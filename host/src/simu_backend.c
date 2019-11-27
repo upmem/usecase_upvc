@@ -67,12 +67,12 @@
  * @brief Arguments needed for the thread that will be offload onto a DPU.
  */
 typedef struct align_on_dpu_arg {
-    reads_info_t reads_info;
     int numdpu;
     double nodp_time;
     double odpd_time;
     unsigned int nodp_call;
     unsigned int odpd_call;
+    int delta_neighbour;
 } align_on_dpu_arg_t;
 
 static int min(int a, int b) { return a < b ? a : b; }
@@ -96,10 +96,9 @@ static void ODPD_compute(
  * @brief Compute the alignment distance by dynamical programming on the diagonals of the matrix.
  * Stops when score is greater than max_score
  */
-static int ODPD(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
+static int ODPD(int8_t *s1, int8_t *s2, int max_score, int size_neighbour_in_symbols)
 {
-    int size_neighbour = reads_info->size_neighbour_in_32bits_words;
-    int matrix_size = size_neighbour + 1;
+    int matrix_size = size_neighbour_in_symbols + 1;
     int D[2][matrix_size];
     int P[2][matrix_size];
     int Q[2][matrix_size];
@@ -189,11 +188,10 @@ static int translation_table[256] = { 0, 10, 10, 10, 10, 20, 20, 20, 10, 20, 20,
  * @brief Optimized version of ODPD (if no INDELS)
  * If it detects INDELS, return -1. In this case we will need the run the full ODPD.
  */
-static int noDP(int8_t *s1, int8_t *s2, int max_score, reads_info_t *reads_info)
+static int noDP(int8_t *s1, int8_t *s2, int max_score, int delta_neighbour)
 {
     int score = 0;
-    int size_neighbour = reads_info->size_neighbour_in_bytes;
-    int delta_neighbour = reads_info->delta_neighbour_in_bytes;
+    int size_neighbour = SIZE_NEIGHBOUR_IN_BYTES;
     for (int i = 0; i < size_neighbour - delta_neighbour; i++) {
         int s_xor = ((int)(s1[i] ^ s2[i])) & 0xFF;
         int s_translated = translation_table[s_xor];
@@ -241,8 +239,9 @@ static void *align_on_dpu(void *arg)
     int nb_map = 0;
     align_on_dpu_arg_t *dpu_arg = (align_on_dpu_arg_t *)arg;
     int numdpu = dpu_arg->numdpu;
-    reads_info_t *reads_info = &(dpu_arg->reads_info);
-    int size_neighbour = reads_info->size_neighbour_in_bytes;
+    int delta_neighbour = dpu_arg->delta_neighbour;
+    int size_neighbour = SIZE_NEIGHBOUR_IN_BYTES;
+    int size_neighbour_in_symbols = SIZE_IN_SYMBOLS(delta_neighbour);
     int aligned_nbr_size = ALIGN_DPU(size_neighbour);
     int size_nbr_coord = aligned_nbr_size + sizeof(dpu_result_coord_t);
     mem_dpu_t *M = get_mem_dpu(numdpu);
@@ -257,19 +256,18 @@ static void *align_on_dpu(void *arg)
         int nb_map_start = nb_map;
         for (int nb_neighbour = 0; nb_neighbour < M->count[current_read]; nb_neighbour++) {
             dpu_result_coord_t curr_coord
-                = *((dpu_result_coord_t *)(&M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(mram_info_t)]));
-            int8_t *curr_nbr
-                = &M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(dpu_result_coord_t) + sizeof(mram_info_t)];
+                = *((dpu_result_coord_t *)(&M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord]));
+            int8_t *curr_nbr = &M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(dpu_result_coord_t)];
             int8_t *curr_read = &M->neighbour_read[current_read * size_neighbour];
 
             GET_TIME;
-            int score_noDP = noDP(curr_read, curr_nbr, min, reads_info);
+            int score_noDP = noDP(curr_read, curr_nbr, min, delta_neighbour);
             STORE_NODP_TIME;
 
             int score = score_noDP;
             if (score_noDP == -1) {
                 GET_TIME;
-                int score_ODPD = ODPD(curr_read, curr_nbr, min, reads_info);
+                int score_ODPD = ODPD(curr_read, curr_nbr, min, size_neighbour_in_symbols);
                 STORE_ODPD_TIME;
                 score = score_ODPD;
             }
@@ -297,19 +295,19 @@ static void *align_on_dpu(void *arg)
 }
 
 void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t *requests, int num_read, int nb_read_written,
-    index_seed_t *seed, int8_t *nbr, reads_info_t *reads_info)
+    index_seed_t *seed, int8_t *nbr)
 {
     write_count(seed->num_dpu, nb_read_written, seed->nb_nbr);
     write_offset(seed->num_dpu, nb_read_written, seed->offset);
     write_num(seed->num_dpu, nb_read_written, num_read);
     write_num(seed->num_dpu, nb_read_written + 1, -1);
-    write_neighbour_read(seed->num_dpu, nb_read_written, nbr, reads_info);
+    write_neighbour_read(seed->num_dpu, nb_read_written, nbr);
 }
 
 void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __attribute__((unused)) devices_t *devices,
     __attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
-    __attribute__((unused)) unsigned int nb_pass, sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx,
-    reads_info_t *reads_info)
+    __attribute__((unused)) unsigned int nb_pass, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
+    times_ctx_t *times_ctx)
 {
     double t1, t2;
     unsigned int nb_dpu = get_nb_dpu();
@@ -327,8 +325,8 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __
     sem_wait(acc_wait_sem);
 
     for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
-        thread_args[numdpu].reads_info = *reads_info;
         thread_args[numdpu].numdpu = numdpu;
+        thread_args[numdpu].delta_neighbour = delta_neighbour;
 #ifdef PRINT_NODP_ODPD_TIME
         thread_args[numdpu].nodp_time = 0.0;
         thread_args[numdpu].odpd_time = 0.0;
@@ -369,18 +367,18 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __
 
 void init_backend_simulation(unsigned int *nb_rank, __attribute__((unused)) devices_t **devices,
     __attribute__((unused)) unsigned int nb_dpu_per_run, __attribute__((unused)) const char *dpu_binary,
-    index_seed_t ***index_seed, reads_info_t *reads_info)
+    index_seed_t ***index_seed)
 {
     *index_seed = load_index_seeds();
     *nb_rank = 1;
 
-    malloc_dpu(reads_info, get_nb_dpu());
+    malloc_dpu(get_nb_dpu());
 }
 
 void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigned int nb_dpu) { free_dpu(nb_dpu); }
 
 void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned int rank_id,
-    __attribute__((unused)) devices_t *devices, __attribute__((unused)) reads_info_t *reads_info, times_ctx_t *times_ctx)
+    __attribute__((unused)) int delta_neighbour, __attribute__((unused)) devices_t *devices, times_ctx_t *times_ctx)
 {
     double t1, t2;
     mem_dpu_t *MDPU;
@@ -395,7 +393,7 @@ void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset, __att
 
     for (unsigned int each_dpu = first_dpu; each_dpu < nb_dpu; each_dpu++) {
         MDPU = get_mem_dpu(each_dpu);
-        mram_load((mram_info_t *)(MDPU->neighbour_idx), each_dpu);
+        mram_load((uint8_t *)(MDPU->neighbour_idx), each_dpu);
     }
 
     t2 = my_clock();

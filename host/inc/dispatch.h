@@ -33,21 +33,19 @@ typedef struct {
  * @param nb_read          Number of reads to dispatch.
  * @param dispatch_requests  Table of dispatch_request_t to store the dispatching between the DPUs.
  * @param times_ctx        Times information for the whole application.
- * @param reads_info       Information on the size of the seed and the neighbour.
  * @param backends_functions  Functions to be use by the dispatcher depending on the backend.
  *
  * @return The dispatcher result.
  */
 void dispatch_read(index_seed_t **index_seed, int8_t *read_buffer, int nb_read, dispatch_request_t *dispatch_requests,
-    times_ctx_t *times_ctx, reads_info_t *reads_info, backends_functions_t *backends_functions);
+    times_ctx_t *times_ctx, backends_functions_t *backends_functions);
 
 /**
  * @brief Create a table of requests to be filled with dispatch_read
  *
  * @param nb_dpu      Number of DPUs on which to dispatch the reads.
- * @param reads_info  Information on the size of the seed and the neighbour.
  */
-dispatch_request_t *dispatch_create(unsigned int nb_dpu, reads_info_t *reads_info);
+dispatch_request_t *dispatch_create(unsigned int nb_dpu);
 
 /**
  * @brief Frees the requests produced by dispatch_read.

@@ -9,6 +9,8 @@
 
 #include "upvc.h"
 
+#include "common.h"
+
 #define MAX_SEQ_SIZE (512)
 #define MAX_BUF_SIZE (1024)
 
@@ -18,14 +20,13 @@
  * @param f          File to parse.
  * @param read1      Output the next read in the file.
  * @param read2      Output the pair of the next read in the file.
- * @param reads_info Information on the size of the seed and the neighbour.
  *
  * @return The size of the read.
  */
-static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, reads_info_t *reads_info)
+static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2)
 {
     int offset = 0;
-    int size_read = reads_info->size_read;
+    int size_read = SIZE_READ;
     char comment[MAX_BUF_SIZE];
     char sequence_buffer[MAX_SEQ_SIZE];
     int invnt[4] = { 2, 3, 0, 1 };
@@ -64,19 +65,19 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, reads_info_t *
     return size_read;
 }
 
-int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_ctx, reads_info_t *reads_info)
+int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_ctx)
 {
     double t1, t2;
     int nb_read = 0;
-    int size_read = reads_info->size_read;
+    int size_read = SIZE_READ;
 
     t1 = my_clock();
 
     while (nb_read < MAX_READS_BUFFER) {
-        if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * size_read], &reads_buffer[(nb_read + 1) * size_read], reads_info)
+        if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * size_read], &reads_buffer[(nb_read + 1) * size_read])
                 <= 0)
             || (get_seq_fast_AQ(
-                    fpe2, &reads_buffer[(nb_read + 2) * size_read], &reads_buffer[(nb_read + 3) * size_read], reads_info)
+                    fpe2, &reads_buffer[(nb_read + 2) * size_read], &reads_buffer[(nb_read + 3) * size_read])
                    <= 0))
             break;
         nb_read += 4;

@@ -24,13 +24,13 @@ typedef struct {
 /**
  * @brief Compute the alignment distance by dynamical programming on the diagonals of the matrix.
  *
- * @param s1          A neighbour sequence of int8_t.
- * @param s2          A neighbour sequence of int8_t.
- * @param backtrack   Output backtrack use to minimize the distance.
- * @param reads_info  Information on the size of the seed and the neighbour.
+ * @param s1                         A neighbour sequence of int8_t.
+ * @param s2                         A neighbour sequence of int8_t.
+ * @param backtrack                  Output backtrack use to minimize the distance.
+ * @param size_neighbour_in_symbols  Number of symbols in a neighbour.
  *
  * @return the distance between s1 and s2.
  */
-int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, reads_info_t *reads_info);
+int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_symbols);
 
 #endif /* __COMPARE_H__ */

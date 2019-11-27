@@ -40,7 +40,7 @@ MUTEX_INIT(result_pool_mutex);
 /**
  * @brief The buffer of result in mram.
  */
-__mram dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
+__mram_noinit dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
 
 #define DPU_RESULT_WRITE(res, addr)                                                                                              \
     do {                                                                                                                         \
@@ -105,7 +105,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
 
 void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
-    __attribute__((aligned(8))) static const dpu_result_out_t end_of_results
+    __dma_aligned static const dpu_result_out_t end_of_results
         = { .num = (unsigned int)-1, .score = (unsigned int)-1, .coord.seq_nr = 0, .coord.seed_nr = 0 };
     /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
      * has a num equal to -1.

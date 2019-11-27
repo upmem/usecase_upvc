@@ -3,12 +3,7 @@
  */
 
 #include "odpd.h"
-#include <alloc.h>
+#include "common.h"
 
 /* Need big space to store one triplet of matrices per tasklet */
-int *__M = 0;
-
-void odpd_init(unsigned int nb_tasklets, unsigned int nbr_sym_len)
-{
-    __M = mem_alloc(3 * SIZEOF_MATRIX(nbr_sym_len) * nb_tasklets);
-}
+uint8_t __M[3 * NB_TASKLET_PER_DPU * SIZEOF_MATRIX(NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, 0))];

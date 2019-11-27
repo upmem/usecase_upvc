@@ -21,26 +21,19 @@
 #define MAX_DPU_RESULTS (1 << 16)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
+#define SIZE_READ 120
+#define SIZE_SEED 14
+#define SIZE_NEIGHBOUR_IN_BYTES ((SIZE_READ - SIZE_SEED) / 4)
+#define DELTA_NEIGHBOUR(round) ((SIZE_SEED * round) / 4)
+#define SIZE_IN_SYMBOLS(delta) ((SIZE_NEIGHBOUR_IN_BYTES - delta) * 4)
+
 /**
  * @brief A snapshot of the MRAM.
  *
- * @var total_nbr_size  Size of all the reads of the reference genome.
- * @var nb_nbr          Total number of neighbours stored in this MRAM.
- * @var nbr_len         Length of a neighbour, in bytes.
  * @var delta           Delta to apply to nodp and odpd comparison depending on the round.
  */
-typedef struct {
-    uint32_t total_nbr_size;
-    uint32_t nb_nbr;
-    uint32_t nbr_len;
-    uint32_t delta;
-} mram_info_t;
-#define MRAM_INFO_ADDR(mram_offset) (ALIGN_DPU(mram_offset))
-#define MRAM_INFO_READ(mram_info, mram_offset)                                                                                   \
-    do {                                                                                                                         \
-        mram_read16(MRAM_INFO_ADDR(mram_offset), mram_info);                                                                     \
-    } while (0)
-_Static_assert(sizeof(mram_info_t) == 16, "mram_info_t size changed (make sure that MRAM_INFO_READ changed as well)");
+typedef uint64_t delta_info_t;
+#define DPU_MRAM_INFO_VAR m_mram_info
 
 /**
  * @brief Coordonates of the read that matched in the reference genome.
@@ -89,18 +82,13 @@ typedef struct {
 typedef uint64_t dpu_compute_time_t;
 #define DPU_COMPUTE_TIME_VAR m_dpu_compute_time
 
-#define DPU_INPUTS_ADDR(mram_offset) (ALIGN_DPU(MRAM_INFO_ADDR(mram_offset) + sizeof(mram_info_t)))
-#define DPU_INPUTS_SIZE(mram_offset) (MRAM_SIZE - DPU_INPUTS_ADDR(mram_offset))
-
 /**
  * @brief Information on the requests reads to a DPU.
  */
 typedef struct {
-    uint32_t nb_reads;
-    uint32_t magic;
+    uint64_t nb_reads;
 } request_info_t;
-
-#define DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) (ALIGN_DPU(DPU_INPUTS_ADDR(mram_offset) + (mram_info)->total_nbr_size))
+#define DPU_REQUEST_INFO_VAR m_dpu_request_info
 
 /**
  * @brief Structure representing one request to a DPU, resulting from the dispatching of reads.
@@ -110,15 +98,14 @@ typedef struct {
  * @var offset  The 1st neighbour address.
  * @var count   The number of neighbours.
  * @var num     A reference number to the original request.
+ * @var nbr     The input neighbour to compare with the reference
  */
 typedef struct {
     uint32_t offset;
     uint32_t count;
     uint32_t num;
+    uint8_t nbr[SIZE_NEIGHBOUR_IN_BYTES];
 } dpu_request_t;
-
-#define DPU_REQUEST_ADDR(mram_info, mram_offset)                                                                                 \
-    (ALIGN_DPU(DPU_REQUEST_INFO_ADDR(mram_info, mram_offset) + sizeof(request_info_t)))
-#define DPU_REQUEST_SIZE(size_nbr) (ALIGN_DPU(sizeof(dpu_request_t) + (size_nbr)))
+#define DPU_REQUEST_VAR m_dpu_request
 
 #endif /* __COMMON_H__ */

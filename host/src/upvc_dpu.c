@@ -28,14 +28,14 @@ void malloc_dpu_res(int nb_dpu)
     }
 }
 
-void malloc_dpu(reads_info_t *reads_info, int nb_dpu)
+void malloc_dpu(int nb_dpu)
 {
     malloc_dpu_res(nb_dpu);
     MDPU = (mem_dpu_t *)calloc(nb_dpu, sizeof(mem_dpu_t));
     assert(MDPU != NULL);
 
     for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
-        MDPU[num_dpu].neighbour_read = (int8_t *)malloc(sizeof(int8_t) * reads_info->size_neighbour_in_bytes * MAX_DPU_REQUEST);
+        MDPU[num_dpu].neighbour_read = (int8_t *)malloc(sizeof(int8_t) * SIZE_NEIGHBOUR_IN_BYTES * MAX_DPU_REQUEST);
         MDPU[num_dpu].count = (int *)malloc(sizeof(int) * MAX_DPU_REQUEST);
         MDPU[num_dpu].offset = (int *)malloc(sizeof(int) * MAX_DPU_REQUEST);
         MDPU[num_dpu].num = (int *)malloc(sizeof(int) * MAX_DPU_REQUEST);
@@ -69,11 +69,11 @@ void free_dpu(int nb_dpu)
     free(MDPU);
 }
 
-void write_neighbours_and_coordinates(int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord, reads_info_t *reads_info)
+void write_neighbours_and_coordinates(int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord)
 {
     mem_dpu_t *mdpu = &(MDPU[numdpu]);
 
-    unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+    unsigned int size_neighbour_in_bytes = SIZE_NEIGHBOUR_IN_BYTES;
     unsigned int aligned_nbr_len = ALIGN_DPU(size_neighbour_in_bytes);
     unsigned int aligned_coord_nbr_len = sizeof(dpu_result_coord_t) + aligned_nbr_len;
 
@@ -82,9 +82,9 @@ void write_neighbours_and_coordinates(int numdpu, int index_idx, int8_t *nbrs, d
         mdpu->neighbour_idx + (index_idx * aligned_coord_nbr_len) + sizeof(dpu_result_coord_t), nbrs, (size_t)aligned_nbr_len);
 }
 
-void write_neighbour_read(int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info)
+void write_neighbour_read(int num_dpu, int read_idx, int8_t *values)
 {
-    int size_neighbour = reads_info->size_neighbour_in_bytes;
+    int size_neighbour = SIZE_NEIGHBOUR_IN_BYTES;
     for (int i = 0; i < size_neighbour; i++) {
         MDPU[num_dpu].neighbour_read[read_idx * size_neighbour + i] = values[i];
     }
@@ -118,9 +118,9 @@ static void print_byte_to_sym(uint8_t byte, unsigned int offset, FILE *out)
     fprintf(out, "%c", as_char);
 }
 
-void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *reads_info)
+void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out)
 {
-    unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+    unsigned int size_neighbour_in_bytes = SIZE_NEIGHBOUR_IN_BYTES;
     unsigned int aligned_nbr_len = ALIGN_DPU(size_neighbour_in_bytes);
     unsigned int aligned_coord_nbr_len = sizeof(dpu_result_coord_t) + aligned_nbr_len;
     for (int each_nbr = 0; each_nbr < nb_nbr; each_nbr++) {
@@ -139,9 +139,9 @@ void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *r
     fprintf(out, "\n");
 }
 
-void print_coordinates(int d, int offs, int l, FILE *out, reads_info_t *reads_info)
+void print_coordinates(int d, int offs, int l, FILE *out)
 {
-    unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+    unsigned int size_neighbour_in_bytes = SIZE_NEIGHBOUR_IN_BYTES;
     unsigned int aligned_nbr_len = ALIGN_DPU(size_neighbour_in_bytes);
     unsigned int aligned_coord_nbr_len = sizeof(dpu_result_coord_t) + aligned_nbr_len;
     for (int i = 0; i < l; i++) {

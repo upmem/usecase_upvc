@@ -56,8 +56,7 @@ get_tasklet_matrix:                                                 // matrix = 
     mul_ul_ul  t0,      id,      t0                                 // 3 * tid
     mul_ul_ul  t0,      t0,      t1                                 // 3 * tid * (len + 2)
     lsl        t0,      t0,      +3                                 // 3 * tid * (len + 2) * 8
-    lw         matrix,  %zero,   __M                                // load __M
-    add        matrix,  matrix,  t0                                 // matrix = __M + 3 * tid * (len + 2) * 8
+    add        matrix,  t0,      __M                                // matrix = __M + 3 * tid * (len + 2) * 8
 
 init_matrix:
     move       cost,    0                                           // Initialization value

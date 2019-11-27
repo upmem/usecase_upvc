@@ -39,7 +39,6 @@ typedef struct {
     FILE *fipe1;
     FILE *fipe2;
     times_ctx_t *times_ctx;
-    reads_info_t *reads_info;
 } thread_get_reads_arg_t;
 
 void *thread_get_reads(void *arg)
@@ -52,7 +51,6 @@ void *thread_get_reads(void *arg)
     sem_t *dispatch_free_sem = args->dispatch_free_sem;
     sem_t *acc_process_wait_sem = args->acc_process_wait_sem;
     times_ctx_t *times_ctx = args->times_ctx;
-    reads_info_t *reads_info = args->reads_info;
 
     unsigned int nb_dpu = get_nb_dpu();
     unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
@@ -66,8 +64,8 @@ void *thread_get_reads(void *arg)
         }
 
         PRINT_TIME_GET_READS(times_ctx, each_pass);
-        reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
-        nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx, reads_info);
+        reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * SIZE_READ);
+        nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx);
         PRINT_TIME_GET_READS(times_ctx, each_pass);
 
         sem_post(dispatch_free_sem);
@@ -82,8 +80,8 @@ void *thread_get_reads(void *arg)
             }
 
             PRINT_TIME_GET_READS(times_ctx, each_pass);
-            reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * reads_info->size_read);
-            nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx, reads_info);
+            reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * SIZE_READ);
+            nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx);
             PRINT_TIME_GET_READS(times_ctx, each_pass);
 
             if (DEBUG_PASS != -1) {
@@ -107,12 +105,12 @@ typedef struct {
     sem_t *acc_wait_sem;
     sem_t *acc_free_sem;
     unsigned int rank_id;
+    int round;
     int *nb_read;
     devices_t *devices;
     dispatch_request_t *dispatch_requests;
     backends_functions_t *backends_functions;
     times_ctx_t *times_ctx;
-    reads_info_t *reads_info;
 } thread_exec_rank_arg_t;
 
 void *thread_exec_rank(void *arg)
@@ -124,22 +122,24 @@ void *thread_exec_rank(void *arg)
     sem_t *acc_wait_sem = args->acc_wait_sem;
     sem_t *acc_free_sem = args->acc_free_sem;
     unsigned int rank_id = args->rank_id;
+    int round = args->round;
     volatile int *nb_read = args->nb_read;
     devices_t *devices = args->devices;
     dispatch_request_t *dispatch_requests = args->dispatch_requests;
     backends_functions_t *backends_functions = args->backends_functions;
     times_ctx_t *times_ctx = args->times_ctx;
-    reads_info_t *reads_info = args->reads_info;
 
     unsigned int nb_dpu = get_nb_dpu();
     unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
     unsigned int each_pass_mod = 0;
 
+    unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
+
     for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
         printf("[%u-%u] loading mram\n", dpu_offset, rank_id);
         PRINT_TIME_WRITE_MRAM(times_ctx, 0, rank_id);
         t1 = my_clock();
-        backends_functions->load_mram(dpu_offset, rank_id, devices, reads_info, times_ctx);
+        backends_functions->load_mram(dpu_offset, rank_id, delta_neighbour, devices, times_ctx);
         t2 = my_clock();
         PRINT_TIME_WRITE_MRAM(times_ctx, 0, rank_id);
         printf("[%u-%u]  time %.2lf sec\n", dpu_offset, rank_id, t2 - t1);
@@ -153,8 +153,8 @@ void *thread_exec_rank(void *arg)
                 printf("[%u-%u] running pass\n", each_pass, rank_id);
                 PRINT_TIME_MAP_READ(times_ctx, each_pass, rank_id);
                 t1 = my_clock();
-                backends_functions->run_dpu(dispatch_requests, devices, dpu_offset, rank_id, each_pass, dispatch_free_sem,
-                    acc_wait_sem, times_ctx, reads_info);
+                backends_functions->run_dpu(dispatch_requests, devices, dpu_offset, rank_id, each_pass, delta_neighbour,
+                    dispatch_free_sem, acc_wait_sem, times_ctx);
                 t2 = my_clock();
                 PRINT_TIME_MAP_READ(times_ctx, each_pass, rank_id);
                 printf("[%u-%u]  time %.2lf sec\n", each_pass, rank_id, t2 - t1);
@@ -187,7 +187,6 @@ typedef struct {
     dispatch_request_t *dispatch_requests;
     backends_functions_t *backends_functions;
     times_ctx_t *times_ctx;
-    reads_info_t *reads_info;
 } thread_dispatch_arg_t;
 
 void *thread_dispatch(void *arg)
@@ -203,7 +202,6 @@ void *thread_dispatch(void *arg)
     dispatch_request_t *dispatch_requests = args->dispatch_requests;
     backends_functions_t *backends_functions = args->backends_functions;
     times_ctx_t *times_ctx = args->times_ctx;
-    reads_info_t *reads_info = args->reads_info;
 
     unsigned int nb_dpu = get_nb_dpu();
     unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
@@ -221,8 +219,7 @@ void *thread_dispatch(void *arg)
 
             if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
                 PRINT_TIME_DISPATCH(times_ctx, each_pass);
-                dispatch_read(index_seed, reads_buffer[each_pass_mod], nb_read[each_pass_mod], dispatch_requests, times_ctx,
-                    reads_info, backends_functions);
+                dispatch_read(index_seed, reads_buffer[each_pass_mod], nb_read[each_pass_mod], dispatch_requests, times_ctx, backends_functions);
                 PRINT_TIME_DISPATCH(times_ctx, each_pass);
             }
 
@@ -350,7 +347,6 @@ typedef struct {
     FILE *fope1;
     FILE *fope2;
     times_ctx_t *times_ctx;
-    reads_info_t *reads_info;
 } thread_process_arg_t;
 
 void *thread_process(void *arg)
@@ -370,7 +366,6 @@ void *thread_process(void *arg)
     FILE *fope1 = args->fope1;
     FILE *fope2 = args->fope2;
     times_ctx_t *times_ctx = args->times_ctx;
-    reads_info_t *reads_info = args->reads_info;
 
     unsigned int each_pass = 0, each_pass_mod;
 
@@ -380,7 +375,7 @@ void *thread_process(void *arg)
         if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
             PRINT_TIME_PROCESS_READ(times_ctx, each_pass);
             process_read(ref_genome, reads_buffer[each_pass_mod], variant_list, substitution_list, mapping_coverage,
-                result_tab[each_pass], result_tab_nb_read[each_pass], fope1, fope2, round, times_ctx, reads_info);
+                result_tab[each_pass], result_tab_nb_read[each_pass], fope1, fope2, round, times_ctx);
             PRINT_TIME_PROCESS_READ(times_ctx, each_pass);
         }
         free(reads_buffer[each_pass_mod]);
@@ -395,7 +390,7 @@ void *thread_process(void *arg)
 
 static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping_coverage, int *substitution_list,
     dispatch_request_t *dispatch_requests, index_seed_t **index_seed, char *input_prefix, variant_tree_t **variant_list,
-    genome_t *ref_genome, devices_t *devices, times_ctx_t *times_ctx, reads_info_t *reads_info,
+    genome_t *ref_genome, devices_t *devices, times_ctx_t *times_ctx,
     backends_functions_t *backends_functions)
 {
     char filename[1024];
@@ -408,8 +403,8 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
     memset(result_tab, 0, sizeof(dpu_result_out_t *) * MAX_NB_PASS);
     memset(result_tab_nb_read, 0, sizeof(unsigned int) * MAX_NB_PASS);
 
-    reads_info->delta_neighbour_in_bytes = (SIZE_SEED * round) / 4;
-    reads_info->size_neighbour_in_32bits_words = (reads_info->size_neighbour_in_bytes - reads_info->delta_neighbour_in_bytes) * 4;
+    /* reads_info->delta_neighbour_in_bytes = (SIZE_SEED * round) / 4; */
+    /* reads_info->size_neighbour_in_32bits_words = (reads_info->size_neighbour_in_bytes - reads_info->delta_neighbour_in_bytes) * 4; */
 
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
     fope1 = fopen(filename, "w");
@@ -451,7 +446,6 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
             .fipe1 = fipe1,
             .fipe2 = fipe2,
             .times_ctx = times_ctx,
-            .reads_info = reads_info,
         };
         thread_exec_rank_arg_t exec_rank_arg[nb_rank];
         for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
@@ -460,12 +454,12 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
             exec_rank_arg[each_rank].acc_wait_sem = &acc_exec_rank_sem[each_rank];
             exec_rank_arg[each_rank].acc_free_sem = &exec_rank_acc_sem[each_rank];
             exec_rank_arg[each_rank].rank_id = each_rank;
+            exec_rank_arg[each_rank].round = round;
             exec_rank_arg[each_rank].nb_read = nb_read;
             exec_rank_arg[each_rank].devices = devices;
             exec_rank_arg[each_rank].dispatch_requests = dispatch_requests;
             exec_rank_arg[each_rank].backends_functions = backends_functions;
             exec_rank_arg[each_rank].times_ctx = times_ctx;
-            exec_rank_arg[each_rank].reads_info = reads_info;
         }
         thread_dispatch_arg_t dispatch_arg = {
             .get_reads_wait_sem = &get_reads_dispatch_sem,
@@ -478,7 +472,6 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
             .dispatch_requests = dispatch_requests,
             .backends_functions = backends_functions,
             .times_ctx = times_ctx,
-            .reads_info = reads_info,
         };
         thread_acc_arg_t acc_arg = {
             .exec_rank_wait_sem = exec_rank_acc_sem,
@@ -507,7 +500,6 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
             .fope1 = fope1,
             .fope2 = fope2,
             .times_ctx = times_ctx,
-            .reads_info = reads_info,
         };
         int ret;
         ret = sem_init(&get_reads_dispatch_sem, 0, 0);
@@ -581,15 +573,15 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
     fclose(fope2);
 }
 
-static void reload_and_verify_mram_images(reads_info_t *reads_info)
+static void reload_and_verify_mram_images()
 {
     index_seed_t **index_seed;
     FILE *seed_file;
     unsigned int nb_dpu = get_nb_dpu();
-    malloc_dpu(reads_info, nb_dpu);
+    malloc_dpu(nb_dpu);
     index_seed = load_index_seeds();
     seed_file = fopen(SEED_FILE_LOG, "w");
-    print_index_seeds(index_seed, seed_file, reads_info);
+    print_index_seeds(index_seed, seed_file);
     fclose(seed_file);
     printf("Please check %s to verify that the indexing is OK\n", SEED_FILE_LOG);
 
@@ -597,17 +589,17 @@ static void reload_and_verify_mram_images(reads_info_t *reads_info)
     free_dpu(nb_dpu);
 }
 
-static void load_index_save_genome(reads_info_t *reads_info, times_ctx_t *times_ctx)
+static void load_index_save_genome(times_ctx_t *times_ctx)
 {
     genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
-    index_seed_t **index_seed = index_genome(ref_genome, get_nb_dpu(), times_ctx, reads_info);
+    index_seed_t **index_seed = index_genome(ref_genome, get_nb_dpu(), times_ctx);
     save_index_seeds(index_seed);
 
     free_genome(ref_genome);
     free_index(index_seed);
 }
 
-static void do_mapping(backends_functions_t *backends_functions, reads_info_t *reads_info, times_ctx_t *times_ctx)
+static void do_mapping(backends_functions_t *backends_functions, times_ctx_t *times_ctx)
 {
     unsigned int nb_dpu;
     unsigned int nb_rank;
@@ -622,10 +614,10 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
     int *substitution_list = (int *)calloc(sizeof(int), ref_genome->fasta_file_size);
     dispatch_request_t *dispatch_requests;
 
-    backends_functions->init_backend(&nb_rank, &devices, get_nb_dpus_per_run(), get_dpu_binary(), &index_seed, reads_info);
+    backends_functions->init_backend(&nb_rank, &devices, get_nb_dpus_per_run(), get_dpu_binary(), &index_seed);
 
     nb_dpu = get_nb_dpu();
-    dispatch_requests = dispatch_create(nb_dpu, reads_info);
+    dispatch_requests = dispatch_create(nb_dpu);
 
     sprintf(filename, "%s_time.csv", input_prefix);
     times_ctx->time_file = fopen(filename, "w");
@@ -643,7 +635,7 @@ static void do_mapping(backends_functions_t *backends_functions, reads_info_t *r
             fprintf(devices->log_file, "round %i\n", round);
         }
         exec_round(round, nb_rank, mapping_coverage, substitution_list, dispatch_requests, index_seed, input_prefix,
-            &variant_list, ref_genome, devices, times_ctx, reads_info, backends_functions);
+            &variant_list, ref_genome, devices, times_ctx, backends_functions);
 
         if (DEBUG_PASS != -1) {
             FILE *res_file;
@@ -697,7 +689,6 @@ static void print_time()
 
 int main(int argc, char *argv[])
 {
-    reads_info_t reads_info;
     times_ctx_t times_ctx;
     backends_functions_t backends_functions;
 
@@ -709,10 +700,9 @@ int main(int argc, char *argv[])
     printf("%s\n", VERSION);
     print_time();
 
-    reads_info.size_read = get_read_size(get_input_pe1());
-    reads_info.size_neighbour_in_bytes = (reads_info.size_read - SIZE_SEED) / 4;
+    assert(get_read_size(get_input_pe1()) == SIZE_READ);
     printf("Information\n");
-    printf(" - read size: %d\n", reads_info.size_read);
+    printf(" - read size: %d\n", SIZE_READ);
 
     setup_dpus_for_target_type(get_target_type());
 
@@ -732,13 +722,13 @@ int main(int argc, char *argv[])
 
     switch (get_goal()) {
     case goal_index:
-        load_index_save_genome(&reads_info, &times_ctx);
+        load_index_save_genome(&times_ctx);
         break;
     case goal_check:
-        reload_and_verify_mram_images(&reads_info);
+        reload_and_verify_mram_images();
         break;
     case goal_map:
-        do_mapping(&backends_functions, &reads_info, &times_ctx);
+        do_mapping(&backends_functions, &times_ctx);
         break;
     case goal_unknown:
     default:

@@ -28,13 +28,12 @@
  * @param round              Round number of the process_read.
  * @param round              Current round to process.
  * @param times_ctx          Times information for the whole application.
- * @param reads_info         Information on the size of the seed and the neighbour.
  *
  * @return The number of reads that matched.
  */
 unsigned int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **variant_list, int *substitution_list,
     int8_t *mapping_coverage, dpu_result_out_t *result_tab, unsigned int result_tab_nb_read, FILE *fpe1, FILE *fpe2, int round,
-    times_ctx_t *times_ctx, reads_info_t *reads_info);
+    times_ctx_t *times_ctx);
 
 /**
  * @brief Accumulate read in result_tab in ordre to be process when the pass will have been execute on each DPUs.

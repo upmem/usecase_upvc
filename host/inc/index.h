@@ -54,11 +54,10 @@ index_seed_t **load_index_seeds();
  * @param ref_genome  Reference genome to use to create the index.
  * @param nb_dpu      Number of dpu available to compute.
  * @param times_ctx   Times information for the whole application.
- * @param reads_info  Information on the size of the seed and the neighbour.
  *
  * @return The Table of list of index created.
  */
-index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times_ctx, reads_info_t *reads_info);
+index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times_ctx);
 
 /**
  * @brief Free the table of linked-list of index.
@@ -72,8 +71,7 @@ void free_index(index_seed_t **index_seed);
  *
  * @param index_seed  Table to be printed.
  * @param out         File in which to printed the table.
- * @param reads_info  Information on the size of the seed and the neighbour.
  */
-void print_index_seeds(index_seed_t **SEED, FILE *out, reads_info_t *reads_info);
+void print_index_seeds(index_seed_t **SEED, FILE *out);
 
 #endif /* __INDEX_H__ */

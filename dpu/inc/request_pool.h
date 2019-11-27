@@ -18,11 +18,11 @@
  *
  * @return True if a new request was fetched, false if the FIFO is empty.
  */
-bool request_pool_next(uint8_t *request_buffer, dpu_tasklet_stats_t *stats);
+bool request_pool_next(dpu_request_t *request_buffer, dpu_tasklet_stats_t *stats);
 
 /**
  * @brief Initializes the request pool.
  */
-void request_pool_init(mram_info_t *mram_info);
+void request_pool_init();
 
 #endif /* __REQUEST_POOL_H__ */

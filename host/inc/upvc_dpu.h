@@ -41,10 +41,9 @@ dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number);
 /**
  * @brief Allocate structure to store information of DPU memory.
  *
- * @param reads_info  Information on the size of the seed and the neighbour.
  * @param nb_dpu      Number of dpu used to compute.
  */
-void malloc_dpu(reads_info_t *reads_info, int nb_dpu);
+void malloc_dpu(int nb_dpu);
 /**
  * @brief Allocate structure to store results information of DPUs.
  *
@@ -69,8 +68,8 @@ void free_dpu_res(int nb_dpu);
  * @brief Write information of the DPU memory.
  */
 void write_neighbours_and_coordinates(
-    int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord, reads_info_t *reads_info);
-void write_neighbour_read(int num_dpu, int read_idx, int8_t *values, reads_info_t *reads_info);
+    int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord);
+void write_neighbour_read(int num_dpu, int read_idx, int8_t *values);
 void write_count(int num_dpu, int read_idx, int value);
 void write_offset(int num_dpu, int read_idx, int value);
 void write_num(int num_dpu, int read_idx, int value);
@@ -85,7 +84,7 @@ dpu_result_coord_t read_out_coord(int num_dpu, int align_idx);
 /**
  * @brief Print information of the DPU memory.
  */
-void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out, reads_info_t *reads_info);
-void print_coordinates(int d, int offs, int l, FILE *out, reads_info_t *reads_info);
+void print_neighbour_idx(int d, int offs, int nb_nbr, FILE *out);
+void print_coordinates(int d, int offs, int l, FILE *out);
 
 #endif /* __UPVC_DPU_H__ */

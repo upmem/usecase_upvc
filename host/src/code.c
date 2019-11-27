@@ -5,6 +5,8 @@
 #include "upvc.h"
 #include <stdint.h>
 
+#include "common.h"
+
 #define CODE_SIZE (4)
 #define MASK (CODE_SIZE - 1)
 
@@ -20,9 +22,9 @@ int code_seed(int8_t *sequence)
     return seed;
 }
 
-void code_neighbour(int8_t *sequence, int8_t *code, reads_info_t *reads_info)
+void code_neighbour(int8_t *sequence, int8_t *code)
 {
-    for (int i = 0; i < reads_info->size_neighbour_in_bytes; i++) {
+    for (int i = 0; i < SIZE_NEIGHBOUR_IN_BYTES; i++) {
         int j = i * 4;
         code[i] = ((sequence[j + 3] & MASK) * (CODE_SIZE * CODE_SIZE * CODE_SIZE))
             + ((sequence[j + 2] & MASK) * (CODE_SIZE * CODE_SIZE)) + ((sequence[j + 1] & MASK) * (CODE_SIZE))

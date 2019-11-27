@@ -13,6 +13,7 @@
 #include "dout.h"
 #include "request_pool.h"
 #include "stats.h"
+#include "macro_utils.h"
 
 #include "common.h"
 
@@ -26,15 +27,24 @@
  * @var nb_reads      The number of reads in the request pool.
  * @var rdidx         Index of the first unread read in the request pool.
  * @var cur_read      Address of the first read to be processed in MRAM.
- * @var request_size  Size of a request and the neighbour corresponding.
  */
 typedef struct {
     mutex_id_t mutex;
     unsigned int nb_reads;
     unsigned int rdidx;
     mram_addr_t cur_read;
-    unsigned int request_size;
 } request_pool_t;
+
+__mram_noinit request_info_t DPU_REQUEST_INFO_VAR;
+
+__mram_noinit dpu_request_t DPU_REQUEST_VAR[MAX_DPU_REQUEST];
+
+#define DPU_REQUEST_SIZE 40
+#define MRAM_READ_REQUEST(mram_addr, wram_addr)                                                                                  \
+    do {                                                                                                                         \
+        __CONCAT(mram_read, DPU_REQUEST_SIZE)(mram_addr, wram_addr);                                                             \
+    } while (0);
+_Static_assert(sizeof(dpu_request_t) == DPU_REQUEST_SIZE, "sizeof(dpu_request changed, make sure to change MRAM_READ_REQUEST as well)");
 
 /**
  * @brief Common request pool, shared by every tasklet.
@@ -42,27 +52,18 @@ typedef struct {
 static request_pool_t request_pool;
 MUTEX_INIT(request_pool_mutex);
 
-#define REQUEST_INFO_READ(addr, request_info)                                                                                    \
-    do {                                                                                                                         \
-        mram_read8(addr, request_info);                                                                                          \
-    } while (0)
-_Static_assert(sizeof(request_info_t) == 8, "request_info_t size changed (make sure that REQUEST_INFO_READ changed as well)");
-
-void request_pool_init(mram_info_t *mram_info)
+void request_pool_init()
 {
-    __attribute__((aligned(8))) request_info_t io_data;
+    __dma_aligned request_info_t io_data;
 
     request_pool.mutex = MUTEX_GET(request_pool_mutex);
 
-    REQUEST_INFO_READ(DPU_REQUEST_INFO_ADDR(mram_info, DPU_MRAM_HEAP_POINTER), &io_data);
-    request_pool.nb_reads = io_data.nb_reads;
+    request_pool.nb_reads = DPU_REQUEST_INFO_VAR.nb_reads;
     request_pool.rdidx = 0;
-    request_pool.cur_read = (mram_addr_t)DPU_REQUEST_ADDR(mram_info, DPU_MRAM_HEAP_POINTER);
-    request_pool.request_size = DPU_REQUEST_SIZE(mram_info->nbr_len);
-    DEBUG_REQUESTS_PRINT_POOL(request_pool);
+    request_pool.cur_read = (mram_addr_t)DPU_REQUEST_VAR;
 }
 
-bool request_pool_next(uint8_t *request_buffer, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
+bool request_pool_next(dpu_request_t *request, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
     mutex_lock(request_pool.mutex);
     if (request_pool.rdidx == request_pool.nb_reads) {
@@ -71,15 +72,13 @@ bool request_pool_next(uint8_t *request_buffer, STATS_ATTRIBUTE dpu_tasklet_stat
     }
 
     /* Fetch next request into cache */
-    ASSERT_DMA_ADDR(request_pool.cur_read, request_buffer, request_pool.request_size);
-    ASSERT_DMA_LEN(request_pool.request_size);
-    STATS_INCR_LOAD(stats, request_pool.request_size);
-    STATS_INCR_LOAD_DATA(stats, request_pool.request_size);
-    mram_readX(request_pool.cur_read, (void *)request_buffer, request_pool.request_size);
+    STATS_INCR_LOAD(stats, sizeof(dpu_request_t));
+    STATS_INCR_LOAD_DATA(stats, sizeof(dpu_request_t));
+    MRAM_READ_REQUEST(request_pool.cur_read, (void *)request);
 
     /* Point to next request */
     request_pool.rdidx++;
-    request_pool.cur_read += request_pool.request_size;
+    request_pool.cur_read += sizeof(dpu_request_t);
     mutex_unlock(request_pool.mutex);
 
     return true;

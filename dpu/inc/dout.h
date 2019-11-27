@@ -46,7 +46,7 @@ _Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
  * @var nb_page_out    Number of pages of MAX_LOCAL_RESULTS_PER_READ put into the swap area.
  */
 typedef struct {
-    __attribute__((aligned(8))) dpu_result_out_t outs[MAX_LOCAL_RESULTS_PER_READ];
+    __dma_aligned dpu_result_out_t outs[MAX_LOCAL_RESULTS_PER_READ];
     unsigned int nb_results;
     mram_addr_t mram_base;
     unsigned int nb_cached_out;

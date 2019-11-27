@@ -26,11 +26,10 @@
  * @param mram        The target MRAM image.
  * @param vmi         The VMI.
  * @param nb_nbr      How many neighbours are registered.
- * @param reads_info  Information on the size of the seed and the neighbour..
  *
  * @return Whether the VMI is copied (is false if the MRAM is full).
  */
-bool mram_copy_vmi(mram_info_t *mram, vmi_t *vmi, unsigned int nb_nbr, reads_info_t *reads_info);
+bool mram_copy_vmi(uint8_t *mram, vmi_t *vmi);
 
 /**
  * @brief makes a snapshot of an MRAM image into a file.
@@ -42,7 +41,7 @@ bool mram_copy_vmi(mram_info_t *mram, vmi_t *vmi, unsigned int nb_nbr, reads_inf
  *
  * @return false if the snapshot could not be created
  */
-bool mram_save(mram_info_t *mram, unsigned int dpu_id);
+bool mram_save(uint8_t *mram, unsigned int dpu_id);
 
 /**
  * @brief Loads an MRAM file into an MRAM image.
@@ -50,14 +49,6 @@ bool mram_save(mram_info_t *mram, unsigned int dpu_id);
  * @param mram the MRAM image
  * @param dpu_id index of the DPU
  */
-void mram_load(mram_info_t *mram, unsigned int dpu_id);
-
-/**
- * @brief Loads an MRAM file info into an MRAM image.
- *
- * @param mram the MRAM image
- * @param dpu_id index of the DPU
- */
-void mram_load_info(mram_info_t *mram, unsigned int dpu_id);
+void mram_load(uint8_t *mram, unsigned int dpu_id);
 
 #endif /* __INTEGRATION_MDPU_H__ */

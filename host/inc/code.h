@@ -22,8 +22,7 @@ int code_seed(int8_t *sequence);
  *
  * @param sequence    Input neighbour as a table of int8_t.
  * @param code        Ouput sequence of int8_t of the neighbour.
- * @param reads_info  Information on the size of the seed and the neighbour.
  */
-void code_neighbour(int8_t *sequence, int8_t *code, reads_info_t *reads_info);
+void code_neighbour(int8_t *sequence, int8_t *code);
 
 #endif /* __CODE_H__ */

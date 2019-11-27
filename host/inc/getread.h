@@ -16,11 +16,10 @@
  * @param fpe2          Second file of Pair-end read.
  * @param reads_buffer  Output buffer to save pairs of read.
  * @param times_ctx     Times information for the while application.
- * @param reads_info    Information on the size of the seed and the neighbour.
  *
  * @return The number of read written in "reads_buffer".
  */
-int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_ctx, reads_info_t *reads_info);
+int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_ctx);
 
 /**
  * @brief Get the size of one read.

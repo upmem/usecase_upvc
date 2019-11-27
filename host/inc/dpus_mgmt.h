@@ -22,12 +22,11 @@ typedef struct {
     unsigned int nb_ranks_per_run;
     struct dpu_rank_t **ranks;
     unsigned int nb_dpus;
-    struct dpu_t **dpus;
-    mram_info_t *mram_info;
     pthread_mutex_t log_mutex;
     FILE *log_file;
-    mram_addr_t mram_compute_time_addr, mram_result_addr, mram_tasklet_stats_addr, mram_available_addr;
-    mram_size_t mram_compute_time_size, mram_result_size;
+    mram_addr_t mram_info_addr, mram_request_info_addr, mram_requests_addr, mram_compute_time_addr, mram_result_addr,
+        mram_tasklet_stats_addr, mram_available_addr;
+    mram_size_t mram_requests_size, mram_result_size, mram_available_size;
 } devices_t;
 
 /**
@@ -55,8 +54,9 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program);
  * @param rank_id      The rank number.
  * @param devices      Available devices.
  * @param mram         The mram content.
+ * @param delta_neighbour   The delta to apply to the UPVC DPU algorithm.
  */
-void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, mram_info_t **mram);
+void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram, int delta_neighbour);
 
 /**
  * @brief Frees the allocated DPUs.
@@ -93,10 +93,9 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices);
  * @param dpu_offset  The offset in DPUs to find the mram.
  * @param devices     List of available devices.
  * @param dispatch    The structure containing the dispatching of the reads into the DPUs.
- * @param reads_info  Information on the size of the seed and the neighbour.
  */
 void dpu_try_write_dispatch_into_mram(
-    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch, reads_info_t *reads_info);
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch);
 
 /**
  * @brief Reads the result area of a DPU, raises an exception if something went wrong with the DPU.
@@ -109,14 +108,5 @@ void dpu_try_write_dispatch_into_mram(
  */
 void dpu_try_get_results_and_log(
     unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
-
-/**
- * @brief Makes a snapshot of an MRAM into a given file.
- *
- * @param dpu_id     The DPU number.
- * @param devices    List of available devices.
- * @param file_name  Where to save data.
- */
-void dpu_try_backup_mram(unsigned int tid, devices_t *devices, const char *file_name);
 
 #endif /* __INTEGRATION_DPUS_H__ */

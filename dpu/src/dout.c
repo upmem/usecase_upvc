@@ -10,7 +10,7 @@
 #include "debug.h"
 #include "stats.h"
 
-__mram dpu_result_out_t m_dpu_swap_result[NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ];
+__mram_noinit dpu_result_out_t m_dpu_swap_result[NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ];
 
 void dout_clear(dout_t *dout)
 {

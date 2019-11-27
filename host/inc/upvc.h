@@ -10,7 +10,6 @@
 #define DEBUG_DPU (-1)
 
 #define VERSION "VERSION 1.5"
-#define SIZE_SEED 14
 #define MAX_READS_BUFFER 1048576 /* Maximum number of read by round        */
 
 #define COST_SUB 10
@@ -27,16 +26,6 @@
 #define CODE_C 1 /* ('C'>>1)&3   43H  0100 0011 */
 #define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
-
-/**
- * @brief Structure with information on the size of the reads and its neighbour.
- */
-typedef struct {
-    int size_read;
-    int size_neighbour_in_32bits_words;
-    int size_neighbour_in_bytes;
-    int delta_neighbour_in_bytes;
-} reads_info_t;
 
 #include <pthread.h>
 #include <stdio.h>

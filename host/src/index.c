@@ -114,21 +114,21 @@ static vmi_t *init_vmis(unsigned int nb_dpu)
     return vmis;
 }
 
-static void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int *nbr_counts, unsigned int nb_dpu, reads_info_t *reads_info)
+static void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int nb_dpu)
 {
-    mram_info_t *mram_image = (mram_info_t *)malloc(MRAM_SIZE);
+    uint8_t *mram_image = (uint8_t *)malloc(MRAM_SIZE);
     printf("Creating MRAM images\n");
     for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
         vmi_t *this_vmi = vmis + each_dpu;
-        mram_copy_vmi(mram_image, this_vmi, nbr_counts[each_dpu], reads_info);
+        mram_copy_vmi(mram_image, this_vmi);
         mram_save(mram_image, each_dpu);
     }
     free(mram_image);
 }
 
-static void free_vmis(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbours, reads_info_t *reads_info)
+static void free_vmis(vmi_t *vmis, unsigned int nb_dpu)
 {
-    dump_mdpu_images_into_mram_files(vmis, nb_neighbours, nb_dpu, reads_info);
+    dump_mdpu_images_into_mram_files(vmis, nb_dpu);
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
         vmi_delete(vmis + dpuno);
     }
@@ -136,9 +136,9 @@ static void free_vmis(vmi_t *vmis, unsigned int nb_dpu, unsigned int *nb_neighbo
 }
 
 static void write_vmi(
-    vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord, reads_info_t *reads_info)
+    vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord)
 {
-    unsigned int size_neighbour_in_bytes = reads_info->size_neighbour_in_bytes;
+    unsigned int size_neighbour_in_bytes = SIZE_NEIGHBOUR_IN_BYTES;
     unsigned int out_len = ALIGN_DPU(sizeof(dpu_result_coord_t) + size_neighbour_in_bytes);
     uint64_t temp_buff[out_len / sizeof(uint64_t)];
     memset(temp_buff, 0, out_len);
@@ -147,10 +147,10 @@ static void write_vmi(
     vmi_write(vmis + dpuno, k * out_len, temp_buff, out_len);
 }
 
-index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times_ctx, reads_info_t *reads_info)
+index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times_ctx)
 {
     double t1, t2;
-    int size_neighbour = reads_info->size_neighbour_in_bytes;
+    int size_neighbour = SIZE_NEIGHBOUR_IN_BYTES;
     seed_counter_t *seed_counter;
     long dpu_workload[nb_dpu];
     int dpu_index_size[nb_dpu];
@@ -246,9 +246,6 @@ index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times
         }
     }
 
-    unsigned int nb_neighbours[nb_dpu];
-    memset(nb_neighbours, 0, nb_dpu * sizeof(unsigned int));
-
     /* Writing data in DPUs memories */
     printf("\tWriting data in DPUs memories\n");
     memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
@@ -278,20 +275,19 @@ index_seed_t **index_genome(genome_t *ref_genome, int nb_dpu, times_ctx_t *times
             }
             align_idx = seed->offset + seed_counter[seed_code].nb_seed - total_nb_neighbour;
 
-            code_neighbour(&ref_genome->data[sequence_start_idx + sequence_idx + SIZE_SEED], buf_code_neighbour, reads_info);
+            code_neighbour(&ref_genome->data[sequence_start_idx + sequence_idx + SIZE_SEED], buf_code_neighbour);
             if (sequence_idx % 1000 == 0)
                 printf("\r\t%lli/%lli %i/%i         ", (unsigned long long)sequence_idx,
                     (unsigned long long)ref_genome->len_seq[seq_number] - size_neighbour - SIZE_SEED + 1, seq_number,
                     ref_genome->nb_seq);
-            write_vmi(vmis, seed->num_dpu, align_idx, buf_code_neighbour, coord_var, reads_info);
-            nb_neighbours[seed->num_dpu]++;
+            write_vmi(vmis, seed->num_dpu, align_idx, buf_code_neighbour, coord_var);
 
             seed_counter[seed_code].nb_seed++;
         }
         printf("\n");
     }
 
-    free_vmis(vmis, nb_dpu, nb_neighbours, reads_info);
+    free_vmis(vmis, nb_dpu);
     free(seed_counter);
 
     t2 = my_clock();
@@ -315,16 +311,16 @@ void free_index(index_seed_t **index_seed)
     free(index_seed);
 }
 
-void print_index_seeds(index_seed_t **index_seed, FILE *out, reads_info_t *reads_info)
+void print_index_seeds(index_seed_t **index_seed, FILE *out)
 {
     for (int i = 0; i < NB_SEED; i++) {
         fprintf(out, "SEED=%u\n", i);
         index_seed_t *seed = index_seed[i];
         while (seed != NULL) {
             fprintf(out, "\tPU %u @%u[%u]\n", seed->num_dpu, seed->offset, seed->nb_nbr);
-            print_neighbour_idx(seed->num_dpu, seed->offset, seed->nb_nbr, out, reads_info);
+            print_neighbour_idx(seed->num_dpu, seed->offset, seed->nb_nbr, out);
             fprintf(out, "\t");
-            print_coordinates(seed->num_dpu, seed->offset, seed->nb_nbr, out, reads_info);
+            print_coordinates(seed->num_dpu, seed->offset, seed->nb_nbr, out);
             seed = seed->next;
         }
     }

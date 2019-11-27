@@ -11,7 +11,7 @@ endif ()
 
 include(${UPMEM_HOME}/share/upmem/cmake/include/host/DpuHost.cmake)
 
-set(CMAKE_C_FLAGS "--std=c99 -O3 -Wall -Wextra -Werror -g3")
+set(CMAKE_C_FLAGS "--std=c99 -O3 -Wall -Wextra -Werror -g3 -Wno-strict-overflow")
 link_directories("${DPU_HOST_LINK_DIRECTORIES}")
 
 file(GLOB_RECURSE SOURCES src/*.c)

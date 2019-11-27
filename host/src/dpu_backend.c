@@ -22,28 +22,29 @@
 #include "backends_functions.h"
 
 static void dispatch_request_add(
-    dispatch_request_t *reads, unsigned int offset, unsigned int count, unsigned int num, int8_t *nbr, reads_info_t *reads_info)
+    dispatch_request_t *reads, unsigned int offset, unsigned int count, unsigned int num, int8_t *nbr)
 {
     dpu_request_t *new_read
-        = (dpu_request_t *)(reads->reads_area + reads->nb_reads * DPU_REQUEST_SIZE(reads_info->size_neighbour_in_bytes));
+        = (dpu_request_t *)(reads->reads_area + reads->nb_reads * sizeof(dpu_request_t));
     new_read->offset = offset;
     new_read->count = count;
     new_read->num = num;
 
-    memcpy(((uint8_t *)new_read) + sizeof(dpu_request_t), nbr, (size_t)reads_info->size_neighbour_in_bytes);
+    memcpy(&new_read->nbr[0], nbr, (size_t)SIZE_NEIGHBOUR_IN_BYTES);
     reads->nb_reads++;
 }
 
 void add_seed_to_dpu_requests(dispatch_request_t *requests, int num_read, __attribute__((unused)) int nb_read_written,
-    index_seed_t *seed, int8_t *nbr, reads_info_t *reads_info)
+    index_seed_t *seed, int8_t *nbr)
 {
     dispatch_request_t *this_request = requests + seed->num_dpu;
     dispatch_request_add(
-        this_request, (unsigned int)seed->offset, (unsigned int)seed->nb_nbr, (unsigned int)num_read, nbr, reads_info);
+        this_request, (unsigned int)seed->offset, (unsigned int)seed->nb_nbr, (unsigned int)num_read, nbr);
 }
 
 void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int dpu_offset, unsigned int rank_id,
-    unsigned int nb_pass, sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx, reads_info_t *reads_info)
+    unsigned int nb_pass, __attribute__((unused)) int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
+    times_ctx_t *times_ctx)
 {
     double t1, t2, t3, t4;
     unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
@@ -53,7 +54,7 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     if ((DEBUG_DPU == -1) || ((DEBUG_DPU / nb_dpus_per_rank) == (rank_id + dpu_offset / nb_dpus_per_rank))) {
 
         PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
-        dpu_try_write_dispatch_into_mram(rank_id, dpu_offset + rank_id * nb_dpus_per_rank, devices, dispatch, reads_info);
+        dpu_try_write_dispatch_into_mram(rank_id, dpu_offset + rank_id * nb_dpus_per_rank, devices, dispatch);
         sem_post(dispatch_free_sem);
 
         PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
@@ -99,7 +100,7 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
 }
 
 void init_backend_dpu(unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, const char *dpu_binary,
-    index_seed_t ***index_seed, __attribute__((unused)) reads_info_t *reads_info)
+    index_seed_t ***index_seed)
 {
     *index_seed = load_index_seeds();
     malloc_dpu_res(get_nb_dpu());
@@ -113,28 +114,26 @@ void free_backend_dpu(devices_t *devices, unsigned int nb_dpu)
     free_dpu_res(nb_dpu);
 }
 
-void load_mram_dpu(
-    unsigned int dpu_offset, unsigned int rank_id, devices_t *devices, reads_info_t *reads_info, times_ctx_t *times_ctx)
+void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neighbour, devices_t *devices, times_ctx_t *times_ctx)
 {
     double t1, t2;
     unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
-    mram_info_t **mram = (mram_info_t **)malloc(nb_dpus_per_rank * sizeof(mram_info_t *));
+    uint8_t **mram = (uint8_t **)malloc(nb_dpus_per_rank * sizeof(uint8_t *));
     assert(mram != NULL);
 
     t1 = my_clock();
 
     if ((DEBUG_DPU == -1) || ((DEBUG_DPU / nb_dpus_per_rank) == (rank_id + dpu_offset / nb_dpus_per_rank))) {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-            mram[each_dpu] = (mram_info_t *)malloc(MRAM_SIZE);
+            mram[each_dpu] = (uint8_t *)malloc(MRAM_SIZE);
             assert(mram[each_dpu] != NULL);
         }
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
             unsigned int this_dpu = dpu_offset + each_dpu + rank_id * nb_dpus_per_rank;
             mram_load(mram[each_dpu], this_dpu);
-            mram[each_dpu]->delta = reads_info->delta_neighbour_in_bytes;
         }
-        dpu_try_write_mram(rank_id, devices, mram);
+        dpu_try_write_mram(rank_id, devices, mram, delta_neighbour);
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
             free(mram[each_dpu]);

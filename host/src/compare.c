@@ -42,9 +42,9 @@ static void DPD_compute(
     }
 }
 
-int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, reads_info_t *reads_info)
+int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_symbols)
 {
-    int matrix_size = reads_info->size_neighbour_in_32bits_words + 1;
+    int matrix_size = size_neighbour_in_symbols + 1;
     int diagonal = (NB_DIAG / 2) + 1;
     int D[matrix_size][matrix_size];
     int P[matrix_size][matrix_size];
