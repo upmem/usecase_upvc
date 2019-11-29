@@ -105,14 +105,13 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
     unsigned int each_dpu = 0;
     struct dpu_t *dpu;
     DPU_FOREACH(rank, dpu) {
-        const unsigned int old_mram_info_t_size = 16;
 #ifdef USE_COPY_TO_MRAMS
         dpu_transfer_matrix_add_dpu(
-            dpu, matrix, mram[each_dpu] + old_mram_info_t_size, devices->mram_available_size, devices->mram_available_addr, 0);
+            dpu, matrix, mram[each_dpu], devices->mram_available_size, devices->mram_available_addr, 0);
         dpu_transfer_matrix_add_dpu(dpu, matrix_delta, &delta_neighbour, sizeof(delta_info_t), devices->mram_info_addr, 0);
 #else
         status = dpu_copy_to_dpu(
-            dpu, (const uint8_t *)(mram[each_dpu] + old_mram_info_t_size), devices->mram_available_addr, devices->mram_available_size);
+            dpu, (const uint8_t *)mram[each_dpu], devices->mram_available_addr, devices->mram_available_size);
         assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpu failed");
         status = dpu_copy_to_dpu(dpu, (const uint8_t *)&delta_neighbour, devices->mram_info_addr, sizeof(delta_info_t));
         assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpu failed");
