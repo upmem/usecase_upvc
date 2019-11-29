@@ -66,13 +66,20 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
 
     struct dpu_t *one_dpu;
     DPU_FOREACH (devices->ranks[0], one_dpu) {
-        dpu_get_mram_symbol(one_dpu, DPU_MRAM_HEAP_POINTER_NAME, &devices->mram_available_addr, NULL);
-        dpu_get_mram_symbol(one_dpu, XSTR(DPU_MRAM_INFO_VAR), &devices->mram_info_addr, NULL);
-        dpu_get_mram_symbol(one_dpu, XSTR(DPU_REQUEST_INFO_VAR), &devices->mram_request_info_addr, NULL);
-        dpu_get_mram_symbol(one_dpu, XSTR(DPU_REQUEST_VAR), &devices->mram_requests_addr, &devices->mram_requests_size);
-        dpu_get_mram_symbol(one_dpu, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time_addr, NULL);
-        dpu_get_mram_symbol(one_dpu, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats_addr, NULL);
-        dpu_get_mram_symbol(one_dpu, XSTR(DPU_RESULT_VAR), &devices->mram_result_addr, &devices->mram_result_size);
+        status = dpu_get_mram_symbol(one_dpu, DPU_MRAM_HEAP_POINTER_NAME, &devices->mram_available_addr, NULL);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
+        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_MRAM_INFO_VAR), &devices->mram_info_addr, NULL);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
+        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_REQUEST_INFO_VAR), &devices->mram_request_info_addr, NULL);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
+        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_REQUEST_VAR), &devices->mram_requests_addr, &devices->mram_requests_size);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
+        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time_addr, NULL);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
+        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats_addr, NULL);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
+        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_RESULT_VAR), &devices->mram_result_addr, &devices->mram_result_size);
+        assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
         break;
     }
     devices->mram_available_size = MRAM_SIZE - (devices->mram_available_addr & (MRAM_SIZE - 1));
