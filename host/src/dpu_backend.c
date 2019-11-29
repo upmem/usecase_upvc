@@ -119,6 +119,7 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neig
     double t1, t2;
     unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
     uint8_t **mram = (uint8_t **)malloc(nb_dpus_per_rank * sizeof(uint8_t *));
+    size_t mram_size[nb_dpus_per_rank];
     assert(mram != NULL);
 
     t1 = my_clock();
@@ -131,9 +132,9 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neig
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
             unsigned int this_dpu = dpu_offset + each_dpu + rank_id * nb_dpus_per_rank;
-            mram_load(mram[each_dpu], this_dpu);
+            mram_size[each_dpu] = mram_load(mram[each_dpu], this_dpu);
         }
-        dpu_try_write_mram(rank_id, devices, mram, delta_neighbour);
+        dpu_try_write_mram(rank_id, devices, mram, mram_size, delta_neighbour);
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
             free(mram[each_dpu]);

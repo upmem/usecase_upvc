@@ -106,31 +106,16 @@ void save_index_seeds(index_seed_t **index_seed)
 static vmi_t *init_vmis(unsigned int nb_dpu)
 {
     vmi_t *vmis = (vmi_t *)calloc(nb_dpu, sizeof(vmi_t));
-    char vmi_name[8];
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-        (void)sprintf(vmi_name, "%04u", dpuno);
-        vmi_create(vmi_name, vmis + dpuno);
+        vmi_open(dpuno, vmis + dpuno);
     }
     return vmis;
 }
 
-static void dump_mdpu_images_into_mram_files(vmi_t *vmis, unsigned int nb_dpu)
-{
-    uint8_t *mram_image = (uint8_t *)malloc(MRAM_SIZE);
-    printf("Creating MRAM images\n");
-    for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-        vmi_t *this_vmi = vmis + each_dpu;
-        mram_copy_vmi(mram_image, this_vmi);
-        mram_save(mram_image, each_dpu);
-    }
-    free(mram_image);
-}
-
 static void free_vmis(vmi_t *vmis, unsigned int nb_dpu)
 {
-    dump_mdpu_images_into_mram_files(vmis, nb_dpu);
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-        vmi_delete(vmis + dpuno);
+        vmi_close(vmis + dpuno);
     }
     free(vmis);
 }

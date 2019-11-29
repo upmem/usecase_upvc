@@ -54,9 +54,10 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program);
  * @param rank_id      The rank number.
  * @param devices      Available devices.
  * @param mram         The mram content.
+ * @param mram_size    The size of the mrams.
  * @param delta_neighbour   The delta to apply to the UPVC DPU algorithm.
  */
-void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram, int delta_neighbour);
+void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram, size_t *mram_size, int delta_neighbour);
 
 /**
  * @brief Frees the allocated DPUs.

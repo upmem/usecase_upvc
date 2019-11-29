@@ -81,7 +81,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     return devices;
 }
 
-void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram, int delta_neighbour)
+void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram, size_t *mram_size, int delta_neighbour)
 {
     dpu_api_status_t status;
     struct dpu_rank_t *rank = devices->ranks[rank_id];
@@ -97,6 +97,7 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
         dpu_transfer_matrix_add_dpu(
             dpu, matrix, mram[each_dpu], devices->mram_available_size, devices->mram_available_addr, 0);
         dpu_transfer_matrix_add_dpu(dpu, matrix_delta, &delta_neighbour, sizeof(delta_info_t), devices->mram_info_addr, 0);
+        assert(mram_size[each_dpu] < devices->mram_available_size && "mram is to big to fit in DPU");
         each_dpu++;
     }
 
