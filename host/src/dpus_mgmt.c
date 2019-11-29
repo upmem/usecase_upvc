@@ -18,13 +18,6 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-/* #define LOG_DPUS */
-#ifdef LOG_DPUS
-#define log_dpu(dpu, out) dpulog_read_for_dpu(dpu, out)
-#else
-#define log_dpu(dpu, log)
-#endif /* LOG_DPUS */
-
 static char *profile;
 
 #define USE_COPY_TO_MRAMS 1
@@ -168,10 +161,10 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
         case DPU_STATUS_RUNNING:
             continue;
         case DPU_STATUS_ERROR:
-            log_dpu(dpu, stdout);
+            dpulog_read_for_dpu(dpu, stdout);
             ERROR_EXIT(10, "*** DPU %u.%u reported an error - aborting", rank_id, each_dpu);
         default:
-            log_dpu(dpu, stdout);
+            dpulog_read_for_dpu(dpu, stdout);
             ERROR_EXIT(11, "*** could not get DPU %u.%u status %u - aborting", rank_id, each_dpu, run_status[each_dpu]);
         }
         each_dpu++;
@@ -242,11 +235,13 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
 {
     dpu_api_status_t status;
     struct dpu_rank_t *rank = devices->ranks[rank_id];
-    unsigned int nb_dpus_per_rank = devices->nb_dpus_per_rank;
+    unsigned int nb_dpus_per_rank;
+    status = dpu_get_nr_of_dpus_in(rank, &nb_dpus_per_rank);
+    assert(status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_in failed");
     dpu_compute_time_t compute_time[nb_dpus_per_rank];
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
-    DPU_FOREACH(rank, dpu) {
+    DPU_FOREACH (rank, dpu) {
 #ifdef USE_COPY_TO_MRAMS
         dpu_transfer_matrix_add_dpu(
             dpu, matrix, &compute_time[each_dpu], sizeof(dpu_compute_time_t), devices->mram_compute_time_addr, 0);
@@ -267,10 +262,11 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
     /* Collect stats */
     dpu_tasklet_stats_t tasklet_stats[nb_dpus_per_rank][NB_TASKLET_PER_DPU];
     for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
-            dpu_transfer_matrix_add_dpu(devices->dpus[each_dpu + rank_id * nb_dpus_per_rank], matrix,
-                &tasklet_stats[each_dpu][each_tasklet], sizeof(dpu_tasklet_stats_t),
+        each_dpu = 0;
+        DPU_FOREACH (rank, dpu) {
+            dpu_transfer_matrix_add_dpu(dpu, matrix, &tasklet_stats[each_dpu][each_tasklet], sizeof(dpu_tasklet_stats_t),
                 (mram_addr_t)(devices->mram_tasklet_stats_addr + each_tasklet * sizeof(dpu_tasklet_stats_t)), 0);
+            each_dpu++;
         }
         status = dpu_copy_from_dpus(rank, matrix);
         assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
@@ -279,7 +275,8 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
 
     pthread_mutex_lock(&devices->log_mutex);
     fprintf(devices->log_file, "rank %u offset %u\n", rank_id, dpu_offset);
-    for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_rank; each_dpu++) {
+    each_dpu = 0;
+    DPU_FOREACH (rank, dpu) {
         unsigned int this_dpu = each_dpu + dpu_offset + rank_id * nb_dpus_per_rank;
         fprintf(devices->log_file, "LOG DPU=%u TIME=%llu SEC=%.3f\n", this_dpu, (unsigned long long)compute_time[each_dpu],
             (float)compute_time[each_dpu] / CLOCK_PER_SECONDS);
@@ -320,7 +317,8 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
         fprintf(devices->log_file, "LOG DPU=%u STORE=%u\n", this_dpu, agreagated_stats.mram_store);
 
 #endif
-        log_dpu(devices->dpus[this_dpu], devices->log_file);
+        dpulog_read_for_dpu(dpu, devices->log_file);
+        each_dpu++;
     }
     fflush(devices->log_file);
     pthread_mutex_unlock(&devices->log_mutex);
