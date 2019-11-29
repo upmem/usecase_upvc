@@ -20,8 +20,6 @@
 
 static char *profile;
 
-#define USE_COPY_TO_MRAMS 1
-
 void setup_dpus_for_target_type(target_type_t target_type)
 {
     switch (target_type) {
@@ -87,39 +85,27 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
 {
     dpu_api_status_t status;
     struct dpu_rank_t *rank = devices->ranks[rank_id];
-#ifdef USE_COPY_TO_MRAMS
     struct dpu_transfer_mram *matrix, *matrix_delta;
     status = dpu_transfer_matrix_allocate(rank, &matrix);
     assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
     status = dpu_transfer_matrix_allocate(rank, &matrix_delta);
     assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
-#endif
 
     unsigned int each_dpu = 0;
     struct dpu_t *dpu;
     DPU_FOREACH(rank, dpu) {
-#ifdef USE_COPY_TO_MRAMS
         dpu_transfer_matrix_add_dpu(
             dpu, matrix, mram[each_dpu], devices->mram_available_size, devices->mram_available_addr, 0);
         dpu_transfer_matrix_add_dpu(dpu, matrix_delta, &delta_neighbour, sizeof(delta_info_t), devices->mram_info_addr, 0);
-#else
-        status = dpu_copy_to_dpu(
-            dpu, (const uint8_t *)mram[each_dpu], devices->mram_available_addr, devices->mram_available_size);
-        assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpu failed");
-        status = dpu_copy_to_dpu(dpu, (const uint8_t *)&delta_neighbour, devices->mram_info_addr, sizeof(delta_info_t));
-        assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpu failed");
-#endif
         each_dpu++;
     }
 
-#ifdef USE_COPY_TO_MRAMS
     status = dpu_copy_to_dpus(rank, matrix);
     assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpus failed");
     status = dpu_copy_to_dpus(rank, matrix_delta);
     assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpus failed");
     dpu_transfer_matrix_free(rank, matrix);
     dpu_transfer_matrix_free(rank, matrix_delta);
-#endif
 }
 
 void dpu_try_free(devices_t *devices)
@@ -177,21 +163,17 @@ void dpu_try_write_dispatch_into_mram(
 {
     dpu_api_status_t status;
     struct dpu_rank_t *rank = devices->ranks[rank_id];
-#ifdef USE_COPY_TO_MRAMS
     struct dpu_transfer_mram *matrix_header, *matrix_reads;
-#endif
 
     unsigned int nb_dpus_per_rank;
     status = dpu_get_nr_of_dpus_in(rank, &nb_dpus_per_rank);
     assert(status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_in failed");
     request_info_t io_header[nb_dpus_per_rank];
 
-#ifdef USE_COPY_TO_MRAMS
     status = dpu_transfer_matrix_allocate(rank, &matrix_header);
     assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
     status = dpu_transfer_matrix_allocate(rank, &matrix_reads);
     assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
-#endif
 
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
@@ -199,23 +181,13 @@ void dpu_try_write_dispatch_into_mram(
         unsigned int nb_reads = dispatch[each_dpu + dpu_offset].nb_reads;
         io_header[each_dpu].nb_reads = nb_reads;
 
-#ifdef USE_COPY_TO_MRAMS
         dpu_transfer_matrix_add_dpu(
             dpu, matrix_header, &io_header[each_dpu], sizeof(request_info_t), devices->mram_request_info_addr, 0);
         dpu_transfer_matrix_add_dpu(dpu, matrix_reads, dispatch[each_dpu + dpu_offset].reads_area, devices->mram_requests_size,
             devices->mram_requests_addr, 0);
-#else
-        status = dpu_copy_to_dpu(
-            dpu, (const uint8_t *)&io_header[each_dpu], devices->mram_request_info_addr, sizeof(request_info_t));
-        assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpu failed");
-        status = dpu_copy_to_dpu(dpu, (const uint8_t *)dispatch[each_dpu + dpu_offset].reads_area, devices->mram_requests_addr,
-            devices->mram_requests_size);
-        assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpu failed");
-#endif
         each_dpu++;
     }
 
-#ifdef USE_COPY_TO_MRAMS
     status = dpu_copy_to_dpus(rank, matrix_header);
     assert(status == DPU_API_SUCCESS && "dpu_copy_to_dpus failed");
     status = dpu_copy_to_dpus(rank, matrix_reads);
@@ -223,15 +195,10 @@ void dpu_try_write_dispatch_into_mram(
 
     dpu_transfer_matrix_free(rank, matrix_header);
     dpu_transfer_matrix_free(rank, matrix_reads);
-#endif
 }
 
 #define CLOCK_PER_SECONDS (600000000.0)
-#ifdef USE_COPY_TO_MRAMS
 static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, struct dpu_transfer_mram *matrix)
-#else
-static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices)
-#endif
 {
     dpu_api_status_t status;
     struct dpu_rank_t *rank = devices->ranks[rank_id];
@@ -242,21 +209,13 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
     DPU_FOREACH (rank, dpu) {
-#ifdef USE_COPY_TO_MRAMS
         dpu_transfer_matrix_add_dpu(
             dpu, matrix, &compute_time[each_dpu], sizeof(dpu_compute_time_t), devices->mram_compute_time_addr, 0);
-#else
-        status = dpu_copy_from_dpu(
-            dpu, devices->mram_compute_time_addr, (uint8_t *)&compute_time[each_dpu], sizeof(dpu_compute_time_t));
-        assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpu failed");
-#endif
         each_dpu++;
     }
 
-#ifdef USE_COPY_TO_MRAMS
     status = dpu_copy_from_dpus(rank, matrix);
     assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
-#endif
 
 #ifdef STATS_ON
     /* Collect stats */
@@ -329,36 +288,21 @@ void dpu_try_get_results_and_log(
 {
     dpu_api_status_t status;
     struct dpu_rank_t *rank = devices->ranks[rank_id];
-#ifdef USE_COPY_TO_MRAMS
     struct dpu_transfer_mram *matrix;
     status = dpu_transfer_matrix_allocate(rank, &matrix);
     assert(status == DPU_API_SUCCESS && "dpu_transfer_matrix_allocate failed");
-#endif
 
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
     DPU_FOREACH(rank, dpu) {
-#ifdef USE_COPY_TO_MRAMS
         dpu_transfer_matrix_add_dpu(
             dpu, matrix, result_buffer[each_dpu], devices->mram_result_size, devices->mram_result_addr, 0);
-#else
-        status = dpu_copy_from_dpu(dpu, devices->mram_result_addr, (uint8_t *)result_buffer[each_dpu], devices->mram_result_size);
-        assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpu failed");
-
-#endif
         each_dpu++;
     }
 
-#ifdef USE_COPY_TO_MRAMS
     status = dpu_copy_from_dpus(rank, matrix);
     assert(status == DPU_API_SUCCESS && "dpu_copy_from_dpus failed");
-#endif
 
-
-#ifdef USE_COPY_TO_MRAMS
     dpu_try_log(rank_id, dpu_offset, devices, matrix);
     dpu_transfer_matrix_free(rank, matrix);
-#else
-    dpu_try_log(rank_id, dpu_offset, devices);
-#endif
 }
