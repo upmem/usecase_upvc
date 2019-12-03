@@ -403,10 +403,6 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
     memset(result_tab, 0, sizeof(dpu_result_out_t *) * MAX_NB_PASS);
     memset(result_tab_nb_read, 0, sizeof(unsigned int) * MAX_NB_PASS);
 
-    /* reads_info->delta_neighbour_in_bytes = (SIZE_SEED * round) / 4; */
-    /* reads_info->size_neighbour_in_32bits_words = (reads_info->size_neighbour_in_bytes - reads_info->delta_neighbour_in_bytes) *
-     * 4; */
-
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
     fope1 = fopen(filename, "w");
     sprintf(filename, "%s_%d_PE2.fasta", input_prefix, round + 1);
