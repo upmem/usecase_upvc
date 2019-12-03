@@ -24,8 +24,7 @@
 static void dispatch_request_add(
     dispatch_request_t *reads, unsigned int offset, unsigned int count, unsigned int num, int8_t *nbr)
 {
-    dpu_request_t *new_read
-        = (dpu_request_t *)(reads->reads_area + reads->nb_reads * sizeof(dpu_request_t));
+    dpu_request_t *new_read = (dpu_request_t *)(reads->reads_area + reads->nb_reads * sizeof(dpu_request_t));
     new_read->offset = offset;
     new_read->count = count;
     new_read->num = num;
@@ -34,12 +33,11 @@ static void dispatch_request_add(
     reads->nb_reads++;
 }
 
-void add_seed_to_dpu_requests(dispatch_request_t *requests, int num_read, __attribute__((unused)) int nb_read_written,
-    index_seed_t *seed, int8_t *nbr)
+void add_seed_to_dpu_requests(
+    dispatch_request_t *requests, int num_read, __attribute__((unused)) int nb_read_written, index_seed_t *seed, int8_t *nbr)
 {
     dispatch_request_t *this_request = requests + seed->num_dpu;
-    dispatch_request_add(
-        this_request, (unsigned int)seed->offset, (unsigned int)seed->nb_nbr, (unsigned int)num_read, nbr);
+    dispatch_request_add(this_request, (unsigned int)seed->offset, (unsigned int)seed->nb_nbr, (unsigned int)num_read, nbr);
 }
 
 void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int dpu_offset, unsigned int rank_id,
@@ -99,8 +97,8 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     times_ctx->tot_read_result += t4 - t3;
 }
 
-void init_backend_dpu(unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, const char *dpu_binary,
-    index_seed_t ***index_seed)
+void init_backend_dpu(
+    unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, const char *dpu_binary, index_seed_t ***index_seed)
 {
     *index_seed = load_index_seeds();
     malloc_dpu_res(get_nb_dpu());

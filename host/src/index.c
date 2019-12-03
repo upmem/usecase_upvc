@@ -120,8 +120,7 @@ static void free_vmis(vmi_t *vmis, unsigned int nb_dpu)
     free(vmis);
 }
 
-static void write_vmi(
-    vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord)
+static void write_vmi(vmi_t *vmis, unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord)
 {
     unsigned int size_neighbour_in_bytes = SIZE_NEIGHBOUR_IN_BYTES;
     unsigned int out_len = ALIGN_DPU(sizeof(dpu_result_coord_t) + size_neighbour_in_bytes);

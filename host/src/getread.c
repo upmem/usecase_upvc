@@ -74,11 +74,8 @@ int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_c
     t1 = my_clock();
 
     while (nb_read < MAX_READS_BUFFER) {
-        if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * size_read], &reads_buffer[(nb_read + 1) * size_read])
-                <= 0)
-            || (get_seq_fast_AQ(
-                    fpe2, &reads_buffer[(nb_read + 2) * size_read], &reads_buffer[(nb_read + 3) * size_read])
-                   <= 0))
+        if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * size_read], &reads_buffer[(nb_read + 1) * size_read]) <= 0)
+            || (get_seq_fast_AQ(fpe2, &reads_buffer[(nb_read + 2) * size_read], &reads_buffer[(nb_read + 3) * size_read]) <= 0))
             break;
         nb_read += 4;
     }

@@ -93,9 +93,8 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
 
     unsigned int each_dpu = 0;
     struct dpu_t *dpu;
-    DPU_FOREACH(rank, dpu) {
-        dpu_transfer_matrix_add_dpu(
-            dpu, matrix, mram[each_dpu], devices->mram_available_size, devices->mram_available_addr, 0);
+    DPU_FOREACH (rank, dpu) {
+        dpu_transfer_matrix_add_dpu(dpu, matrix, mram[each_dpu], devices->mram_available_size, devices->mram_available_addr, 0);
         dpu_transfer_matrix_add_dpu(dpu, matrix_delta, &delta_neighbour, sizeof(delta_info_t), devices->mram_info_addr, 0);
         assert(mram_size[each_dpu] < devices->mram_available_size && "mram is to big to fit in DPU");
         each_dpu++;
@@ -134,7 +133,7 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
     uint32_t nb_dpus_running = 0;
 
     status = dpu_get_nr_of_dpus_in(rank, &nb_dpus_per_rank);
-    assert (status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_in failed");
+    assert(status == DPU_API_SUCCESS && "dpu_get_nr_of_dpus_in failed");
     dpu_run_status_t run_status[nb_dpus_per_rank];
 
     status = dpu_get_all_status(devices->ranks[rank_id], run_status, &nb_dpus_running);
@@ -142,7 +141,7 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
 
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
-    DPU_FOREACH(rank, dpu) {
+    DPU_FOREACH (rank, dpu) {
         switch (run_status[each_dpu]) {
         case DPU_STATUS_IDLE:
         case DPU_STATUS_RUNNING:
@@ -178,7 +177,7 @@ void dpu_try_write_dispatch_into_mram(
 
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
-    DPU_FOREACH(rank, dpu) {
+    DPU_FOREACH (rank, dpu) {
         unsigned int nb_reads = dispatch[each_dpu + dpu_offset].nb_reads;
         io_header[each_dpu].nb_reads = nb_reads;
 
@@ -295,7 +294,7 @@ void dpu_try_get_results_and_log(
 
     struct dpu_t *dpu;
     unsigned int each_dpu = 0;
-    DPU_FOREACH(rank, dpu) {
+    DPU_FOREACH (rank, dpu) {
         dpu_transfer_matrix_add_dpu(
             dpu, matrix, result_buffer[each_dpu], devices->mram_result_size, devices->mram_result_addr, 0);
         each_dpu++;

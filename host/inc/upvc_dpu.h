@@ -67,8 +67,7 @@ void free_dpu_res(int nb_dpu);
 /**
  * @brief Write information of the DPU memory.
  */
-void write_neighbours_and_coordinates(
-    int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord);
+void write_neighbours_and_coordinates(int numdpu, int index_idx, int8_t *nbrs, dpu_result_coord_t coord);
 void write_neighbour_read(int num_dpu, int read_idx, int8_t *values);
 void write_count(int num_dpu, int read_idx, int value);
 void write_offset(int num_dpu, int read_idx, int value);

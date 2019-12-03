@@ -11,9 +11,9 @@
 
 #include "debug.h"
 #include "dout.h"
+#include "macro_utils.h"
 #include "request_pool.h"
 #include "stats.h"
-#include "macro_utils.h"
 
 #include "common.h"
 
@@ -44,7 +44,8 @@ __mram_noinit dpu_request_t DPU_REQUEST_VAR[MAX_DPU_REQUEST];
     do {                                                                                                                         \
         __CONCAT(mram_read, DPU_REQUEST_SIZE)(mram_addr, wram_addr);                                                             \
     } while (0);
-_Static_assert(sizeof(dpu_request_t) == DPU_REQUEST_SIZE, "sizeof(dpu_request changed, make sure to change MRAM_READ_REQUEST as well)");
+_Static_assert(
+    sizeof(dpu_request_t) == DPU_REQUEST_SIZE, "sizeof(dpu_request changed, make sure to change MRAM_READ_REQUEST as well)");
 
 /**
  * @brief Common request pool, shared by every tasklet.

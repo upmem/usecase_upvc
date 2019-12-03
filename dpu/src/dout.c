@@ -6,8 +6,8 @@
 #include <defs.h>
 #include <mram.h>
 
-#include "dout.h"
 #include "debug.h"
+#include "dout.h"
 #include "stats.h"
 
 __mram_noinit dpu_result_out_t m_dpu_swap_result[NB_TASKLET_PER_DPU * MAX_RESULTS_PER_READ];

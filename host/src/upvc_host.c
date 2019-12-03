@@ -219,7 +219,8 @@ void *thread_dispatch(void *arg)
 
             if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
                 PRINT_TIME_DISPATCH(times_ctx, each_pass);
-                dispatch_read(index_seed, reads_buffer[each_pass_mod], nb_read[each_pass_mod], dispatch_requests, times_ctx, backends_functions);
+                dispatch_read(index_seed, reads_buffer[each_pass_mod], nb_read[each_pass_mod], dispatch_requests, times_ctx,
+                    backends_functions);
                 PRINT_TIME_DISPATCH(times_ctx, each_pass);
             }
 
@@ -390,8 +391,7 @@ void *thread_process(void *arg)
 
 static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping_coverage, int *substitution_list,
     dispatch_request_t *dispatch_requests, index_seed_t **index_seed, char *input_prefix, variant_tree_t **variant_list,
-    genome_t *ref_genome, devices_t *devices, times_ctx_t *times_ctx,
-    backends_functions_t *backends_functions)
+    genome_t *ref_genome, devices_t *devices, times_ctx_t *times_ctx, backends_functions_t *backends_functions)
 {
     char filename[1024];
     FILE *fipe1, *fipe2, *fope1, *fope2;
@@ -404,7 +404,8 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
     memset(result_tab_nb_read, 0, sizeof(unsigned int) * MAX_NB_PASS);
 
     /* reads_info->delta_neighbour_in_bytes = (SIZE_SEED * round) / 4; */
-    /* reads_info->size_neighbour_in_32bits_words = (reads_info->size_neighbour_in_bytes - reads_info->delta_neighbour_in_bytes) * 4; */
+    /* reads_info->size_neighbour_in_32bits_words = (reads_info->size_neighbour_in_bytes - reads_info->delta_neighbour_in_bytes) *
+     * 4; */
 
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
     fope1 = fopen(filename, "w");

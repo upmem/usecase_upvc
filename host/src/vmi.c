@@ -3,16 +3,16 @@
  */
 
 #include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-#include "upvc.h"
 #include "mram_dpu.h"
+#include "upvc.h"
 #include "vmi.h"
 
 bool vmi_open(unsigned int dpu_id, vmi_t *vmi)

@@ -10,7 +10,7 @@
 
 #include "common.h"
 
-char file_name[24] = {0};
+char file_name[24] = { 0 };
 
 char *make_mram_file_name(unsigned int dpu_id)
 {
@@ -28,4 +28,3 @@ size_t mram_load(uint8_t *mram, unsigned int dpu_id)
     fclose(f);
     return read_size;
 }
-

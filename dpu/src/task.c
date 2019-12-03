@@ -87,7 +87,6 @@ _Static_assert(
  */
 __dma_aligned static dout_t global_dout[NB_TASKLET_PER_DPU];
 
-
 typedef struct {
     dpu_result_coord_t coord;
     uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
@@ -128,8 +127,9 @@ static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcou
     *last_time = current_time;
 }
 
-static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t *cached_coords_and_nbr, uint8_t *current_read_nbr,
-    dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats, mutex_id_t *mutex_miscellaneous)
+static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t *cached_coords_and_nbr,
+    uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats,
+    mutex_id_t *mutex_miscellaneous)
 {
     int score, score_nodp, score_odpd = -1;
     uint8_t *ref_nbr = &cached_coords_and_nbr->nbr[0];
@@ -173,9 +173,8 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t
         tasklet_stats);
 }
 
-static void compute_request(sysname_t tasklet_id, coords_and_nbr_t *cached_coords_and_nbr,
-    uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats,
-    mutex_id_t *mutex_miscellaneous)
+static void compute_request(sysname_t tasklet_id, coords_and_nbr_t *cached_coords_and_nbr, uint8_t *current_read_nbr,
+    dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats, mutex_id_t *mutex_miscellaneous)
 {
     int mini = MAX_SCORE;
     for (unsigned int idx = 0; idx < request->count; idx += NB_REF_PER_READ) {
@@ -226,8 +225,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 
         dout_clear(dout);
 
-        compute_request(tasklet_id, cached_coords_and_nbr, current_read_nbr, request, dout, &tasklet_stats,
-            &mutex_miscellaneous);
+        compute_request(tasklet_id, cached_coords_and_nbr, current_read_nbr, request, dout, &tasklet_stats, &mutex_miscellaneous);
 
         STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
         result_pool_write(dout, &tasklet_stats);

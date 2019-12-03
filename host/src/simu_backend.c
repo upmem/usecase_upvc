@@ -294,8 +294,8 @@ static void *align_on_dpu(void *arg)
     return NULL;
 }
 
-void add_seed_to_simulation_requests(__attribute__((unused)) dispatch_request_t *requests, int num_read, int nb_read_written,
-    index_seed_t *seed, int8_t *nbr)
+void add_seed_to_simulation_requests(
+    __attribute__((unused)) dispatch_request_t *requests, int num_read, int nb_read_written, index_seed_t *seed, int8_t *nbr)
 {
     write_count(seed->num_dpu, nb_read_written, seed->nb_nbr);
     write_offset(seed->num_dpu, nb_read_written, seed->offset);

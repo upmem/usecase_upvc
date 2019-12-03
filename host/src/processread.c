@@ -141,7 +141,7 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
 }
 
 static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **variant_list,
-                        int *substitution_list, int8_t *mapping_coverage, unsigned int size_neighbour_in_symbols)
+    int *substitution_list, int8_t *mapping_coverage, unsigned int size_neighbour_in_symbols)
 {
     uint32_t code_result_idx;
     uint8_t code_result_tab[256];
@@ -387,14 +387,14 @@ int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **va
         }
 
         /* Compute a [0, 3] read pair */
-        if (!compute_read_pair(0, 3, offset, nbread, result_tab, result_tab_tmp, numpair, round, fpe1, fpe2, reads_buffer,
-                &result_found)) {
+        if (!compute_read_pair(
+                0, 3, offset, nbread, result_tab, result_tab_tmp, numpair, round, fpe1, fpe2, reads_buffer, &result_found)) {
             continue;
         }
 
         /* Compute a [1, 2] read pair */
-        if (!compute_read_pair(2, 1, offset, nbread, result_tab, result_tab_tmp, numpair, round, fpe1, fpe2, reads_buffer,
-                &result_found)) {
+        if (!compute_read_pair(
+                2, 1, offset, nbread, result_tab, result_tab_tmp, numpair, round, fpe1, fpe2, reads_buffer, &result_found)) {
             continue;
         }
 
