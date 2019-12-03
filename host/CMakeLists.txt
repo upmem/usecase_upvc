@@ -44,12 +44,12 @@ add_custom_target(check cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integrati
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta.ref | sort > ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta.ref.sort
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta.ref | sort > ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta.ref.sort
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta.ref | sort > ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta.ref.sort
-        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE1.fasta | sort | diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE1.fasta.ref.sort -
-        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE1.fasta | sort | diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE1.fasta.ref.sort -
-        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE1.fasta | sort | diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE1.fasta.ref.sort -
-        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta | sort | diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta.ref.sort -
-        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta | sort | diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta.ref.sort -
-        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta | sort | diff ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta.ref.sort -
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE1.fasta | sort | diff -y ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE1.fasta.ref.sort -
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE1.fasta | sort | diff -y ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE1.fasta.ref.sort -
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE1.fasta | sort | diff -y ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE1.fasta.ref.sort -
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta | sort | diff -y ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_1_PE2.fasta.ref.sort -
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta | sort | diff -y ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_2_PE2.fasta.ref.sort -
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta | sort | diff -y ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_3_PE2.fasta.ref.sort -
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
 include(ExternalProject)
