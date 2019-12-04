@@ -24,9 +24,8 @@ typedef struct {
     unsigned int nb_dpus;
     pthread_mutex_t log_mutex;
     FILE *log_file;
-    mram_addr_t mram_info_addr, mram_request_info_addr, mram_requests_addr, mram_compute_time_addr, mram_result_addr,
-        mram_tasklet_stats_addr, mram_available_addr;
-    mram_size_t mram_requests_size, mram_result_size, mram_available_size;
+    struct dpu_symbol_t mram_info, mram_request_info, mram_requests, mram_compute_time, mram_result, mram_tasklet_stats,
+        mram_available;
 } devices_t;
 
 /**

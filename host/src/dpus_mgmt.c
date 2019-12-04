@@ -57,23 +57,23 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
 
     struct dpu_t *one_dpu;
     DPU_FOREACH (devices->ranks[0], one_dpu) {
-        status = dpu_get_mram_symbol(one_dpu, DPU_MRAM_HEAP_POINTER_NAME, &devices->mram_available_addr, NULL);
+        struct dpu_runtime_context_t *rt_ctx = dpu_get_runtime_context(one_dpu);
+        status = dpu_get_symbol(rt_ctx, DPU_MRAM_HEAP_POINTER_NAME, &devices->mram_available);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
-        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_MRAM_INFO_VAR), &devices->mram_info_addr, NULL);
+        status = dpu_get_symbol(rt_ctx, XSTR(DPU_MRAM_INFO_VAR), &devices->mram_info);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
-        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_REQUEST_INFO_VAR), &devices->mram_request_info_addr, NULL);
+        status = dpu_get_symbol(rt_ctx, XSTR(DPU_REQUEST_INFO_VAR), &devices->mram_request_info);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
-        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_REQUEST_VAR), &devices->mram_requests_addr, &devices->mram_requests_size);
+        status = dpu_get_symbol(rt_ctx, XSTR(DPU_REQUEST_VAR), &devices->mram_requests);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
-        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time_addr, NULL);
+        status = dpu_get_symbol(rt_ctx, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
-        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats_addr, NULL);
+        status = dpu_get_symbol(rt_ctx, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
-        status = dpu_get_mram_symbol(one_dpu, XSTR(DPU_RESULT_VAR), &devices->mram_result_addr, &devices->mram_result_size);
+        status = dpu_get_symbol(rt_ctx, XSTR(DPU_RESULT_VAR), &devices->mram_result);
         assert(status == DPU_API_SUCCESS && "dpu_get_mram_symbol failed");
         break;
     }
-    devices->mram_available_size = MRAM_SIZE - (devices->mram_available_addr & (MRAM_SIZE - 1));
 
     pthread_mutex_init(&devices->log_mutex, NULL);
     devices->log_file = fopen("upvc_log.txt", "w");
@@ -94,9 +94,10 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
     unsigned int each_dpu = 0;
     struct dpu_t *dpu;
     DPU_FOREACH (rank, dpu) {
-        dpu_transfer_matrix_add_dpu(dpu, matrix, mram[each_dpu], devices->mram_available_size, devices->mram_available_addr, 0);
-        dpu_transfer_matrix_add_dpu(dpu, matrix_delta, &delta_neighbour, sizeof(delta_info_t), devices->mram_info_addr, 0);
-        assert(mram_size[each_dpu] < devices->mram_available_size && "mram is to big to fit in DPU");
+        dpu_transfer_matrix_add_dpu(
+            dpu, matrix, mram[each_dpu], devices->mram_available.size, devices->mram_available.address, 0);
+        dpu_transfer_matrix_add_dpu(dpu, matrix_delta, &delta_neighbour, sizeof(delta_info_t), devices->mram_info.address, 0);
+        assert(mram_size[each_dpu] < devices->mram_available.size && "mram is to big to fit in DPU");
         each_dpu++;
     }
 
@@ -182,9 +183,9 @@ void dpu_try_write_dispatch_into_mram(
         io_header[each_dpu].nb_reads = nb_reads;
 
         dpu_transfer_matrix_add_dpu(
-            dpu, matrix_header, &io_header[each_dpu], sizeof(request_info_t), devices->mram_request_info_addr, 0);
-        dpu_transfer_matrix_add_dpu(dpu, matrix_reads, dispatch[each_dpu + dpu_offset].reads_area, devices->mram_requests_size,
-            devices->mram_requests_addr, 0);
+            dpu, matrix_header, &io_header[each_dpu], sizeof(request_info_t), devices->mram_request_info.address, 0);
+        dpu_transfer_matrix_add_dpu(dpu, matrix_reads, dispatch[each_dpu + dpu_offset].reads_area, devices->mram_requests.size,
+            devices->mram_requests.address, 0);
         each_dpu++;
     }
 
@@ -210,7 +211,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
     unsigned int each_dpu = 0;
     DPU_FOREACH (rank, dpu) {
         dpu_transfer_matrix_add_dpu(
-            dpu, matrix, &compute_time[each_dpu], sizeof(dpu_compute_time_t), devices->mram_compute_time_addr, 0);
+            dpu, matrix, &compute_time[each_dpu], sizeof(dpu_compute_time_t), devices->mram_compute_time.address, 0);
         each_dpu++;
     }
 
@@ -224,7 +225,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
         each_dpu = 0;
         DPU_FOREACH (rank, dpu) {
             dpu_transfer_matrix_add_dpu(dpu, matrix, &tasklet_stats[each_dpu][each_tasklet], sizeof(dpu_tasklet_stats_t),
-                (mram_addr_t)(devices->mram_tasklet_stats_addr + each_tasklet * sizeof(dpu_tasklet_stats_t)), 0);
+                (mram_addr_t)(devices->mram_tasklet_stats.address + each_tasklet * sizeof(dpu_tasklet_stats_t)), 0);
             each_dpu++;
         }
         status = dpu_copy_from_dpus(rank, matrix);
@@ -296,7 +297,7 @@ void dpu_try_get_results_and_log(
     unsigned int each_dpu = 0;
     DPU_FOREACH (rank, dpu) {
         dpu_transfer_matrix_add_dpu(
-            dpu, matrix, result_buffer[each_dpu], devices->mram_result_size, devices->mram_result_addr, 0);
+            dpu, matrix, result_buffer[each_dpu], devices->mram_result.size, devices->mram_result.address, 0);
         each_dpu++;
     }
 
