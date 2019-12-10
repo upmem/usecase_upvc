@@ -17,7 +17,8 @@
 
 bool vmi_open(unsigned int dpu_id, vmi_t *vmi)
 {
-    vmi->handle = open(make_mram_file_name(dpu_id), O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+    char file_name[FILE_NAME_SIZE];
+    vmi->handle = open(make_mram_file_name(file_name, dpu_id), O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
     if (vmi->handle == -1) {
         ERROR("VMI: open failed");
         return false;

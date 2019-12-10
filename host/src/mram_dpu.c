@@ -8,19 +8,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "mram_dpu.h"
 #include "common.h"
 
-char file_name[24] = { 0 };
-
-char *make_mram_file_name(unsigned int dpu_id)
+char *make_mram_file_name(char *str, unsigned int dpu_id)
 {
-    sprintf(file_name, "mram_%04u.bin", dpu_id);
-    return file_name;
+    sprintf(str, "mram_%04u.bin", dpu_id);
+    return str;
 }
 
 size_t mram_load(uint8_t *mram, unsigned int dpu_id)
 {
-    FILE *f = fopen(make_mram_file_name(dpu_id), "rb");
+    char file_name[FILE_NAME_SIZE];
+    FILE *f = fopen(make_mram_file_name(file_name, dpu_id), "rb");
     assert(f != NULL);
 
     size_t read_size = fread(mram, sizeof(uint8_t), MRAM_SIZE, f);

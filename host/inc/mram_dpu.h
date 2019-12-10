@@ -12,6 +12,8 @@
  */
 #include "common.h"
 
+#define FILE_NAME_SIZE 24
+
 /**
  * @brief create the name of the 'dpu_id'th mram
  *
@@ -19,7 +21,7 @@
  *
  * @return the name of the mram
  */
-char *make_mram_file_name(unsigned int dpu_id);
+char *make_mram_file_name(char *str, unsigned int dpu_id);
 
 /**
  * @brief Loads an MRAM file into an MRAM image.
