@@ -146,6 +146,7 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
         switch (run_status[each_dpu]) {
         case DPU_STATUS_IDLE:
         case DPU_STATUS_RUNNING:
+            each_dpu++;
             continue;
         case DPU_STATUS_ERROR:
             dpulog_read_for_dpu(dpu, stdout);
@@ -154,7 +155,6 @@ bool dpu_try_check_status(unsigned int rank_id, devices_t *devices)
             dpulog_read_for_dpu(dpu, stdout);
             ERROR_EXIT(11, "*** could not get DPU %u.%u status %u - aborting", rank_id, each_dpu, run_status[each_dpu]);
         }
-        each_dpu++;
     }
     return (nb_dpus_running == 0);
 }
