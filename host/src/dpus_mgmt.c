@@ -37,7 +37,8 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     devices_t *devices = (devices_t *)malloc(sizeof(devices_t));
     assert(devices != NULL);
 
-    DPU_ASSERT(dpu_alloc_dpus(profile, nb_dpus_per_run, &devices->ranks, &devices->nb_ranks_per_run, NULL));
+    DPU_ASSERT(dpu_alloc_dpus(profile, nb_dpus_per_run, &devices->ranks, &devices->nb_ranks_per_run, &nb_dpus_per_run));
+    set_nb_dpus_per_run(nb_dpus_per_run);
 
     devices->nb_dpus_per_rank = (unsigned int *)malloc(devices->nb_ranks_per_run * sizeof(unsigned int));
     devices->rank_mram_offset = (unsigned int *)malloc(devices->nb_ranks_per_run * sizeof(unsigned int));
