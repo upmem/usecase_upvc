@@ -20,6 +20,15 @@
 
 static char *profile;
 
+static uint64_t compute_checksum(uint64_t *buffer, size_t size_in_bytes)
+{
+    uint64_t res = 0ULL;
+    for (unsigned int id = 0; id < (size_in_bytes / sizeof(uint64_t)); id++) {
+        res += buffer[id];
+    }
+    return res;
+}
+
 void setup_dpus_for_target_type(target_type_t target_type)
 {
     switch (target_type) {
@@ -65,6 +74,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
         DPU_ASSERT(dpu_get_symbol(rt_ctx, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time));
         DPU_ASSERT(dpu_get_symbol(rt_ctx, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats));
         DPU_ASSERT(dpu_get_symbol(rt_ctx, XSTR(DPU_RESULT_VAR), &devices->mram_result));
+        DPU_ASSERT(dpu_get_symbol(rt_ctx, XSTR(DPU_RESULTS_CHECKSUM_VAR), &devices->mram_results_checksum));
         break;
     }
 
@@ -146,7 +156,7 @@ void dpu_try_run(unsigned int rank_id, devices_t *devices)
 }
 
 void dpu_try_write_dispatch_into_mram(
-    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch)
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch, uint64_t *requests_checksum)
 {
     struct dpu_rank_t *rank = devices->ranks[rank_id];
     struct dpu_transfer_mram *matrix_header, *matrix_reads;
@@ -170,6 +180,8 @@ void dpu_try_write_dispatch_into_mram(
         unsigned int this_dpu = each_dpu + dpu_offset;
         if (this_dpu < nb_dpu) {
             io_header[each_dpu] = dispatch[this_dpu];
+            requests_checksum[each_dpu] = compute_checksum(
+                (uint64_t *)dispatch[this_dpu].reads_area, dispatch[this_dpu].nb_reads * sizeof(dpu_request_t));
         } else {
             io_header[each_dpu] = dummy_dispatch;
         }
@@ -276,12 +288,13 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
     pthread_mutex_unlock(&devices->log_mutex);
 }
 
-void dpu_try_get_results_and_log(
-    unsigned int rank_id, __attribute__((unused)) unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)
+void dpu_try_get_results_and_log(unsigned int rank_id, __attribute__((unused)) unsigned int dpu_offset, devices_t *devices,
+    dpu_result_out_t **result_buffer, uint64_t *results_checksum)
 {
     struct dpu_rank_t *rank = devices->ranks[rank_id];
-    struct dpu_transfer_mram *matrix;
+    struct dpu_transfer_mram *matrix, *matrix_checksum;
     DPU_ASSERT(dpu_transfer_matrix_allocate(rank, &matrix));
+    DPU_ASSERT(dpu_transfer_matrix_allocate(rank, &matrix_checksum));
     uint32_t nb_dpus_per_rank;
     DPU_ASSERT(dpu_get_nr_of_dpus_in(rank, &nb_dpus_per_rank));
     uint8_t *results[nb_dpus_per_rank];
@@ -297,12 +310,15 @@ void dpu_try_get_results_and_log(
         } else {
             results[each_dpu] = dummy_results;
         }
+        DPU_ASSERT(dpu_transfer_matrix_add_dpu(dpu, matrix_checksum, &results_checksum[each_dpu],
+            devices->mram_results_checksum.size, devices->mram_results_checksum.address, 0));
         DPU_ASSERT(dpu_transfer_matrix_add_dpu(
             dpu, matrix, results[each_dpu], devices->mram_result.size, devices->mram_result.address, 0));
         each_dpu++;
     }
 
     DPU_ASSERT(dpu_copy_from_dpus(rank, matrix));
+    DPU_ASSERT(dpu_copy_from_dpus(rank, matrix_checksum));
 
     dpu_try_log(rank_id, dpu_offset, devices, matrix);
     dpu_transfer_matrix_free(rank, matrix);

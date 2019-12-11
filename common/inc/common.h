@@ -106,4 +106,6 @@ typedef struct {
 } dpu_request_t;
 #define DPU_REQUEST_VAR m_dpu_request
 
+#define DPU_RESULTS_CHECKSUM_VAR m_dpu_results_checksum
+
 #endif /* __COMMON_H__ */

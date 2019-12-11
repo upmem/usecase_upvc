@@ -40,6 +40,12 @@ void add_seed_to_dpu_requests(
     dispatch_request_add(this_request, (unsigned int)seed->offset, (unsigned int)seed->nb_nbr, (unsigned int)num_read, nbr);
 }
 
+#define NB_DPU 256
+#define NB_PASS_MAX 250
+#define NB_ROUND 3
+#define CHECKSUMS_TABLE_SIZE (NB_ROUND * NB_PASS_MAX * NB_DPU * 2)
+
+uint64_t *checksums_table;
 void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int dpu_offset, unsigned int rank_id,
     unsigned int nb_pass, __attribute__((unused)) int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
     times_ctx_t *times_ctx)
@@ -49,7 +55,9 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     t1 = my_clock();
 
     PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
-    dpu_try_write_dispatch_into_mram(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, dispatch);
+    uint64_t requests_checksum[devices->nb_dpus_per_rank[rank_id]];
+    dpu_try_write_dispatch_into_mram(
+        rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, dispatch, requests_checksum);
     sem_post(dispatch_free_sem);
 
     PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
@@ -71,7 +79,24 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
          (each_dpu < nb_dpus_per_rank) && (this_dpu < nb_dpu); each_dpu++, this_dpu++) {
         results[each_dpu] = get_mem_dpu_res(this_dpu);
     }
-    dpu_try_get_results_and_log(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, results);
+    uint64_t results_checksum[devices->nb_dpus_per_rank[rank_id]];
+    dpu_try_get_results_and_log(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, results, results_checksum);
+    for (unsigned int each_dpu = 0; each_dpu < devices->nb_dpus_per_rank[rank_id]; each_dpu++) {
+        unsigned int this_dpu = dpu_offset + each_dpu + devices->rank_mram_offset[rank_id];
+        unsigned int round = (delta_neighbour / (SIZE_SEED / 4));
+        if (checksums_table[this_dpu * 2 + 1 + NB_DPU * 2 * (nb_pass + NB_PASS_MAX * round)] != requests_checksum[each_dpu]) {
+            printf("[r%u,p%u] %u.(%u+%u) => %u | I:%u => 0x%lx != 0x%lx\n", round, nb_pass, rank_id, dpu_offset, each_dpu,
+                this_dpu, this_dpu * 2 + 1 + NB_DPU * 2 * (nb_pass + NB_PASS_MAX * round),
+                checksums_table[this_dpu * 2 + 1 + NB_DPU * 2 * (nb_pass + NB_PASS_MAX * round)], requests_checksum[each_dpu]);
+            exit(-66);
+        }
+        if (checksums_table[this_dpu * 2 + NB_DPU * 2 * (nb_pass + NB_PASS_MAX * round)] != results_checksum[each_dpu]) {
+            printf("[r%u,p%u] %u.(%u+%u) => %u | O:%u => 0x%lx != 0x%lx\n", round, nb_pass, rank_id, dpu_offset, each_dpu,
+                this_dpu, this_dpu * 2 + NB_DPU * 2 * (nb_pass + NB_PASS_MAX * round),
+                checksums_table[this_dpu * 2 + NB_DPU * 2 * (nb_pass + NB_PASS_MAX * round)], results_checksum[each_dpu]);
+            exit(-66);
+        }
+    }
 
     PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
 
@@ -93,12 +118,18 @@ void init_backend_dpu(
     malloc_dpu_res(get_nb_dpu());
     *devices = dpu_try_alloc_for(nb_dpu_per_run, dpu_binary);
     *nb_rank = (*devices)->nb_ranks_per_run;
+    checksums_table = calloc(CHECKSUMS_TABLE_SIZE, sizeof(uint64_t));
+    assert(checksums_table != NULL);
+    FILE *f = fopen("checksum_output.bin", "r");
+    assert(fread(checksums_table, sizeof(uint64_t), CHECKSUMS_TABLE_SIZE, f) == CHECKSUMS_TABLE_SIZE);
+    fclose(f);
 }
 
 void free_backend_dpu(devices_t *devices, unsigned int nb_dpu)
 {
     dpu_try_free(devices);
     free_dpu_res(nb_dpu);
+    free(checksums_table);
 }
 
 void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neighbour, devices_t *devices, times_ctx_t *times_ctx)

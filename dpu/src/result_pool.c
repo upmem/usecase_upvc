@@ -42,6 +42,18 @@ MUTEX_INIT(result_pool_mutex);
  */
 __mram_noinit dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
 
+__mram_noinit uint64_t DPU_RESULTS_CHECKSUM_VAR;
+uint64_t checksum;
+
+static uint64_t compute_checksum(uint64_t *buffer, size_t size_in_bytes)
+{
+    uint64_t res = 0ULL;
+    for (unsigned int id = 0; id < (size_in_bytes / sizeof(uint64_t)); id++) {
+        res += buffer[id];
+    }
+    return res;
+}
+
 #define DPU_RESULT_WRITE(res, addr)                                                                                              \
     do {                                                                                                                         \
         mram_write16(res, addr);                                                                                                 \
@@ -53,6 +65,7 @@ void result_pool_init()
     result_pool.mutex = MUTEX_GET(result_pool_mutex);
     result_pool.wridx = 0;
     result_pool.cur_write = (mram_addr_t)DPU_RESULT_VAR;
+    checksum = 0ULL;
 }
 
 void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
@@ -75,6 +88,8 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         STATS_INCR_LOAD(stats, LOCAL_RESULTS_PAGE_SIZE);
         LOCAL_RESULTS_PAGE_READ(source_addr, result_pool.cache);
 
+        checksum += compute_checksum((uint64_t *)result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
+
         ASSERT_DMA_ADDR(result_pool.cur_write, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
         STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
         STATS_INCR_STORE_RESULT(stats, LOCAL_RESULTS_PAGE_SIZE);
@@ -90,6 +105,8 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
         STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
         DPU_RESULT_WRITE((void *)&(results->outs[each_result]), result_pool.cur_write);
+
+        checksum += compute_checksum((uint64_t *)&(results->outs[each_result]), sizeof(dpu_result_out_t));
 
         result_pool.wridx++;
         result_pool.cur_write += sizeof(dpu_result_out_t);
@@ -117,6 +134,8 @@ void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
     DPU_RESULT_WRITE((void *)&end_of_results, result_pool.cur_write);
     STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
     STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
+
+    DPU_RESULTS_CHECKSUM_VAR = checksum;
 
     mutex_unlock(result_pool.mutex);
 }

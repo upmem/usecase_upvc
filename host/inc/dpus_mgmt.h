@@ -26,7 +26,7 @@ typedef struct {
     pthread_mutex_t log_mutex;
     FILE *log_file;
     struct dpu_symbol_t mram_info, mram_request_info, mram_requests, mram_compute_time, mram_result, mram_tasklet_stats,
-        mram_available;
+        mram_available, mram_results_checksum;
 } devices_t;
 
 /**
@@ -86,7 +86,7 @@ void dpu_try_run(unsigned int rank_id, devices_t *devices);
  * @param dispatch    The structure containing the dispatching of the reads into the DPUs.
  */
 void dpu_try_write_dispatch_into_mram(
-    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch);
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch, uint64_t *requests_checksum);
 
 /**
  * @brief Reads the result area of a DPU, raises an exception if something went wrong with the DPU.
@@ -97,7 +97,7 @@ void dpu_try_write_dispatch_into_mram(
  * @param devices  List of available devices.
  * @param result_buffer The table of DPU results to store the results (last one having a request number equal to -1).
  */
-void dpu_try_get_results_and_log(
-    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
+void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, devices_t *devices,
+    dpu_result_out_t **result_buffer, uint64_t *results_checksum);
 
 #endif /* __INTEGRATION_DPUS_H__ */
