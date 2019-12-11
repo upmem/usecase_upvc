@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#include "common.h"
+
 /**
  * @brief List of reads dispatched to a DPU.
  *
@@ -14,7 +16,7 @@
  * @var reads     A table of nb_reads requests. Since the read size is not fixed, the table is a raw byte stream.
  */
 typedef struct {
-    uint32_t nb_reads;
+    nb_request_t nb_reads;
     int8_t *reads_area;
 } dispatch_request_t;
 

@@ -302,7 +302,7 @@ int accumulate_read(
 
     t1 = my_clock();
 
-    for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run(); numdpu++) {
+    for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run() && numdpu < get_nb_dpu(); numdpu++) {
         unsigned int k = 0;
         int num_read;
         do {
@@ -314,7 +314,7 @@ int accumulate_read(
     *result_tab_nb_read = *result_tab_nb_read + nb_total_read;
     *result_tab = realloc(*result_tab, *result_tab_nb_read * sizeof(dpu_result_out_t));
 
-    for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run(); numdpu++) {
+    for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run() && numdpu < get_nb_dpu(); numdpu++) {
         int k = 0;
         int num_read = read_out_num(numdpu, k);
 

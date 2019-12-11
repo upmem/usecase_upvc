@@ -85,10 +85,8 @@ typedef uint64_t dpu_compute_time_t;
 /**
  * @brief Information on the requests reads to a DPU.
  */
-typedef struct {
-    uint64_t nb_reads;
-} request_info_t;
-#define DPU_REQUEST_INFO_VAR m_dpu_request_info
+typedef uint64_t nb_request_t;
+#define DPU_NB_REQUEST_VAR m_dpu_nb_request
 
 /**
  * @brief Structure representing one request to a DPU, resulting from the dispatching of reads.

@@ -35,7 +35,7 @@ typedef struct {
     mram_addr_t cur_read;
 } request_pool_t;
 
-__mram_noinit request_info_t DPU_REQUEST_INFO_VAR;
+__mram_noinit nb_request_t DPU_NB_REQUEST_VAR;
 
 __mram_noinit dpu_request_t DPU_REQUEST_VAR[MAX_DPU_REQUEST];
 
@@ -55,11 +55,9 @@ MUTEX_INIT(request_pool_mutex);
 
 void request_pool_init()
 {
-    __dma_aligned request_info_t io_data;
-
     request_pool.mutex = MUTEX_GET(request_pool_mutex);
 
-    request_pool.nb_reads = DPU_REQUEST_INFO_VAR.nb_reads;
+    request_pool.nb_reads = (unsigned int)DPU_NB_REQUEST_VAR;
     request_pool.rdidx = 0;
     request_pool.cur_read = (mram_addr_t)DPU_REQUEST_VAR;
 }

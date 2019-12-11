@@ -18,8 +18,9 @@
  * @brief General structure describing the DPUs involved in a run.
  */
 typedef struct {
-    unsigned int nb_dpus_per_rank;
     unsigned int nb_ranks_per_run;
+    unsigned int *nb_dpus_per_rank;
+    unsigned int *rank_mram_offset;
     struct dpu_rank_t **ranks;
     unsigned int nb_dpus;
     pthread_mutex_t log_mutex;
@@ -75,16 +76,6 @@ void dpu_try_free(devices_t *devices);
  * @param devices  Available devices.
  */
 void dpu_try_run(unsigned int rank_id, devices_t *devices);
-
-/**
- * @brief Checks the status of a rank of DPUs.
- *
- * @param rank_id  The rank number.
- * @param devices  Available devices.
- *
- * @return Whether the DPU has finished its run.
- */
-bool dpu_try_check_status(unsigned int rank_id, devices_t *devices);
 
 /**
  * @brief Stores the dispatch parameters into a DPU, raises an exception if the MRAM limit is reached.
