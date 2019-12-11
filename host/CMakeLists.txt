@@ -29,11 +29,12 @@ if(NOT DPU_TARGET)
         endif()
 endif()
 
-if(NOT NB_DPU)
-        set(NB_DPU "1")
+set(NB_DPU_MARK)
+if (NB_DPU)
+        set(NB_DPU_MARK "-n")
 endif()
 
-add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map -n ${NB_DPU} -t ${DPU_TARGET} -b ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu_task
+add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU} -t ${DPU_TARGET} -b ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu_task
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
