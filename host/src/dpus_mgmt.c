@@ -125,7 +125,7 @@ void dpu_try_run(unsigned int rank_id, devices_t *devices)
         struct dpu_t *dpu;
         unsigned int each_dpu = 0;
         DPU_FOREACH (rank, dpu) {
-            switch (run_status[each_dpu++]) {
+            switch (run_status[each_dpu]) {
             case DPU_STATUS_IDLE:
             case DPU_STATUS_RUNNING:
                 break;
@@ -137,6 +137,7 @@ void dpu_try_run(unsigned int rank_id, devices_t *devices)
                 DPU_ASSERT(dpulog_read_for_dpu(dpu, stdout));
                 ERROR_EXIT(11, "*** could not get DPU %u.%u status %u - aborting", rank_id, each_dpu, run_status[each_dpu]);
             }
+            each_dpu++;
         }
         exit(10);
     }
