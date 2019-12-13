@@ -9,7 +9,6 @@
 
 typedef enum { target_type_unknown, target_type_simulator, target_type_hw } target_type_t;
 typedef enum { goal_unknown, goal_index, goal_check, goal_map } goal_t;
-typedef enum { nb_dpu_unknown, nb_dpu_128 = 128, nb_dpu_256 = 256, nb_dpu_2048 = 2048, nb_dpu_4096 = 4096 } nb_dpu_t;
 
 /**
  * @brief Get the path where to store temporary and final file
@@ -50,12 +49,12 @@ goal_t get_goal();
 /**
  * @brief Get the number of DPUs to be use to compute.
  */
-nb_dpu_t get_nb_dpu();
+unsigned int get_nb_dpu();
 
 /**
  * @brief Set the number of DPUs to be use to compute.
  */
-void set_nb_dpu(nb_dpu_t val);
+void set_nb_dpu(unsigned int val);
 
 /**
  * @brief Get the execution mode.

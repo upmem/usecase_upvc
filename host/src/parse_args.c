@@ -25,7 +25,7 @@ static char *dpu_binary = NULL;
 static bool simulation_mode = false;
 static target_type_t target_type = target_type_unknown;
 static goal_t goal = goal_unknown;
-static nb_dpu_t nb_dpu = nb_dpu_unknown;
+static unsigned int nb_dpu = 0;
 static unsigned int nb_dpus_per_run = DPU_ALLOCATE_ALL;
 
 /**************************************************************************************/
@@ -63,10 +63,10 @@ static void check_args()
         usage();
     }
 
-    if (goal == goal_index && nb_dpu == nb_dpu_unknown) {
+    if (goal == goal_index && nb_dpu == 0) {
         ERROR("missing option (number of dpus)");
         usage();
-    } else if (goal != goal_index && nb_dpu != nb_dpu_unknown) {
+    } else if (goal != goal_index && nb_dpu != 0) {
         ERROR("number of dpus in only for indexing");
         usage();
     }
@@ -180,25 +180,15 @@ void set_nb_dpus_per_run(unsigned int val) { nb_dpus_per_run = val; }
 /**************************************************************************************/
 static void validate_nb_dpu(const char *nb_dpu_str)
 {
-    if (nb_dpu != nb_dpu_unknown) {
+    if (nb_dpu != 0) {
         ERROR("number of DPUs option has been entered more than once");
         usage();
-    } else if (strcmp(nb_dpu_str, "128") == 0) {
-        nb_dpu = nb_dpu_128;
-    } else if (strcmp(nb_dpu_str, "256") == 0) {
-        nb_dpu = nb_dpu_256;
-    } else if (strcmp(nb_dpu_str, "2048") == 0) {
-        nb_dpu = nb_dpu_2048;
-    } else if (strcmp(nb_dpu_str, "4096") == 0) {
-        nb_dpu = nb_dpu_4096;
-    } else {
-        ERROR("wrong number of DPUs");
-        usage();
     }
+    nb_dpu = (unsigned int)atoi(nb_dpu_str);
 }
 
-nb_dpu_t get_nb_dpu() { return nb_dpu; }
-void set_nb_dpu(nb_dpu_t val) { nb_dpu = val; }
+unsigned int get_nb_dpu() { return nb_dpu; }
+void set_nb_dpu(unsigned int val) { nb_dpu = val; }
 
 /**************************************************************************************/
 /**************************************************************************************/
