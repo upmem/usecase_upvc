@@ -30,18 +30,24 @@ Data-set must consist of 3 files:
 Run once to create the MRAM for the reference genomee to compare to:
 
 ```
-./build/host/upvc -i <dataset_prefix> -d <number_of_virtual_dpus_during_execution> -g index -s
+./<path_to_build>/host/upvc -i <dataset_prefix> -d <number_of_virtual_dpus_during_execution> -g index -s
 ```
 
 Then run:
 
 ```
-./build/host/upvc -i <dataset_prefix> -g map -t <target=fsim|fpga> -b <dpu_binary> [-n <number_of_physical_dpus_available>]
+./<path_to_build>/host/upvc -i <dataset_prefix> -g map -t <target=simulator|hw> -b <dpu_binary> [-n <number_of_physical_dpus_available>]
 ```
 
 If the number of physical dpus available is not specified, the program will try to alloc every dpus available at runtime.
 
 Result are in ``<dataset_prefix>_upvc.vcf``
+
+To check the quality of the results use:
+
+```
+python <path_to_build>/../tests/compareVCF.py <dataset_prefix>.vcf <dataset_prefix>_upvc.vcf
+```
 
 Paper link
 ----------
