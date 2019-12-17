@@ -53,6 +53,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
         devices->rank_mram_offset[each_rank] = nb_dpus;
         nb_dpus += devices->nb_dpus_per_rank[each_rank];
     }
+    printf("%u DPUs allocated\n", nb_dpus);
 
     struct dpu_t *one_dpu;
     DPU_FOREACH (devices->ranks[0], one_dpu) {
