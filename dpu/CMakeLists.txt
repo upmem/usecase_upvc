@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(dpu C ASM)
 
-set(CMAKE_C_FLAGS "-O2 -g -fstack-size-section")
+set(CMAKE_C_FLAGS "-O2 -g -fstack-size-section -DNR_TASKLETS=${NR_TASKLETS} -DSTACK_SIZE_DEFAULT=256")
 
 INCLUDE_DIRECTORIES(inc)
 INCLUDE_DIRECTORIES(../common/inc/)

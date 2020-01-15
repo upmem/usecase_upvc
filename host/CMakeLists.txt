@@ -11,7 +11,8 @@ endif ()
 
 include(${UPMEM_HOME}/share/upmem/cmake/include/host/DpuHost.cmake)
 
-set(CMAKE_C_FLAGS "--std=c99 -O3 -Wall -Wextra -Werror -g3 -Wno-strict-overflow")
+set(NR_TASKLETS 16)
+set(CMAKE_C_FLAGS "--std=c99 -O3 -Wall -Wextra -Werror -g3 -Wno-strict-overflow -DNR_TASKLETS=${NR_TASKLETS}")
 link_directories("${DPU_HOST_LINK_DIRECTORIES}")
 
 file(GLOB_RECURSE SOURCES src/*.c)
@@ -57,7 +58,7 @@ ExternalProject_Add(
         dpu_task
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${DPU_PROJECT_RELATIVE_PATH}
         BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}
-        CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${UPMEM_HOME}/share/upmem/cmake/dpu.cmake -DUPMEM_HOME=${UPMEM_HOME}
+        CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${UPMEM_HOME}/share/upmem/cmake/dpu.cmake -DUPMEM_HOME=${UPMEM_HOME} -DNR_TASKLETS=${NR_TASKLETS}
         BUILD_ALWAYS TRUE
         INSTALL_COMMAND ""
 )

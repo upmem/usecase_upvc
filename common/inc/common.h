@@ -12,9 +12,6 @@
 
 #define MRAM_SIZE (64 << 20)
 
-#define NB_TASKLET_PER_DPU_LOG2 4
-#define NB_TASKLET_PER_DPU (1 << NB_TASKLET_PER_DPU_LOG2)
-
 #define ALIGN_DPU(val) (((val) + 7) & ~7)
 
 #define MAX_DPU_REQUEST (1 << 16)

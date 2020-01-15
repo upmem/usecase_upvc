@@ -23,11 +23,7 @@
 #include "common.h"
 
 MUTEX_INIT(miscellaneous_mutex);
-BARRIER_INIT(init_barrier, NB_RUNNING_TASKLETS);
-
-#define TASKLETS_INITIALIZER TASKLETS(16, main, 256, 0)
-_Static_assert(16 == NB_TASKLET_PER_DPU, "NB_TASKLET_PER_DPU does not match the number of tasklets declare in rt.h");
-#include <rt.h>
+BARRIER_INIT(init_barrier, NR_TASKLETS);
 
 /**
  * @brief The MRAM information, shared between the tasklets.
@@ -45,7 +41,7 @@ static uint32_t mram_info_delta;
 /**
  * @brief The statistic of each tasklet in the mram.
  */
-__mram_noinit dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NB_TASKLET_PER_DPU];
+__mram_noinit dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NR_TASKLETS];
 #ifdef STATS_ON
 #define DPU_TASKLET_STATS_WRITE(res, addr)                                                                                       \
     do {                                                                                                                         \
@@ -85,15 +81,15 @@ _Static_assert(
  * Each tasklet will use the dout_t at the index of its tasklet_id.
  * It uses this structure to store temporary local results.
  */
-__dma_aligned static dout_t global_dout[NB_TASKLET_PER_DPU];
+__dma_aligned static dout_t global_dout[NR_TASKLETS];
 
 typedef struct {
     dpu_result_coord_t coord;
     uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
 } coords_and_nbr_t;
 
-__dma_aligned coords_and_nbr_t coords_and_nbr[NB_TASKLET_PER_DPU][NB_REF_PER_READ];
-__dma_aligned dpu_request_t requests[NB_TASKLET_PER_DPU];
+__dma_aligned coords_and_nbr_t coords_and_nbr[NR_TASKLETS][NB_REF_PER_READ];
+__dma_aligned dpu_request_t requests[NR_TASKLETS];
 
 /**
  * @brief Fetches a neighbour from the neighbour area.
@@ -266,10 +262,7 @@ int main()
 
     barrier_wait(barrier);
 
-    /* For debugging purpose, one may reduce the number of operating tasklets. */
-    if (tasklet_id < NB_RUNNING_TASKLETS) {
-        run_align(tasklet_id, &accumulate_time, &current_time);
-    }
+    run_align(tasklet_id, &accumulate_time, &current_time);
 
     barrier_wait(barrier);
 

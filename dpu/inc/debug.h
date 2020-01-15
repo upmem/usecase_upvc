@@ -33,10 +33,6 @@
 /* To generate reference patterns for internal developments */
 /* #define DEBUG_PROCESS */
 
-#ifndef NB_RUNNING_TASKLETS
-#define NB_RUNNING_TASKLETS NB_TASKLET_PER_DPU
-#endif /* NB_RUNNING_TASKLETS */
-
 #ifdef DEBUG_MRAM_INFO
 #define DEBUG_MRAM_INFO_PRINT(mram_info)                                                                                         \
     do {                                                                                                                         \

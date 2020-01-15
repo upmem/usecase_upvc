@@ -21,8 +21,8 @@ typedef struct {
     unsigned int nb_ranks_per_run;
     unsigned int *nb_dpus_per_rank;
     unsigned int *rank_mram_offset;
-    struct dpu_rank_t **ranks;
-    unsigned int nb_dpus;
+    struct dpu_set_t all_ranks;
+    struct dpu_set_t *ranks;
     pthread_mutex_t log_mutex;
     FILE *log_file;
     struct dpu_symbol_t mram_info, mram_request_info, mram_requests, mram_compute_time, mram_result, mram_tasklet_stats,

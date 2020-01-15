@@ -6,4 +6,4 @@
 #include "odpd.h"
 
 /* Need big space to store one triplet of matrices per tasklet */
-uint8_t __M[3 * NB_TASKLET_PER_DPU * SIZEOF_MATRIX(NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, 0))];
+uint8_t __M[3 * NR_TASKLETS * SIZEOF_MATRIX(NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, 0))];
