@@ -55,7 +55,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     unsigned int nb_dpus = 0;
     unsigned int each_rank;
     struct dpu_set_t rank;
-    DPU_RANK_FOREACH(devices->all_ranks, rank, each_rank) {
+    DPU_RANK_FOREACH (devices->all_ranks, rank, each_rank) {
         devices->ranks[each_rank] = rank;
         DPU_ASSERT(dpu_get_nr_dpus(rank, &devices->nb_dpus_per_rank[each_rank]));
         devices->rank_mram_offset[each_rank] = nb_dpus;
@@ -263,7 +263,8 @@ void dpu_try_get_results_and_log(
         }
         DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
     }
-    DPU_ASSERT(dpu_push_xfer_symbol(rank, DPU_XFER_FROM_DPU, devices->mram_result, 0, devices->mram_result.size, DPU_XFER_DEFAULT));
+    DPU_ASSERT(
+        dpu_push_xfer_symbol(rank, DPU_XFER_FROM_DPU, devices->mram_result, 0, devices->mram_result.size, DPU_XFER_DEFAULT));
 
     dpu_try_log(rank_id, dpu_offset, devices);
 }
