@@ -116,8 +116,8 @@ void dpu_try_free(devices_t *devices)
 void dpu_try_run(unsigned int rank_id, devices_t *devices)
 {
     struct dpu_set_t rank = devices->ranks[rank_id];
-    dpu_api_status_t status = dpu_launch(rank, DPU_SYNCHRONOUS);
-    if (status == DPU_API_DPU_FAULT_ERROR) {
+    dpu_error_t status = dpu_launch(rank, DPU_SYNCHRONOUS);
+    if (status == DPU_ERR_DPU_FAULT) {
         struct dpu_set_t dpu;
         unsigned int each_dpu = 0;
         DPU_FOREACH (rank, dpu) {
