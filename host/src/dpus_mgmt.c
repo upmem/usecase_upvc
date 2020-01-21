@@ -181,13 +181,13 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
 
 #ifdef STATS_ON
     /* Collect stats */
-    dpu_tasklet_stats_t tasklet_stats[nb_dpus_per_rank][NB_TASKLET_PER_DPU];
-    for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
+    dpu_tasklet_stats_t tasklet_stats[nb_dpus_per_rank][NR_TASKLETS];
+    for (unsigned int each_tasklet = 0; each_tasklet < NR_TASKLETS; each_tasklet++) {
         DPU_FOREACH (rank, dpu, each_dpu) {
             DPU_ASSERT(dpu_prepare_xfer(dpu, &tasklet_stats[each_dpu][each_tasklet]));
         }
-        DPU_ASSERT(dpu_push_xfer(dpu, DPU_XFER_FROM_DPU, devices->mram_tasklet_stats, each_tasklet * sizeof(dpu_tasklet_stats_t),
-            sizeof(dpu_tasklet_stats_t), DPU_XFER_DEFAULT));
+        DPU_ASSERT(dpu_push_xfer_symbol(dpu, DPU_XFER_FROM_DPU, devices->mram_tasklet_stats,
+            each_tasklet * sizeof(dpu_tasklet_stats_t), sizeof(dpu_tasklet_stats_t), DPU_XFER_DEFAULT));
     }
 #endif
 
@@ -213,7 +213,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
             .nodp_time = 0ULL,
             .odpd_time = 0ULL,
         };
-        for (unsigned int each_tasklet = 0; each_tasklet < NB_TASKLET_PER_DPU; each_tasklet++) {
+        for (unsigned int each_tasklet = 0; each_tasklet < NR_TASKLETS; each_tasklet++) {
             agreagated_stats.nb_reqs += tasklet_stats[each_dpu][each_tasklet].nb_reqs;
             agreagated_stats.nb_nodp_calls += tasklet_stats[each_dpu][each_tasklet].nb_nodp_calls;
             agreagated_stats.nb_odpd_calls += tasklet_stats[each_dpu][each_tasklet].nb_odpd_calls;
