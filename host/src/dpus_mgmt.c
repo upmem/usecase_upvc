@@ -244,7 +244,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
 }
 
 void dpu_try_get_results_and_log(
-    unsigned int rank_id, __attribute__((unused)) unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)
 {
     struct dpu_set_t rank = devices->ranks[rank_id];
     uint32_t nb_dpus_per_rank;
