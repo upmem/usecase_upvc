@@ -187,7 +187,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
         DPU_FOREACH (rank, dpu, each_dpu) {
             DPU_ASSERT(dpu_prepare_xfer(dpu, &tasklet_stats[each_dpu][each_tasklet]));
         }
-        DPU_ASSERT(dpu_push_xfer_symbol(dpu, DPU_XFER_FROM_DPU, devices->mram_tasklet_stats,
+        DPU_ASSERT(dpu_push_xfer_symbol(rank, DPU_XFER_FROM_DPU, devices->mram_tasklet_stats,
             each_tasklet * sizeof(dpu_tasklet_stats_t), sizeof(dpu_tasklet_stats_t), DPU_XFER_DEFAULT));
     }
 #endif
