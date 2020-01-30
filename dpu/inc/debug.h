@@ -122,7 +122,7 @@
 #ifdef DEBUG_REQUESTS
 
 #define DEBUG_REQUESTS_VAR                                                                                                       \
-    uint8_t *debug_process_syms = mem_alloc_dma(ALIGN_DPU(NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta)));
+    uint8_t *debug_process_syms = mem_alloc(ALIGN_DPU(NB_BYTES_TO_SYMS(mram_info.nbr_len, mram_info.delta)));
 #define DEBUG_REQUESTS_PRINT_POOL(request_pool)                                                                                  \
     do {                                                                                                                         \
         printf("R> nb_reads = %u\n", (request_pool).nb_reads);                                                                   \
