@@ -57,12 +57,6 @@ _Static_assert(sizeof(dpu_tasklet_stats_t) == 48,
  * @brief The compute time performance value store in mram.
  */
 __mram_noinit dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
-#define DPU_COMPUTE_TIME_WRITE(res)                                                                                              \
-    do {                                                                                                                         \
-        mram_write8(res, (mram_addr_t)&DPU_COMPUTE_TIME_VAR);                                                                    \
-    } while (0)
-_Static_assert(
-    sizeof(dpu_compute_time_t) == 8, "dpu_compute_time_t size changed (make sure that DPU_COMPUTE_TIME_WRITE changed as well)");
 
 /**
  * @brief Maximum score allowed.
@@ -105,11 +99,11 @@ static void load_reference_multiple_nbr_and_coords_at(
     /* The input starts with coordinates (8 bytes), followed by the neighbour. Structure is aligned
      * on 8 bytes boundary.
      */
-    mram_addr_t coords_nbr_address = (mram_addr_t)(DPU_MRAM_HEAP_POINTER + (base + idx) * sizeof(coords_and_nbr_t));
+    uintptr_t coords_nbr_address = ((uintptr_t)DPU_MRAM_HEAP_POINTER + (base + idx) * sizeof(coords_and_nbr_t));
     unsigned int coords_nbr_len_total = sizeof(coords_and_nbr_t) * NB_REF_PER_READ;
     ASSERT_DMA_ADDR(coords_nbr_address, cache, coords_nbr_len_total);
     ASSERT_DMA_LEN(coords_nbr_len_total);
-    mram_readX(coords_nbr_address, cache, coords_nbr_len_total);
+    mram_read((__mram_ptr void *)coords_nbr_address, cache, coords_nbr_len_total);
     STATS_INCR_LOAD(stats, coords_nbr_len_total);
     STATS_INCR_LOAD_DATA(stats, coords_nbr_len_total);
 }
@@ -269,7 +263,7 @@ int main()
     if (tasklet_id == 0) {
         get_time_and_accumulate(&accumulate_time, &current_time);
         accumulate_time = (accumulate_time + current_time) - start_time;
-        DPU_COMPUTE_TIME_WRITE(&accumulate_time);
+        mram_write(&accumulate_time, &DPU_COMPUTE_TIME_VAR, sizeof(accumulate_time));
     }
 
     return 0;

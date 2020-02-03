@@ -32,20 +32,12 @@ typedef struct {
     mutex_id_t mutex;
     unsigned int nb_reads;
     unsigned int rdidx;
-    mram_addr_t cur_read;
+    uintptr_t cur_read;
 } request_pool_t;
 
 __mram_noinit nb_request_t DPU_NB_REQUEST_VAR;
 
 __mram_noinit dpu_request_t DPU_REQUEST_VAR[MAX_DPU_REQUEST];
-
-#define DPU_REQUEST_SIZE 40
-#define MRAM_READ_REQUEST(mram_addr, wram_addr)                                                                                  \
-    do {                                                                                                                         \
-        __CONCAT(mram_read, DPU_REQUEST_SIZE)(mram_addr, wram_addr);                                                             \
-    } while (0);
-_Static_assert(
-    sizeof(dpu_request_t) == DPU_REQUEST_SIZE, "sizeof(dpu_request changed, make sure to change MRAM_READ_REQUEST as well)");
 
 /**
  * @brief Common request pool, shared by every tasklet.
@@ -59,7 +51,7 @@ void request_pool_init()
 
     request_pool.nb_reads = (unsigned int)DPU_NB_REQUEST_VAR;
     request_pool.rdidx = 0;
-    request_pool.cur_read = (mram_addr_t)DPU_REQUEST_VAR;
+    request_pool.cur_read = (uintptr_t)DPU_REQUEST_VAR;
 }
 
 bool request_pool_next(dpu_request_t *request, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
@@ -73,7 +65,7 @@ bool request_pool_next(dpu_request_t *request, STATS_ATTRIBUTE dpu_tasklet_stats
     /* Fetch next request into cache */
     STATS_INCR_LOAD(stats, sizeof(dpu_request_t));
     STATS_INCR_LOAD_DATA(stats, sizeof(dpu_request_t));
-    MRAM_READ_REQUEST(request_pool.cur_read, (void *)request);
+    mram_read((__mram_ptr void *)request_pool.cur_read, (void *)request, sizeof(*request));
 
     /* Point to next request */
     request_pool.rdidx++;

@@ -25,16 +25,6 @@
 
 #define MAX_LOCAL_RESULTS_PER_READ 32
 #define LOCAL_RESULTS_PAGE_SIZE (MAX_LOCAL_RESULTS_PER_READ * sizeof(dpu_result_out_t))
-#define LOCAL_RESULTS_PAGE_READ(addr, val)                                                                                       \
-    do {                                                                                                                         \
-        mram_read512(addr, val);                                                                                                 \
-    } while (0)
-#define LOCAL_RESULTS_PAGE_WRITE(res, addr)                                                                                      \
-    do {                                                                                                                         \
-        mram_write512(res, addr);                                                                                                \
-    } while (0)
-_Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
-    "LOCAL_RESULTS_PAGE_SIZE changed (make sure that LOCAL_RESULTS_PAGE_READ/WRITE changed as well)");
 
 /**
  * @brief The results produces by one tasklet when processing one read.
@@ -48,7 +38,7 @@ _Static_assert(LOCAL_RESULTS_PAGE_SIZE == 512,
 typedef struct {
     __dma_aligned dpu_result_out_t outs[MAX_LOCAL_RESULTS_PER_READ];
     unsigned int nb_results;
-    mram_addr_t mram_base;
+    uintptr_t mram_base;
     unsigned int nb_cached_out;
     unsigned int nb_page_out;
 } dout_t;
@@ -86,6 +76,6 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
  * @param dout    Data output.
  * @param pageno  The requested page number.
  */
-mram_addr_t dout_swap_page_addr(const dout_t *dout, unsigned int pageno);
+__mram_ptr void *dout_swap_page_addr(const dout_t *dout, unsigned int pageno);
 
 #endif /* __DOUT_H__ */

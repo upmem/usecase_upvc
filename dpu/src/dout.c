@@ -21,7 +21,7 @@ void dout_clear(dout_t *dout)
 
 void dout_init(unsigned int tid, dout_t *dout)
 {
-    dout->mram_base = (mram_addr_t)&m_dpu_swap_result[tid * MAX_RESULTS_PER_READ];
+    dout->mram_base = (uintptr_t)&m_dpu_swap_result[tid * MAX_RESULTS_PER_READ];
     dout_clear(dout);
 }
 
@@ -29,7 +29,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
 {
     dpu_result_out_t *new_out;
     if (dout->nb_cached_out == MAX_LOCAL_RESULTS_PER_READ) {
-        mram_addr_t swap_addr;
+        __mram_ptr void *swap_addr;
 
         /* Local cache is full, copy into the swap area.
          * This shall never happen, but let's verify that we remain inside our assigned swap area. */
@@ -38,7 +38,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
             halt();
         }
         swap_addr = dout_swap_page_addr(dout, dout->nb_page_out);
-        LOCAL_RESULTS_PAGE_WRITE(dout->outs, swap_addr);
+        mram_write(dout->outs, swap_addr, LOCAL_RESULTS_PAGE_SIZE);
         STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
         dout->nb_cached_out = 0;
         dout->nb_page_out++;
@@ -54,7 +54,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
     dout->nb_results++;
 }
 
-mram_addr_t dout_swap_page_addr(const dout_t *dout, unsigned int pageno)
+__mram_ptr void *dout_swap_page_addr(const dout_t *dout, unsigned int pageno)
 {
-    return (mram_addr_t)(dout->mram_base + (pageno * LOCAL_RESULTS_PAGE_SIZE));
+    return (__mram_ptr void *)(dout->mram_base + (pageno * LOCAL_RESULTS_PAGE_SIZE));
 }
