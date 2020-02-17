@@ -41,29 +41,28 @@ void add_seed_to_dpu_requests(
 }
 
 void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int dpu_offset, unsigned int rank_id,
-    unsigned int nb_pass, __attribute__((unused)) int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
-    times_ctx_t *times_ctx)
+    __attribute__((unused)) int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx)
 {
     double t1, t2, t3, t4, t5;
 
     t1 = my_clock();
 
-    PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
+    PRINT_TIME_WRITE_READS(times_ctx, rank_id);
     dpu_try_write_dispatch_into_mram(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, dispatch);
     sem_post(dispatch_free_sem);
 
-    PRINT_TIME_WRITE_READS(times_ctx, nb_pass, rank_id);
+    PRINT_TIME_WRITE_READS(times_ctx, rank_id);
     t2 = my_clock();
-    PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
+    PRINT_TIME_COMPUTE(times_ctx, rank_id);
 
     dpu_try_run(rank_id, devices);
 
-    PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
+    PRINT_TIME_COMPUTE(times_ctx, rank_id);
     t3 = my_clock();
 
     sem_wait(acc_wait_sem);
     t4 = my_clock();
-    PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
+    PRINT_TIME_READ_RES(times_ctx, rank_id);
     /* Gather results and free DPUs */
     uint32_t nb_dpus_per_rank = devices->nb_dpus_per_rank[rank_id];
     dpu_result_out_t *results[nb_dpus_per_rank];
@@ -74,7 +73,7 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     }
     dpu_try_get_results_and_log(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, results);
 
-    PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
+    PRINT_TIME_READ_RES(times_ctx, rank_id);
 
     t5 = my_clock();
     times_ctx->map_read = t5 - t1;
