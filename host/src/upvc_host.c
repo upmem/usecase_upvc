@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #include "dispatch.h"
 #include "dpu_backend.h"
@@ -113,7 +114,32 @@ typedef struct {
     dispatch_request_t *dispatch_requests;
     backends_functions_t *backends_functions;
     times_ctx_t *times_ctx;
+    uint32_t nb_rank;
 } thread_exec_rank_arg_t;
+
+void print(uint32_t rank_id, uint32_t nb_rank, const char *fmt, ...)
+{
+    uint32_t each_rank;
+    va_list args;
+    va_start(args, fmt);
+    char str[512];
+    int str_i = 0;
+    for (each_rank = 0; each_rank < rank_id; each_rank++) {
+        str[str_i++] = '|';
+        str[str_i++] = '\t';
+    }
+    str[str_i++] = '|';
+    str_i += vsprintf(&str[str_i], fmt, args);
+    str[str_i++] = '\t';
+    for (each_rank++; each_rank < nb_rank; each_rank++) {
+        str[str_i++] = '|';
+        str[str_i++] = '\t';
+    }
+    str[str_i++] = '|';
+    str[str_i++] = '\n';
+    str[str_i++] = '\0';
+    fprintf(stdout, "%s", str);
+}
 
 void *thread_exec_rank(void *arg)
 {
@@ -130,6 +156,7 @@ void *thread_exec_rank(void *arg)
     dispatch_request_t *dispatch_requests = args->dispatch_requests;
     backends_functions_t *backends_functions = args->backends_functions;
     times_ctx_t *times_ctx = args->times_ctx;
+    uint32_t nb_rank = args->nb_rank;
 
     unsigned int nb_dpu = get_nb_dpu();
     unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
@@ -138,13 +165,13 @@ void *thread_exec_rank(void *arg)
     unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
 
     for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
-        printf("[%u-%u] loading mram\n", dpu_offset, rank_id);
+        print(rank_id, nb_rank, "M %u", dpu_offset);
         PRINT_TIME_WRITE_MRAM(times_ctx, rank_id);
         t1 = my_clock();
         backends_functions->load_mram(dpu_offset, rank_id, delta_neighbour, devices, times_ctx);
         t2 = my_clock();
         PRINT_TIME_WRITE_MRAM(times_ctx, rank_id);
-        printf("[%u-%u]  time %.2lf sec\n", dpu_offset, rank_id, t2 - t1);
+        print(rank_id, nb_rank, "%.2lf", t2 - t1);
 
         unsigned int each_pass = 0;
 
@@ -152,14 +179,14 @@ void *thread_exec_rank(void *arg)
         while (nb_read[each_pass_mod] != 0) {
 
             if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
-                printf("[%u-%u] running pass\n", each_pass, rank_id);
+                print(rank_id, nb_rank, "P %u", each_pass);
                 PRINT_TIME_MAP_READ(times_ctx, rank_id);
                 t1 = my_clock();
                 backends_functions->run_dpu(
                     dispatch_requests, devices, dpu_offset, rank_id, delta_neighbour, dispatch_free_sem, acc_wait_sem, times_ctx);
                 t2 = my_clock();
                 PRINT_TIME_MAP_READ(times_ctx, rank_id);
-                printf("[%u-%u]  time %.2lf sec\n", each_pass, rank_id, t2 - t1);
+                print(rank_id, nb_rank, "%.2lf", t2 - t1);
             } else {
                 sem_post(dispatch_free_sem);
                 if (DEBUG_DPU == -1) {
@@ -459,6 +486,7 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
             exec_rank_arg[each_rank].dispatch_requests = dispatch_requests;
             exec_rank_arg[each_rank].backends_functions = backends_functions;
             exec_rank_arg[each_rank].times_ctx = times_ctx;
+            exec_rank_arg[each_rank].nb_rank = nb_rank;
         }
         thread_dispatch_arg_t dispatch_arg = {
             .get_reads_wait_sem = &get_reads_dispatch_sem,
@@ -629,7 +657,10 @@ static void do_mapping(backends_functions_t *backends_functions, times_ctx_t *ti
             continue;
         }
 
-        printf("starting round %u\n", round);
+        printf("#################\n"
+               "starting round %u\n"
+               "#################\n",
+            round);
         if (devices != NULL) {
             fprintf(devices->log_file, "round %i\n", round);
         }
