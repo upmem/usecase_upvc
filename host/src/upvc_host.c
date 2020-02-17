@@ -65,6 +65,7 @@ void *thread_get_reads(void *arg)
 
         PRINT_TIME_GET_READS(times_ctx, each_pass);
         reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * SIZE_READ);
+        assert(reads_buffer[each_pass_mod] != NULL);
         nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx);
         PRINT_TIME_GET_READS(times_ctx, each_pass);
 
@@ -81,6 +82,7 @@ void *thread_get_reads(void *arg)
 
             PRINT_TIME_GET_READS(times_ctx, each_pass);
             reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * SIZE_READ);
+            assert(reads_buffer[each_pass_mod] != NULL);
             nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx);
             PRINT_TIME_GET_READS(times_ctx, each_pass);
 
