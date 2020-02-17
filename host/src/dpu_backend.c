@@ -44,7 +44,7 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     unsigned int nb_pass, __attribute__((unused)) int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
     times_ctx_t *times_ctx)
 {
-    double t1, t2, t3, t4;
+    double t1, t2, t3, t4, t5;
 
     t1 = my_clock();
 
@@ -60,9 +60,10 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
 
     PRINT_TIME_COMPUTE(times_ctx, nb_pass, rank_id);
     t3 = my_clock();
-    PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
 
     sem_wait(acc_wait_sem);
+    t4 = my_clock();
+    PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
     /* Gather results and free DPUs */
     uint32_t nb_dpus_per_rank = devices->nb_dpus_per_rank[rank_id];
     dpu_result_out_t *results[nb_dpus_per_rank];
@@ -75,15 +76,15 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
 
     PRINT_TIME_READ_RES(times_ctx, nb_pass, rank_id);
 
-    t4 = my_clock();
-    times_ctx->map_read = t4 - t1;
-    times_ctx->tot_map_read += t4 - t1;
+    t5 = my_clock();
+    times_ctx->map_read = t5 - t1;
+    times_ctx->tot_map_read += t5 - t1;
     times_ctx->write_reads = t2 - t1;
     times_ctx->tot_write_reads += t2 - t1;
     times_ctx->compute = t3 - t2;
     times_ctx->tot_compute += t3 - t2;
-    times_ctx->read_result = t4 - t3;
-    times_ctx->tot_read_result += t4 - t3;
+    times_ctx->read_result = t5 - t4;
+    times_ctx->tot_read_result += t5 - t4;
 }
 
 void init_backend_dpu(
