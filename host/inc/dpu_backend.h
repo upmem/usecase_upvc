@@ -23,7 +23,7 @@ void add_seed_to_dpu_requests(dispatch_request_t *requests, int num_read, int nb
  * @brief Compute one pass on DPUs.
  */
 void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int dpu_offset, unsigned int rank_id,
-    unsigned int nb_pass, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx);
+    int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx);
 
 /**
  * @brief Index the reference genome and alloc physical DPUs

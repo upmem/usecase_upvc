@@ -305,9 +305,8 @@ void add_seed_to_simulation_requests(
 }
 
 void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __attribute__((unused)) devices_t *devices,
-    __attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
-    __attribute__((unused)) unsigned int nb_pass, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
-    times_ctx_t *times_ctx)
+    __attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id, int delta_neighbour,
+    sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx)
 {
     double t1, t2;
     unsigned int nb_dpu = get_nb_dpu();
