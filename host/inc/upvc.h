@@ -29,6 +29,9 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <string.h>
 /**
  * @brief Structure to get the time to do each part of the application.
  */
@@ -100,5 +103,33 @@ static inline double my_clock(void)
         ERROR(fmt, ##__VA_ARGS__);                                                                                               \
         exit((err_code));                                                                                                        \
     } while (0)
+
+static inline void print(const uint32_t rank_id, const uint32_t nb_rank, const char *fmt, ...)
+{
+    uint32_t each_rank;
+    va_list args;
+    va_start(args, fmt);
+    char str[512];
+    int str_i = 0;
+    const char *tabulation = "          ";
+    for (each_rank = 0; each_rank < rank_id; each_rank++) {
+        str[str_i++] = '|';
+        memcpy(&str[str_i], tabulation, strlen(tabulation));
+        str_i += strlen(tabulation);
+    }
+    str[str_i++] = '|';
+    int fmt_size = vsprintf(&str[str_i], fmt, args);
+    memcpy(&str[str_i + fmt_size], tabulation, strlen(tabulation) - fmt_size);
+    str_i += strlen(tabulation);
+    for (each_rank++; each_rank < nb_rank; each_rank++) {
+        str[str_i++] = '|';
+        memcpy(&str[str_i], tabulation, strlen(tabulation));
+        str_i += strlen(tabulation);
+    }
+    str[str_i++] = '|';
+    str[str_i++] = '\n';
+    str[str_i++] = '\0';
+    fprintf(stdout, "%s", str);
+}
 
 #endif /* __UPVC_H__ */

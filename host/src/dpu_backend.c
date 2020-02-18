@@ -76,6 +76,11 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     PRINT_TIME_READ_RES(times_ctx, rank_id);
 
     t5 = my_clock();
+
+    print(rank_id, devices->nb_ranks_per_run, "W %.3lf", t2 - t1);
+    print(rank_id, devices->nb_ranks_per_run, "C %.3lf", t3 - t2);
+    print(rank_id, devices->nb_ranks_per_run, "R %.3lf", t5 - t4);
+
     times_ctx->map_read = t5 - t1;
     times_ctx->tot_map_read += t5 - t1;
     times_ctx->write_reads = t2 - t1;
