@@ -9,7 +9,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <stdarg.h>
 
 #include "dispatch.h"
 #include "dpu_backend.h"
@@ -117,30 +116,6 @@ typedef struct {
     uint32_t nb_rank;
 } thread_exec_rank_arg_t;
 
-void print(uint32_t rank_id, uint32_t nb_rank, const char *fmt, ...)
-{
-    uint32_t each_rank;
-    va_list args;
-    va_start(args, fmt);
-    char str[512];
-    int str_i = 0;
-    for (each_rank = 0; each_rank < rank_id; each_rank++) {
-        str[str_i++] = '|';
-        str[str_i++] = '\t';
-    }
-    str[str_i++] = '|';
-    str_i += vsprintf(&str[str_i], fmt, args);
-    str[str_i++] = '\t';
-    for (each_rank++; each_rank < nb_rank; each_rank++) {
-        str[str_i++] = '|';
-        str[str_i++] = '\t';
-    }
-    str[str_i++] = '|';
-    str[str_i++] = '\n';
-    str[str_i++] = '\0';
-    fprintf(stdout, "%s", str);
-}
-
 void *thread_exec_rank(void *arg)
 {
     double t1, t2;
@@ -186,7 +161,7 @@ void *thread_exec_rank(void *arg)
                     dispatch_requests, devices, dpu_offset, rank_id, delta_neighbour, dispatch_free_sem, acc_wait_sem, times_ctx);
                 t2 = my_clock();
                 PRINT_TIME_MAP_READ(times_ctx, rank_id);
-                print(rank_id, nb_rank, "%.2lf", t2 - t1);
+                print(rank_id, nb_rank, "T %.2lf", t2 - t1);
             } else {
                 sem_post(dispatch_free_sem);
                 if (DEBUG_DPU == -1) {
