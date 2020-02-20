@@ -20,13 +20,11 @@
  * This output FIFO is shared by the tasklets to write back results to host, thus is protected by a critical section.
  *
  * @var cache      Local cache to perform memory transfers.
- * @var mutex      Critical section that protects the pool.
  * @var wridx      Index of the current output in the FIFO.
  * @var cur_write  Where to write in MRAM.
  */
 typedef struct {
     uint8_t cache[LOCAL_RESULTS_PAGE_SIZE];
-    mutex_id_t mutex;
     unsigned int wridx;
     uintptr_t cur_write;
 } result_pool_t;
@@ -44,7 +42,6 @@ __mram_noinit dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
 
 void result_pool_init()
 {
-    result_pool.mutex = MUTEX_GET(result_pool_mutex);
     result_pool.wridx = 0;
     result_pool.cur_write = (uintptr_t)DPU_RESULT_VAR;
 }
@@ -54,7 +51,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
     unsigned int each_result = 0;
     unsigned int pageno;
 
-    mutex_lock(result_pool.mutex);
+    mutex_lock(result_pool_mutex);
 
     /* Read back and write the swapped results */
     for (pageno = 0; pageno < results->nb_page_out; pageno++) {
@@ -94,7 +91,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         halt();
     }
 
-    mutex_unlock(result_pool.mutex);
+    mutex_unlock(result_pool_mutex);
 }
 
 void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
@@ -104,7 +101,7 @@ void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
     /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
      * has a num equal to -1.
      */
-    mutex_lock(result_pool.mutex);
+    mutex_lock(result_pool_mutex);
     /* Mark the end of result data, do not increment the indexes, so that the next one restarts from this
      * point.
      */
@@ -112,5 +109,5 @@ void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
     STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
     STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
 
-    mutex_unlock(result_pool.mutex);
+    mutex_unlock(result_pool_mutex);
 }
