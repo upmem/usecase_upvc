@@ -22,7 +22,6 @@
 
 #include "common.h"
 
-MUTEX_INIT(miscellaneous_mutex);
 BARRIER_INIT(init_barrier, NR_TASKLETS);
 
 /**
@@ -118,8 +117,7 @@ static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcou
 }
 
 static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t *cached_coords_and_nbr,
-    uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats,
-    mutex_id_t *mutex_miscellaneous)
+    uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats)
 {
     int score, score_nodp, score_odpd = -1;
     uint8_t *ref_nbr = &cached_coords_and_nbr->nbr[0];
@@ -164,14 +162,13 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t
 }
 
 static void compute_request(sysname_t tasklet_id, coords_and_nbr_t *cached_coords_and_nbr, uint8_t *current_read_nbr,
-    dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats, mutex_id_t *mutex_miscellaneous)
+    dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats)
 {
     int mini = MAX_SCORE;
     for (unsigned int idx = 0; idx < request->count; idx += NB_REF_PER_READ) {
         load_reference_multiple_nbr_and_coords_at(request->offset, idx, (uint8_t *)cached_coords_and_nbr, tasklet_stats);
         for (unsigned int ref_id = 0; ref_id < NB_REF_PER_READ && ((idx + ref_id) < request->count); ref_id++) {
-            compare_neighbours(tasklet_id, &mini, &cached_coords_and_nbr[ref_id], current_read_nbr, request, dout, tasklet_stats,
-                mutex_miscellaneous);
+            compare_neighbours(tasklet_id, &mini, &cached_coords_and_nbr[ref_id], current_read_nbr, request, dout, tasklet_stats);
         }
     }
 }
@@ -198,7 +195,6 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
         .nodp_time = 0ULL,
         .odpd_time = 0ULL,
     };
-    mutex_id_t mutex_miscellaneous = MUTEX_GET(miscellaneous_mutex);
     dout_t *dout = &global_dout[tasklet_id];
     coords_and_nbr_t *cached_coords_and_nbr = coords_and_nbr[tasklet_id];
     dpu_request_t *request = &requests[tasklet_id];
@@ -215,7 +211,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 
         dout_clear(dout);
 
-        compute_request(tasklet_id, cached_coords_and_nbr, current_read_nbr, request, dout, &tasklet_stats, &mutex_miscellaneous);
+        compute_request(tasklet_id, cached_coords_and_nbr, current_read_nbr, request, dout, &tasklet_stats);
 
         STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
         result_pool_write(dout, &tasklet_stats);

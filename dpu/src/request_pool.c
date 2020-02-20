@@ -23,13 +23,11 @@
  * Requests belong to a FIFO, from which each tasklet picks the reads. The FIFO is protected by a critical
  * section.
  *
- * @var mutex         Critical section that protects the pool.
  * @var nb_reads      The number of reads in the request pool.
  * @var rdidx         Index of the first unread read in the request pool.
  * @var cur_read      Address of the first read to be processed in MRAM.
  */
 typedef struct {
-    mutex_id_t mutex;
     unsigned int nb_reads;
     unsigned int rdidx;
     uintptr_t cur_read;
@@ -47,8 +45,6 @@ MUTEX_INIT(request_pool_mutex);
 
 void request_pool_init()
 {
-    request_pool.mutex = MUTEX_GET(request_pool_mutex);
-
     request_pool.nb_reads = (unsigned int)DPU_NB_REQUEST_VAR;
     request_pool.rdidx = 0;
     request_pool.cur_read = (uintptr_t)DPU_REQUEST_VAR;
@@ -56,9 +52,9 @@ void request_pool_init()
 
 bool request_pool_next(dpu_request_t *request, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
-    mutex_lock(request_pool.mutex);
+    mutex_lock(request_pool_mutex);
     if (request_pool.rdidx == request_pool.nb_reads) {
-        mutex_unlock(request_pool.mutex);
+        mutex_unlock(request_pool_mutex);
         return false;
     }
 
@@ -70,7 +66,7 @@ bool request_pool_next(dpu_request_t *request, STATS_ATTRIBUTE dpu_tasklet_stats
     /* Point to next request */
     request_pool.rdidx++;
     request_pool.cur_read += sizeof(dpu_request_t);
-    mutex_unlock(request_pool.mutex);
+    mutex_unlock(request_pool_mutex);
 
     return true;
 }
