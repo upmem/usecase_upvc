@@ -234,7 +234,6 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 int main()
 {
     sysname_t tasklet_id = me();
-    barrier_id_t barrier = BARRIER_GET(init_barrier);
     perfcounter_t start_time, current_time;
     dpu_compute_time_t accumulate_time;
 
@@ -254,11 +253,11 @@ int main()
         }
     }
 
-    barrier_wait(barrier);
+    barrier_wait(&init_barrier);
 
     run_align(tasklet_id, &accumulate_time, &current_time);
 
-    barrier_wait(barrier);
+    barrier_wait(&init_barrier);
 
     if (tasklet_id == 0) {
         get_time_and_accumulate(&accumulate_time, &current_time);
