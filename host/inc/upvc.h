@@ -79,14 +79,14 @@ static inline double my_clock(void)
     } while (0)
 
 #define PRINT_TIME_GET_READS(times_ctx) PRINT_TIME(times_ctx, "%lf, %lf\n", 0.0)
-#define PRINT_TIME_DISPATCH(times_ctx) PRINT_TIME(times_ctx, "%lf, , %lf\n", 0.2)
-#define PRINT_TIME_ACC_READ(times_ctx) PRINT_TIME(times_ctx, "%lf, , , %lf\n", 0.4)
-#define PRINT_TIME_PROCESS_READ(times_ctx) PRINT_TIME(times_ctx, "%lf, , , , %lf\n", 0.8)
-#define PRINT_TIME_WRITE_MRAM(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , %lf\n", 1 + rank * 0.1)
-#define PRINT_TIME_WRITE_READS(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , %lf\n", 1 + rank * 0.1)
-#define PRINT_TIME_COMPUTE(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , , %lf\n", 1 + rank * 0.1)
-#define PRINT_TIME_READ_RES(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , , , %lf\n", 1 + rank * 0.1)
-#define PRINT_TIME_MAP_READ(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , , , , %lf\n", 1 + rank * 0.1)
+#define PRINT_TIME_DISPATCH(times_ctx) PRINT_TIME(times_ctx, "%lf, , %lf\n", 0.1)
+#define PRINT_TIME_ACC_READ(times_ctx) PRINT_TIME(times_ctx, "%lf, , , %lf\n", 0.2)
+#define PRINT_TIME_PROCESS_READ(times_ctx) PRINT_TIME(times_ctx, "%lf, , , , %lf\n", 0.3)
+#define PRINT_TIME_WRITE_MRAM(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , %lf\n", 0.4 + rank * 0.1)
+#define PRINT_TIME_WRITE_READS(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , %lf\n", 0.4 + rank * 0.1)
+#define PRINT_TIME_COMPUTE(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , , %lf\n", 0.4 + rank * 0.1)
+#define PRINT_TIME_READ_RES(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , , , %lf\n", 0.4 + rank * 0.1)
+#define PRINT_TIME_MAP_READ(times_ctx, rank) PRINT_TIME(times_ctx, "%lf, , , , , , , , , %lf\n", 0.4 + rank * 0.1)
 
 #include <stdlib.h>
 
