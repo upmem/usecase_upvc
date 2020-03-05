@@ -67,11 +67,12 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     uint32_t nb_dpus_per_rank = devices->nb_dpus_per_rank[rank_id];
     dpu_result_out_t *results[nb_dpus_per_rank];
     unsigned int nb_dpu = get_nb_dpu();
+    nb_result_t *nb_res = get_mem_dpu_nb_res(dpu_offset + devices->rank_mram_offset[rank_id]);
     for (unsigned int each_dpu = 0, this_dpu = dpu_offset + devices->rank_mram_offset[rank_id];
          (each_dpu < nb_dpus_per_rank) && (this_dpu < nb_dpu); each_dpu++, this_dpu++) {
         results[each_dpu] = get_mem_dpu_res(this_dpu);
     }
-    dpu_try_get_results_and_log(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, results);
+    dpu_try_get_results_and_log(rank_id, dpu_offset + devices->rank_mram_offset[rank_id], devices, results, nb_res);
 
     PRINT_TIME_READ_RES(times_ctx, rank_id);
 

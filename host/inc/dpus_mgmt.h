@@ -26,7 +26,7 @@ typedef struct {
     pthread_mutex_t log_mutex;
     FILE *log_file;
     struct dpu_symbol_t mram_info, mram_request_info, mram_requests, mram_compute_time, mram_result, mram_tasklet_stats,
-        mram_available;
+        mram_available, mram_result_info;
 } devices_t;
 
 /**
@@ -98,6 +98,6 @@ void dpu_try_write_dispatch_into_mram(
  * @param result_buffer The table of DPU results to store the results (last one having a request number equal to -1).
  */
 void dpu_try_get_results_and_log(
-    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer);
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer, nb_result_t *nb_res);
 
 #endif /* __INTEGRATION_DPUS_H__ */

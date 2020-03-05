@@ -15,10 +15,13 @@
 
 static mem_dpu_t *MDPU;
 static dpu_result_out_t **MDPU_res;
+static nb_result_t *MDPU_nb_res;
 
 mem_dpu_t *get_mem_dpu(unsigned int dpu_number) { return &MDPU[dpu_number]; }
 
 dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number) { return MDPU_res[dpu_number]; }
+
+nb_result_t *get_mem_dpu_nb_res(unsigned int dpu_number) { return &MDPU_nb_res[dpu_number]; }
 
 void malloc_dpu_res(int nb_dpu)
 {
@@ -26,6 +29,7 @@ void malloc_dpu_res(int nb_dpu)
     for (int num_dpu = 0; num_dpu < nb_dpu; num_dpu++) {
         MDPU_res[num_dpu] = (dpu_result_out_t *)malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
     }
+    MDPU_nb_res = (nb_result_t *)malloc(sizeof(nb_result_t) * nb_dpu);
 }
 
 void malloc_dpu(int nb_dpu)
