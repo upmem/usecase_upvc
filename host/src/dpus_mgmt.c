@@ -18,9 +18,9 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+
 static char *profile = NULL;
-static dispatch_request_t dummy_dispatch;
-static uint8_t *dummy_results;
 
 void setup_dpus_for_target_type(target_type_t target_type)
 {
@@ -73,15 +73,10 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats));
 #endif
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_RESULT_VAR), &devices->mram_result));
+    DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_NB_RESULT_VAR), &devices->mram_result_info));
 
     pthread_mutex_init(&devices->log_mutex, NULL);
     devices->log_file = fopen("upvc_log.txt", "w");
-
-    dummy_dispatch.nb_reads = 0;
-    dummy_dispatch.reads_area = malloc(sizeof(dpu_request_t) * MAX_DPU_REQUEST);
-    assert(dummy_dispatch.reads_area);
-    dummy_results = malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
-    assert(dummy_results);
 
     return devices;
 }
@@ -92,12 +87,14 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
 
     unsigned int each_dpu;
     struct dpu_set_t dpu;
+    unsigned int max_mram_size = 0;
     DPU_FOREACH (rank, dpu, each_dpu) {
         assert(mram_size[each_dpu] < devices->mram_available.size && "mram is to big to fit in DPU");
         DPU_ASSERT(dpu_prepare_xfer(dpu, mram[each_dpu]));
+        max_mram_size = MAX(max_mram_size, mram_size[each_dpu]);
     }
     DPU_ASSERT(
-        dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_available, 0, devices->mram_available.size, DPU_XFER_DEFAULT));
+        dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_available, 0, max_mram_size, DPU_XFER_DEFAULT));
 
     DPU_ASSERT(dpu_copy_to_symbol(rank, devices->mram_info, 0, &delta_neighbour, devices->mram_info.size));
 }
@@ -110,8 +107,6 @@ void dpu_try_free(devices_t *devices)
     free(devices->ranks);
     free(devices->nb_dpus_per_rank);
     free(devices);
-    free(dummy_dispatch.reads_area);
-    free(dummy_results);
 }
 
 void dpu_try_run(unsigned int rank_id, devices_t *devices)
@@ -137,6 +132,8 @@ void dpu_try_run(unsigned int rank_id, devices_t *devices)
 void dpu_try_write_dispatch_into_mram(
     unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dispatch_request_t *dispatch)
 {
+    static const dpu_request_t dummy_reads_area[MAX_DPU_REQUEST];
+    static const dispatch_request_t dummy_dispatch = { .nb_reads = 0, .reads_area = (int8_t *)dummy_reads_area };
     struct dpu_set_t rank = devices->ranks[rank_id];
 
     unsigned int nb_dpus_per_rank;
@@ -146,6 +143,7 @@ void dpu_try_write_dispatch_into_mram(
     struct dpu_set_t dpu;
     unsigned int each_dpu;
     unsigned int nb_dpu = get_nb_dpu();
+    unsigned int max_dispatch_size = 0;
     DPU_FOREACH (rank, dpu, each_dpu) {
         unsigned int this_dpu = each_dpu + dpu_offset;
         if (this_dpu < nb_dpu) {
@@ -153,6 +151,7 @@ void dpu_try_write_dispatch_into_mram(
         } else {
             io_header[each_dpu] = dummy_dispatch;
         }
+        max_dispatch_size = MAX(max_dispatch_size, io_header[each_dpu].nb_reads * sizeof(dpu_request_t));
     }
     DPU_FOREACH (rank, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &io_header[each_dpu].nb_reads));
@@ -164,7 +163,7 @@ void dpu_try_write_dispatch_into_mram(
         DPU_ASSERT(dpu_prepare_xfer(dpu, io_header[each_dpu].reads_area));
     }
     DPU_ASSERT(
-        dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_requests, 0, devices->mram_requests.size, DPU_XFER_DEFAULT));
+        dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_requests, 0, max_dispatch_size, DPU_XFER_DEFAULT));
 }
 
 #define CLOCK_PER_SECONDS (600000000.0)
@@ -247,8 +246,11 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset, devices_t
 }
 
 void dpu_try_get_results_and_log(
-    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer)
+    unsigned int rank_id, unsigned int dpu_offset, devices_t *devices, dpu_result_out_t **result_buffer, nb_result_t *nb_res)
 {
+    static dpu_result_out_t dummy_results[MAX_DPU_RESULTS];
+    static nb_result_t dummy_nb_results;
+
     struct dpu_set_t rank = devices->ranks[rank_id];
     uint32_t nb_dpus_per_rank;
     DPU_ASSERT(dpu_get_nr_dpus(rank, &nb_dpus_per_rank));
@@ -257,17 +259,31 @@ void dpu_try_get_results_and_log(
     struct dpu_set_t dpu;
     unsigned int each_dpu;
     unsigned int nb_dpu = get_nb_dpu();
+
+    DPU_FOREACH(rank, dpu, each_dpu) {
+        unsigned int this_dpu = dpu_offset + each_dpu;
+        if (this_dpu < nb_dpu) {
+            results[each_dpu] = (uint8_t *)&nb_res[each_dpu];
+        } else {
+            results[each_dpu] = (uint8_t *)&dummy_nb_results;
+        }
+        DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
+    }
+    DPU_ASSERT(dpu_push_xfer_symbol(
+        rank, DPU_XFER_FROM_DPU, devices->mram_result_info, 0, devices->mram_result_info.size, DPU_XFER_DEFAULT));
+    unsigned int max_nb_result = 0;
     DPU_FOREACH (rank, dpu, each_dpu) {
         unsigned int this_dpu = dpu_offset + each_dpu;
         if (this_dpu < nb_dpu) {
             results[each_dpu] = (uint8_t *)result_buffer[each_dpu];
         } else {
-            results[each_dpu] = dummy_results;
+            results[each_dpu] = (uint8_t *)dummy_results;
         }
         DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
+        max_nb_result = MAX(max_nb_result, nb_res[each_dpu]);
     }
-    DPU_ASSERT(
-        dpu_push_xfer_symbol(rank, DPU_XFER_FROM_DPU, devices->mram_result, 0, devices->mram_result.size, DPU_XFER_DEFAULT));
+    DPU_ASSERT(dpu_push_xfer_symbol(
+        rank, DPU_XFER_FROM_DPU, devices->mram_result, 0, (max_nb_result + 1) * sizeof(dpu_result_out_t), DPU_XFER_DEFAULT));
 
     dpu_try_log(rank_id, dpu_offset, devices);
 }

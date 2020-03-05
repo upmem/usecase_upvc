@@ -38,6 +38,8 @@ mem_dpu_t *get_mem_dpu(unsigned int dpu_number);
  */
 dpu_result_out_t *get_mem_dpu_res(unsigned int dpu_number);
 
+nb_result_t *get_mem_dpu_nb_res(unsigned int dpu_number);
+
 /**
  * @brief Allocate structure to store information of DPU memory.
  *

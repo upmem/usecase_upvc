@@ -60,6 +60,12 @@ typedef struct {
 #define DPU_RESULT_VAR m_dpu_result
 
 /**
+ * @brief Number of results produces by all the tasklets
+ */
+typedef uint32_t nb_result_t;
+#define DPU_NB_RESULT_VAR m_dpu_nb_result
+
+/**
  * @brief stats reported by every tasklet
  */
 typedef struct {
