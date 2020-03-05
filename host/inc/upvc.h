@@ -9,7 +9,7 @@
 #define DEBUG_PASS (-1)
 #define DEBUG_DPU (-1)
 
-#define VERSION "VERSION 1.5"
+#define VERSION "VERSION 1.6"
 #define MAX_READS_BUFFER 1048576 /* Maximum number of read by round        */
 
 #define COST_SUB 10
@@ -62,12 +62,12 @@ typedef struct {
 } times_ctx_t;
 
 #include <stddef.h>
-#include <sys/time.h>
+#include <time.h>
 static inline double my_clock(void)
 {
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return (1.0e-6 * t.tv_usec + t.tv_sec);
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+    return (1.0e-9 * t.tv_nsec + t.tv_sec);
 }
 
 #define PRINT_TIME(times_ctx, str, pass)                                                                                         \
