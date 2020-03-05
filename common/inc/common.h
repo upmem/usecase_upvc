@@ -29,7 +29,7 @@
  *
  * @var delta           Delta to apply to nodp and odpd comparison depending on the round.
  */
-typedef uint64_t delta_info_t;
+typedef uint32_t delta_info_t;
 #define DPU_MRAM_INFO_VAR m_mram_info
 
 /**
@@ -74,7 +74,7 @@ typedef struct {
     uint64_t nodp_time;
     uint64_t odpd_time;
 } dpu_tasklet_stats_t;
-#define DPU_TASKET_STATS_VAR m_dpu_tasklet_stats
+#define DPU_TASKLET_STATS_VAR m_dpu_tasklet_stats
 
 typedef uint64_t dpu_compute_time_t;
 #define DPU_COMPUTE_TIME_VAR m_dpu_compute_time
@@ -82,7 +82,7 @@ typedef uint64_t dpu_compute_time_t;
 /**
  * @brief Information on the requests reads to a DPU.
  */
-typedef uint64_t nb_request_t;
+typedef uint32_t nb_request_t;
 #define DPU_NB_REQUEST_VAR m_dpu_nb_request
 
 /**

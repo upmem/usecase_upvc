@@ -30,12 +30,7 @@ BARRIER_INIT(init_barrier, NR_TASKLETS);
  * Information are gathered by the first tasklet during boot and used by other tasklets
  * to get the memory topology.
  */
-__mram_noinit delta_info_t DPU_MRAM_INFO_VAR;
-
-/**
- * WRAM image of the MRAM information
- */
-static uint32_t mram_info_delta;
+__host delta_info_t DPU_MRAM_INFO_VAR;
 
 /**
  * @brief The statistic of each tasklet in the mram.
@@ -44,18 +39,16 @@ __mram_noinit dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NR_TASKLETS];
 #ifdef STATS_ON
 #define DPU_TASKLET_STATS_WRITE(res, addr)                                                                                       \
     do {                                                                                                                         \
-        mram_write48(res, addr);                                                                                                 \
+        mram_write(res, addr, sizeof(dpu_tasklet_stats_t))                                                                       \
     } while (0)
 #else
 #define DPU_TASKLET_STATS_WRITE(res, addr)
 #endif
-_Static_assert(sizeof(dpu_tasklet_stats_t) == 48,
-    "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
 
 /**
  * @brief The compute time performance value store in mram.
  */
-__mram_noinit dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
+__host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
 
 /**
  * @brief Maximum score allowed.
@@ -125,7 +118,7 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t
 
     STATS_GET_START_TIME(start, acc, end);
 
-    score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info_delta, *mini);
+    score = score_nodp = noDP(current_read_nbr, ref_nbr, DPU_MRAM_INFO_VAR, *mini);
 
     STATS_GET_END_TIME(end, acc);
     STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));
@@ -134,7 +127,7 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t
     if (score_nodp == -1) {
         STATS_GET_START_TIME(start, acc, end);
 
-        score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, mram_info_delta));
+        score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR));
 
         STATS_GET_END_TIME(end, acc);
         STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
@@ -231,19 +224,17 @@ int main()
 {
     sysname_t tasklet_id = me();
     perfcounter_t start_time, current_time;
-    dpu_compute_time_t accumulate_time;
 
     if (tasklet_id == 0) {
-        accumulate_time = 0ULL;
+        DPU_COMPUTE_TIME_VAR = 0ULL;
         mem_reset();
         perfcounter_config(COUNT_CYCLES, true);
         current_time = start_time = perfcounter_get();
 
-        mram_info_delta = DPU_MRAM_INFO_VAR;
         request_pool_init();
         result_pool_init();
 
-        if (((NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, mram_info_delta) + 2) * 3 * 16) >= 0x10000) {
+        if (((NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR) + 2) * 3 * 16) >= 0x10000) {
             printf("cannot run code: symbol length is larger than mulub operation\n");
             halt();
         }
@@ -251,14 +242,13 @@ int main()
 
     barrier_wait(&init_barrier);
 
-    run_align(tasklet_id, &accumulate_time, &current_time);
+    run_align(tasklet_id, &DPU_COMPUTE_TIME_VAR, &current_time);
 
     barrier_wait(&init_barrier);
 
     if (tasklet_id == 0) {
-        get_time_and_accumulate(&accumulate_time, &current_time);
-        accumulate_time = (accumulate_time + current_time) - start_time;
-        mram_write(&accumulate_time, &DPU_COMPUTE_TIME_VAR, sizeof(accumulate_time));
+        get_time_and_accumulate(&DPU_COMPUTE_TIME_VAR, &current_time);
+        DPU_COMPUTE_TIME_VAR = (DPU_COMPUTE_TIME_VAR + current_time) - start_time;
     }
 
     return 0;

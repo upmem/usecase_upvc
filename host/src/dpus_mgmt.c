@@ -69,7 +69,9 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_NB_REQUEST_VAR), &devices->mram_request_info));
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_REQUEST_VAR), &devices->mram_requests));
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_COMPUTE_TIME_VAR), &devices->mram_compute_time));
+#ifdef STATS_ON
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_TASKLET_STATS_VAR), &devices->mram_tasklet_stats));
+#endif
     DPU_ASSERT(dpu_get_symbol(dpu_program, XSTR(DPU_RESULT_VAR), &devices->mram_result));
 
     pthread_mutex_init(&devices->log_mutex, NULL);
