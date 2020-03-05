@@ -140,6 +140,7 @@ void *thread_exec_rank(void *arg)
     unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
 
     for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
+        print_line(rank_id, nb_rank);
         print(rank_id, nb_rank, "M %u", dpu_offset);
         PRINT_TIME_WRITE_MRAM(times_ctx, rank_id);
         t1 = my_clock();
@@ -152,6 +153,7 @@ void *thread_exec_rank(void *arg)
 
         sem_wait(dispatch_wait_sem);
         while (nb_read[each_pass_mod] != 0) {
+            print_line(rank_id, nb_rank);
 
             if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
                 print(rank_id, nb_rank, "P %u", each_pass);

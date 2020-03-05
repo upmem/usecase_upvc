@@ -104,6 +104,8 @@ static inline double my_clock(void)
         exit((err_code));                                                                                                        \
     } while (0)
 
+#define TABULATION "          "
+#define LINE       "----------"
 static inline void print(const uint32_t rank_id, const uint32_t nb_rank, const char *fmt, ...)
 {
     uint32_t each_rank;
@@ -111,25 +113,28 @@ static inline void print(const uint32_t rank_id, const uint32_t nb_rank, const c
     va_start(args, fmt);
     char str[512];
     int str_i = 0;
-    const char *tabulation = "          ";
     for (each_rank = 0; each_rank < rank_id; each_rank++) {
         str[str_i++] = '|';
-        memcpy(&str[str_i], tabulation, strlen(tabulation));
-        str_i += strlen(tabulation);
+        memcpy(&str[str_i], TABULATION, strlen(TABULATION));
+        str_i += strlen(TABULATION);
     }
     str[str_i++] = '|';
     int fmt_size = vsprintf(&str[str_i], fmt, args);
-    memcpy(&str[str_i + fmt_size], tabulation, strlen(tabulation) - fmt_size);
-    str_i += strlen(tabulation);
+    memcpy(&str[str_i + fmt_size], TABULATION, strlen(TABULATION) - fmt_size);
+    str_i += strlen(TABULATION);
     for (each_rank++; each_rank < nb_rank; each_rank++) {
         str[str_i++] = '|';
-        memcpy(&str[str_i], tabulation, strlen(tabulation));
-        str_i += strlen(tabulation);
+        memcpy(&str[str_i], TABULATION, strlen(TABULATION));
+        str_i += strlen(TABULATION);
     }
     str[str_i++] = '|';
     str[str_i++] = '\n';
     str[str_i++] = '\0';
     fprintf(stdout, "%s", str);
+}
+
+static inline void print_line(const uint32_t rank_id, const uint32_t nb_rank) {
+    print(rank_id, nb_rank, LINE);
 }
 
 #endif /* __UPVC_H__ */
