@@ -35,17 +35,4 @@ unsigned int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tr
     int8_t *mapping_coverage, dpu_result_out_t *result_tab, unsigned int result_tab_nb_read, FILE *fpe1, FILE *fpe2, int round,
     times_ctx_t *times_ctx);
 
-/**
- * @brief Accumulate read in result_tab in ordre to be process when the pass will have been execute on each DPUs.
- *
- * @param result_tab          Buffer to store and sort results from every DPUs of a pass.
- * @param result_tab_nb_read  Number of valid read in each index of the result tab.
- * @param dpu_offset          Offset in the virtual DPUs of the first DPU of this run.
- * @param times_ctx           Times information for the whole application.
- *
- * @return The number of reads accumulated.
- */
-unsigned int accumulate_read(
-    dpu_result_out_t **result_tab, unsigned int *result_tab_nb_read, unsigned int dpu_offset, times_ctx_t *times_ctx);
-
 #endif /* __PROCESSREAD_H__ */

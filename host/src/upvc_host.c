@@ -18,6 +18,7 @@
 #include "mram_dpu.h"
 #include "parse_args.h"
 #include "processread.h"
+#include "accumulateread.h"
 #include "simu_backend.h"
 #include "upvc.h"
 #include "upvc_dpu.h"
@@ -406,7 +407,10 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
     unsigned int result_tab_nb_read[MAX_NB_PASS];
     dpu_result_out_t *result_tab[MAX_NB_PASS];
 
-    memset(result_tab, 0, sizeof(dpu_result_out_t *) * MAX_NB_PASS);
+    for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
+        result_tab[each_pass] = malloc(sizeof(dpu_result_out_t));
+        result_tab[each_pass][0].num = -1;
+    }
     memset(result_tab_nb_read, 0, sizeof(unsigned int) * MAX_NB_PASS);
 
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
