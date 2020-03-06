@@ -19,24 +19,6 @@
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
 
-static int cmpresult(const void *a, const void *b)
-{
-    dpu_result_out_t *A = (dpu_result_out_t *)a;
-    dpu_result_out_t *B = (dpu_result_out_t *)b;
-    if (A->num == B->num) {
-        if (A->score > B->score) {
-            return 1;
-        } else {
-            return -1;
-        }
-    }
-    if (A->num > B->num) {
-        return 1;
-    } else {
-        return -1;
-    }
-}
-
 static int check_pair(dpu_result_out_t A1, dpu_result_out_t A2)
 {
     int pos1, pos2;
@@ -291,53 +273,6 @@ static bool compute_read_pair(int type1, int type2, int *offset, int *nbread, dp
         }
     }
     return true;
-}
-
-int accumulate_read(
-    dpu_result_out_t **result_tab, unsigned int *result_tab_nb_read, unsigned int dpu_offset, times_ctx_t *times_ctx)
-{
-    double t1, t2;
-    unsigned int nb_match = *result_tab_nb_read;
-    unsigned int nb_total_read = 0;
-
-    t1 = my_clock();
-
-    for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run() && numdpu < get_nb_dpu(); numdpu++) {
-        unsigned int k = 0;
-        int num_read;
-        do {
-            num_read = read_out_num(numdpu, k);
-            k++;
-        } while (num_read != -1);
-        nb_total_read += (k - 1);
-    }
-    *result_tab_nb_read = *result_tab_nb_read + nb_total_read;
-    *result_tab = realloc(*result_tab, *result_tab_nb_read * sizeof(dpu_result_out_t));
-
-    for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run() && numdpu < get_nb_dpu(); numdpu++) {
-        int k = 0;
-        int num_read = read_out_num(numdpu, k);
-
-        while (num_read != -1) {
-            dpu_result_coord_t coord = read_out_coord(numdpu, k);
-
-            (*result_tab)[nb_match].num = num_read;
-            (*result_tab)[nb_match].coord.seq_nr = coord.seq_nr;
-            (*result_tab)[nb_match].coord.seed_nr = coord.seed_nr;
-            (*result_tab)[nb_match].score = read_out_score(numdpu, k);
-            nb_match++;
-
-            num_read = read_out_num(numdpu, ++k);
-        }
-    }
-    assert(nb_match == *result_tab_nb_read);
-    qsort(*result_tab, nb_match, sizeof(dpu_result_out_t), cmpresult);
-
-    t2 = my_clock();
-    times_ctx->acc_read = t2 - t1;
-    times_ctx->tot_acc_read += t2 - t1;
-
-    return (int)nb_total_read;
 }
 
 int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **variant_list, int *substitution_list,
