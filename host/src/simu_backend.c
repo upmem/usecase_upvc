@@ -165,7 +165,7 @@ static int ODPD(int8_t *s1, int8_t *s2, int max_score, int size_neighbour_in_sym
     }
     int i = matrix_size - 1;
     int pp = i % 2;
-    for (int j = i + 1 - diagonal; j < matrix_size; j++) {
+    for (unsigned int j = i + 1 - diagonal; j < (unsigned int)matrix_size; j++) {
         if (D[pp][j] < min_score) {
             min_score = D[pp][j];
         }
