@@ -89,6 +89,7 @@ int accumulate_read(
     unsigned int nb_dpus = get_nb_dpu();
     nb_result_t *nb_res = get_mem_dpu_nb_res(dpu_offset);
     dpu_result_out_t **result_list = (dpu_result_out_t **)malloc(sizeof(dpu_result_out_t *) * (nb_dpus_per_run + 1));
+    assert(result_list != NULL);
 #pragma omp parallel for
     for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + nb_dpus_per_run; numdpu++) {
         if (numdpu >= nb_dpus)
@@ -103,6 +104,7 @@ int accumulate_read(
     }
     *result_tab_nb_read += total_nb_res;
     dpu_result_out_t *merged_result_tab = malloc((*result_tab_nb_read + 1) * sizeof(dpu_result_out_t));
+    assert(merged_result_tab != NULL);
     result_list[get_nb_dpus_per_run()] = *result_tab;
 
     merge_result_list(merged_result_tab, result_list, get_nb_dpus_per_run() + 1, *result_tab_nb_read);
