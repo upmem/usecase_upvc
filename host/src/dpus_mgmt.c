@@ -91,8 +91,7 @@ void dpu_try_write_mram(unsigned int rank_id, devices_t *devices, uint8_t **mram
         DPU_ASSERT(dpu_prepare_xfer(dpu, mram[each_dpu]));
         max_mram_size = MAX(max_mram_size, mram_size[each_dpu]);
     }
-    DPU_ASSERT(
-        dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_available, 0, max_mram_size, DPU_XFER_DEFAULT));
+    DPU_ASSERT(dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_available, 0, max_mram_size, DPU_XFER_DEFAULT));
 
     DPU_ASSERT(dpu_copy_to_symbol(rank, devices->mram_info, 0, &delta_neighbour, devices->mram_info.size));
 }
@@ -160,8 +159,7 @@ void dpu_try_write_dispatch_into_mram(
     DPU_FOREACH (rank, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, io_header[each_dpu].reads_area));
     }
-    DPU_ASSERT(
-        dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_requests, 0, max_dispatch_size, DPU_XFER_DEFAULT));
+    DPU_ASSERT(dpu_push_xfer_symbol(rank, DPU_XFER_TO_DPU, devices->mram_requests, 0, max_dispatch_size, DPU_XFER_DEFAULT));
 }
 
 #define CLOCK_PER_SECONDS (600000000.0)
@@ -258,7 +256,7 @@ void dpu_try_get_results_and_log(
     unsigned int each_dpu;
     unsigned int nb_dpu = get_nb_dpu();
 
-    DPU_FOREACH(rank, dpu, each_dpu) {
+    DPU_FOREACH (rank, dpu, each_dpu) {
         unsigned int this_dpu = dpu_offset + each_dpu;
         if (this_dpu < nb_dpu) {
             results[each_dpu] = (uint8_t *)&nb_res[each_dpu];
@@ -274,11 +272,11 @@ void dpu_try_get_results_and_log(
         unsigned int this_dpu = dpu_offset + each_dpu;
         if (this_dpu < nb_dpu) {
             results[each_dpu] = (uint8_t *)result_buffer[each_dpu];
+            max_nb_result = MAX(max_nb_result, nb_res[each_dpu]);
         } else {
             results[each_dpu] = (uint8_t *)dummy_results;
         }
         DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
-        max_nb_result = MAX(max_nb_result, nb_res[each_dpu]);
     }
     DPU_ASSERT(dpu_push_xfer_symbol(
         rank, DPU_XFER_FROM_DPU, devices->mram_result, 0, (max_nb_result + 1) * sizeof(dpu_result_out_t), DPU_XFER_DEFAULT));

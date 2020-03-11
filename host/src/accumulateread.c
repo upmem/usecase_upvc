@@ -1,14 +1,16 @@
 #include "common.h"
+#include "parse_args.h"
 #include "upvc.h"
 #include "upvc_dpu.h"
-#include "parse_args.h"
 
 #include <sys/queue.h>
 
+#define MIN(a, b) ((a) > (b) ? (b) : (a))
+
 SLIST_HEAD(min_heap_head, min_heap);
 struct min_heap {
-        dpu_result_out_t *list;
-        SLIST_ENTRY(min_heap) entries;
+    dpu_result_out_t *list;
+    SLIST_ENTRY(min_heap) entries;
 };
 
 static int cmpresult(const void *a, const void *b)
@@ -38,7 +40,7 @@ static void insert_in_order(struct min_heap_head *head, struct min_heap *elem)
         return;
     }
     struct min_heap *curr, *prev = NULL;
-    SLIST_FOREACH(curr, head, entries) {
+    SLIST_FOREACH (curr, head, entries) {
         if (cmpresult(&elem->list[0], &curr->list[0]) == -1) {
             if (prev == NULL)
                 SLIST_INSERT_HEAD(head, elem, entries);
@@ -90,24 +92,25 @@ int accumulate_read(
     nb_result_t *nb_res = get_mem_dpu_nb_res(dpu_offset);
     dpu_result_out_t **result_list = (dpu_result_out_t **)malloc(sizeof(dpu_result_out_t *) * (nb_dpus_per_run + 1));
     assert(result_list != NULL);
+    unsigned int nb_dpus_used_current_run = MIN(get_nb_dpu() - dpu_offset, nb_dpus_per_run);
 #pragma omp parallel for
     for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + nb_dpus_per_run; numdpu++) {
         if (numdpu >= nb_dpus)
             continue;
         dpu_result_out_t *dpu_res = get_mem_dpu_res(numdpu);
-        qsort(dpu_res, nb_res[numdpu-dpu_offset], sizeof(dpu_result_out_t), cmpresult);
-        result_list[numdpu-dpu_offset] = dpu_res;
+        qsort(dpu_res, nb_res[numdpu - dpu_offset], sizeof(dpu_result_out_t), cmpresult);
+        result_list[numdpu - dpu_offset] = dpu_res;
     }
     nb_result_t total_nb_res = 0;
     for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run() && numdpu < get_nb_dpu(); numdpu++) {
-        total_nb_res += nb_res[numdpu-dpu_offset];
+        total_nb_res += nb_res[numdpu - dpu_offset];
     }
     *result_tab_nb_read += total_nb_res;
     dpu_result_out_t *merged_result_tab = malloc((*result_tab_nb_read + 1) * sizeof(dpu_result_out_t));
     assert(merged_result_tab != NULL);
-    result_list[get_nb_dpus_per_run()] = *result_tab;
+    result_list[nb_dpus_used_current_run] = *result_tab;
 
-    merge_result_list(merged_result_tab, result_list, get_nb_dpus_per_run() + 1, *result_tab_nb_read);
+    merge_result_list(merged_result_tab, result_list, nb_dpus_used_current_run + 1, *result_tab_nb_read);
 
     free(*result_tab);
     *result_tab = merged_result_tab;
