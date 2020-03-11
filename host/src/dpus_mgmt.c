@@ -15,9 +15,6 @@
 
 #include "upvc_dpu.h"
 
-#define XSTR(s) STR(s)
-#define STR(s) #s
-
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 static char *profile = NULL;
@@ -44,6 +41,7 @@ devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_progr
     DPU_ASSERT(dpu_load(devices->all_ranks, opt_program, &dpu_program));
     DPU_ASSERT(dpu_get_nr_ranks(devices->all_ranks, &devices->nb_ranks_per_run));
     DPU_ASSERT(dpu_get_nr_dpus(devices->all_ranks, &nb_dpus_per_run));
+    assert(devices->nb_ranks_per_run <= NB_RANKS_MAX);
     set_nb_dpus_per_run(nb_dpus_per_run);
 
     devices->nb_dpus_per_rank = (unsigned int *)malloc(devices->nb_ranks_per_run * sizeof(unsigned int));

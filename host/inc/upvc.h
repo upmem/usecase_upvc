@@ -104,32 +104,37 @@ static inline double my_clock(void)
         exit((err_code));                                                                                                        \
     } while (0)
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
+#define NB_RANKS_MAX (64)
+
 #define TABULATION "          "
 #define LINE       "----------"
+#define SEPARATOR  '|'
+#define ENDLINE    "|\n\0"
 static inline void print(const uint32_t rank_id, const uint32_t nb_rank, const char *fmt, ...)
 {
     uint32_t each_rank;
     va_list args;
     va_start(args, fmt);
-    char str[512];
+    char str[NB_RANKS_MAX * (strlen(TABULATION) + strlen(XSTR(SEPARATOR))) + strlen(ENDLINE) + 1 /* for '\0' */];
     int str_i = 0;
     for (each_rank = 0; each_rank < rank_id; each_rank++) {
-        str[str_i++] = '|';
+        str[str_i++] = SEPARATOR;
         memcpy(&str[str_i], TABULATION, strlen(TABULATION));
         str_i += strlen(TABULATION);
     }
-    str[str_i++] = '|';
+    str[str_i++] = SEPARATOR;
     int fmt_size = vsprintf(&str[str_i], fmt, args);
     memcpy(&str[str_i + fmt_size], TABULATION, strlen(TABULATION) - fmt_size);
     str_i += strlen(TABULATION);
     for (each_rank++; each_rank < nb_rank; each_rank++) {
-        str[str_i++] = '|';
+        str[str_i++] = SEPARATOR;
         memcpy(&str[str_i], TABULATION, strlen(TABULATION));
         str_i += strlen(TABULATION);
     }
-    str[str_i++] = '|';
-    str[str_i++] = '\n';
-    str[str_i++] = '\0';
+    memcpy(&str[str_i], ENDLINE, strlen(ENDLINE) + 1 /* for '\0' */);
     fprintf(stdout, "%s", str);
 }
 
