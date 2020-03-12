@@ -149,7 +149,7 @@ void validate_args(int argc, char **argv)
     extern char *optarg;
 
     prog_name = strdup(argv[0]);
-    while ((opt = getopt(argc, argv, "si:t:g:d:n:")) != -1) {
+    while ((opt = getopt(argc, argv, "si:g:n:")) != -1) {
         switch (opt) {
         case 'i':
             validate_inputs(optarg);
