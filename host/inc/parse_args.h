@@ -7,7 +7,6 @@
 
 #include <stdbool.h>
 
-typedef enum { target_type_unknown, target_type_simulator, target_type_hw } target_type_t;
 typedef enum { goal_unknown, goal_index, goal_check, goal_map } goal_t;
 
 /**
@@ -30,16 +29,6 @@ char *get_input_pe1();
  * @brief Get the path to the second PE file.
  */
 char *get_input_pe2();
-
-/**
- * @brief Get the path to the binary to be load on the DPUs.
- */
-char *get_dpu_binary();
-
-/**
- * @brief Get the target type on which to compute.
- */
-target_type_t get_target_type();
 
 /**
  * @brief Get the goal of the run of the application.

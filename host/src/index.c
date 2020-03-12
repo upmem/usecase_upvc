@@ -72,9 +72,6 @@ index_seed_t **load_index_seeds()
     }
 
     set_nb_dpu(max_dpu + 1);
-    if (get_simulation_mode()) {
-        set_nb_dpus_per_run(max_dpu + 1);
-    }
     printf(" - nb_dpu: %u\n", max_dpu + 1);
 
     fclose(f);

@@ -11,8 +11,10 @@ endif ()
 
 include(${UPMEM_HOME}/share/upmem/cmake/include/host/DpuHost.cmake)
 
+set(DPU_PROJECT_RELATIVE_PATH ../dpu)
+set(DPU_BINARY_NAME dpu_task)
 set(NR_TASKLETS 16)
-set(CMAKE_C_FLAGS "--std=gnu99 -O3 -Wall -Wextra -Werror -g3 -DNR_TASKLETS=${NR_TASKLETS} -fopenmp")
+set(CMAKE_C_FLAGS "--std=gnu99 -O3 -Wall -Wextra -Werror -g3 -DNR_TASKLETS=${NR_TASKLETS} -fopenmp -DDPU_BINARY=\\\"${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/${DPU_BINARY_NAME}\\\"")
 link_directories("${DPU_HOST_LINK_DIRECTORIES}")
 
 file(GLOB_RECURSE SOURCES src/*.c)
@@ -21,21 +23,12 @@ add_executable(upvc ${SOURCES})
 target_include_directories(upvc PUBLIC "${DPU_HOST_INCLUDE_DIRECTORIES}" inc/ ../common/inc/)
 target_link_libraries(upvc ${DPU_HOST_LIBRARIES} pthread)
 
-set(DPU_PROJECT_RELATIVE_PATH ../dpu)
-
-if(NOT DPU_TARGET)
-        set(DPU_TARGET "simulator")
-        if(NOT NB_DPU)
-                set(NB_DPU "2")
-        endif()
-endif()
-
 set(NB_DPU_MARK)
 if (NB_DPU)
         set(NB_DPU_MARK "-n")
 endif()
 
-add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU} -t ${DPU_TARGET} -b ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu_task
+add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU}
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
@@ -55,7 +48,7 @@ add_custom_target(check cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integrati
 
 include(ExternalProject)
 ExternalProject_Add(
-        dpu_task
+        ${DPU_BINARY_NAME}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${DPU_PROJECT_RELATIVE_PATH}
         BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}
         CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${UPMEM_HOME}/share/upmem/cmake/dpu.cmake -DUPMEM_HOME=${UPMEM_HOME} -DNR_TASKLETS=${NR_TASKLETS}

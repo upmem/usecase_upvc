@@ -622,7 +622,7 @@ static void do_mapping(backends_functions_t *backends_functions, times_ctx_t *ti
     int *substitution_list = (int *)calloc(sizeof(int), ref_genome->fasta_file_size);
     dispatch_request_t *dispatch_requests;
 
-    backends_functions->init_backend(&nb_rank, &devices, get_nb_dpus_per_run(), get_dpu_binary(), &index_seed);
+    backends_functions->init_backend(&nb_rank, &devices, get_nb_dpus_per_run(), &index_seed);
 
     nb_dpu = get_nb_dpu();
     dispatch_requests = dispatch_create(nb_dpu);
@@ -714,8 +714,6 @@ int main(int argc, char *argv[])
     assert(get_read_size(get_input_pe1()) == SIZE_READ);
     printf("Information\n");
     printf(" - read size: %d\n", SIZE_READ);
-
-    setup_dpus_for_target_type(get_target_type());
 
     if (get_simulation_mode()) {
         backends_functions.init_backend = init_backend_simulation;

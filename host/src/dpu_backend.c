@@ -92,12 +92,11 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
     times_ctx->tot_read_result += t5 - t4;
 }
 
-void init_backend_dpu(
-    unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, const char *dpu_binary, index_seed_t ***index_seed)
+void init_backend_dpu(unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, index_seed_t ***index_seed)
 {
     *index_seed = load_index_seeds();
     malloc_dpu_res(get_nb_dpu());
-    *devices = dpu_try_alloc_for(nb_dpu_per_run, dpu_binary);
+    *devices = dpu_try_alloc_for(nb_dpu_per_run);
     *nb_rank = (*devices)->nb_ranks_per_run;
 }
 

@@ -21,9 +21,7 @@ static char *input_path = NULL;
 static char *input_fasta = NULL;
 static char *input_pe1 = NULL;
 static char *input_pe2 = NULL;
-static char *dpu_binary = NULL;
 static bool simulation_mode = false;
-static target_type_t target_type = target_type_unknown;
 static goal_t goal = goal_unknown;
 static unsigned int nb_dpu = 0;
 static unsigned int nb_dpus_per_run = DPU_ALLOCATE_ALL;
@@ -33,41 +31,31 @@ static unsigned int nb_dpus_per_run = DPU_ALLOCATE_ALL;
 static void usage()
 {
     ERROR_EXIT(24,
-        "\nusage: %s -i <input_prefix> -d <number_of_dpus> -g <goal> [-s | -n <nb_dpus_per_run> -t <type> -b <dpu_binary> ] \n"
+        "\nusage: %s -i <input_prefix> -n <number_of_dpus> -g <goal> [-s] \n"
         "options:\n"
         "\t-i\tInput prefix that will be used to find the inputs files\n"
-        "\t-d\tNumber of DPUs to use - value=128|256|2048|4096 (only when indexing)\n"
         "\t-g\tGoal of the run - values=index|check|map\n"
-        "\t-s\tSimulation mode (not compatible with -t -g and -b)\n"
-        "\t-n\tNumber of DPUs to use simultaneously per run (usually: 1 for fsim, 8 or more for fpga)\n"
-        "\t  \tdefault: use all dpus available (1 for fsim)"
-        "\t-t\tTarget type - values=simulator|hw\n"
-        "\t-b\tDPU binary to use\n",
+        "\t-s\tSimulation mode (not compatible with -g)\n"
+        "\t-n\tNumber of DPUs to use\n",
         prog_name);
 }
 
 static void check_args()
 {
-    if (simulation_mode && target_type == target_type_simulator && nb_dpus_per_run == DPU_ALLOCATE_ALL)
+    if (simulation_mode && nb_dpus_per_run == DPU_ALLOCATE_ALL)
         nb_dpus_per_run = 1;
     if (prog_name == NULL || input_path == NULL || input_fasta == NULL || input_pe1 == NULL || input_pe2 == NULL
         || goal == goal_unknown) {
         ERROR("missing option");
         usage();
     } else if (simulation_mode
-        && (target_type != target_type_unknown || nb_dpus_per_run != DPU_ALLOCATE_ALL || dpu_binary != NULL)) {
-        ERROR("simulation mode is not compatible with -n -t -g and -b option");
-        usage();
-    } else if (!simulation_mode && (dpu_binary == NULL || target_type == target_type_unknown)) {
-        ERROR("missing option");
+        && goal != goal_unknown) {
+        ERROR("simulation mode is not compatible with -g option");
         usage();
     }
 
-    if (goal == goal_index && nb_dpu == 0) {
+    if (goal == goal_index && nb_dpus_per_run == 0) {
         ERROR("missing option (number of dpus)");
-        usage();
-    } else if (goal != goal_index && nb_dpu != 0) {
-        ERROR("number of dpus in only for indexing");
         usage();
     }
 }
@@ -109,40 +97,6 @@ char *get_input_pe2() { return input_pe2; }
 
 /**************************************************************************************/
 /**************************************************************************************/
-static void validate_dpu_binary(const char *dpu_binary_str)
-{
-    if (dpu_binary != NULL) {
-        ERROR("dpu binary option has been entered more than once");
-        usage();
-    } else {
-        dpu_binary = strdup(dpu_binary_str);
-        verify_that_file_exists(dpu_binary);
-    }
-}
-
-char *get_dpu_binary() { return dpu_binary; }
-
-/**************************************************************************************/
-/**************************************************************************************/
-static void validate_target_type(const char *target_type_str)
-{
-    if (target_type != target_type_unknown) {
-        ERROR("target type option has been entered more than once");
-        usage();
-    } else if (strcmp(target_type_str, "hw") == 0) {
-        target_type = target_type_hw;
-    } else if (strcmp(target_type_str, "simulator") == 0) {
-        target_type = target_type_simulator;
-    } else {
-        ERROR("unknown target type value");
-        usage();
-    }
-}
-
-target_type_t get_target_type() { return target_type; }
-
-/**************************************************************************************/
-/**************************************************************************************/
 static void validate_goal(const char *goal_str)
 {
     if (goal != goal_unknown) {
@@ -178,15 +132,6 @@ void set_nb_dpus_per_run(unsigned int val) { nb_dpus_per_run = val; }
 
 /**************************************************************************************/
 /**************************************************************************************/
-static void validate_nb_dpu(const char *nb_dpu_str)
-{
-    if (nb_dpu != 0) {
-        ERROR("number of DPUs option has been entered more than once");
-        usage();
-    }
-    nb_dpu = (unsigned int)atoi(nb_dpu_str);
-}
-
 unsigned int get_nb_dpu() { return nb_dpu; }
 void set_nb_dpu(unsigned int val) { nb_dpu = val; }
 
@@ -204,22 +149,13 @@ void validate_args(int argc, char **argv)
     extern char *optarg;
 
     prog_name = strdup(argv[0]);
-    while ((opt = getopt(argc, argv, "si:t:g:d:b:n:")) != -1) {
+    while ((opt = getopt(argc, argv, "si:t:g:d:n:")) != -1) {
         switch (opt) {
         case 'i':
             validate_inputs(optarg);
             break;
-        case 't':
-            validate_target_type(optarg);
-            break;
         case 'g':
             validate_goal(optarg);
-            break;
-        case 'd':
-            validate_nb_dpu(optarg);
-            break;
-        case 'b':
-            validate_dpu_binary(optarg);
             break;
         case 's':
             validate_simulation_mode();
@@ -242,5 +178,4 @@ void free_args()
     free(input_fasta);
     free(input_pe1);
     free(input_pe2);
-    free(dpu_binary);
 }

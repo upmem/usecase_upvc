@@ -17,28 +17,17 @@
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-static char *profile = NULL;
+DPU_INCBIN(upvc_dpu_program, DPU_BINARY);
 
-void setup_dpus_for_target_type(target_type_t target_type)
+devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run)
 {
-    switch (target_type) {
-    case target_type_hw:
-        profile = "backend=hw,cycleAccurate=true";
-        break;
-    default:
-        profile = "backend=simulator";
-        break;
-    }
-}
-
-devices_t *dpu_try_alloc_for(unsigned int nb_dpus_per_run, const char *opt_program)
-{
+    const char *profile = "cycleAccurate=true";
     struct dpu_program_t *dpu_program;
     devices_t *devices = (devices_t *)malloc(sizeof(devices_t));
     assert(devices != NULL);
 
     DPU_ASSERT(dpu_alloc(nb_dpus_per_run, profile, &devices->all_ranks));
-    DPU_ASSERT(dpu_load(devices->all_ranks, opt_program, &dpu_program));
+    DPU_ASSERT(dpu_load_from_incbin(devices->all_ranks, &upvc_dpu_program, &dpu_program));
     DPU_ASSERT(dpu_get_nr_ranks(devices->all_ranks, &devices->nb_ranks_per_run));
     DPU_ASSERT(dpu_get_nr_dpus(devices->all_ranks, &nb_dpus_per_run));
     assert(devices->nb_ranks_per_run <= NB_RANKS_MAX);

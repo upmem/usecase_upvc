@@ -29,7 +29,7 @@ void run_on_dpu(dispatch_request_t *dispatch, devices_t *devices, unsigned int d
  * @brief Index the reference genome and alloc physical DPUs
  */
 void init_backend_dpu(
-    unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, const char *dpu_binary, index_seed_t ***index_seed);
+    unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, index_seed_t ***index_seed);
 
 /**
  * @brief Free DPUs.

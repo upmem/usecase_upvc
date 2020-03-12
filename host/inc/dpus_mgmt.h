@@ -34,7 +34,7 @@ typedef struct {
  *
  * @param target_type  The type of targeted DPUs (fsim or fpga).
  */
-void setup_dpus_for_target_type(target_type_t target_type);
+void setup_dpus_for_target_type();
 
 /**
  * @brief Creates the devices to handle a given number of DPUs.
@@ -42,11 +42,10 @@ void setup_dpus_for_target_type(target_type_t target_type);
  * DPUs are created, loaded with the same program.
  *
  * @param nb_dpus      How many DPUs are required.
- * @param opt_program  Program loaded into every DPU.
  *
  * @return The allocated devices structure, or NULL in case of error.
  */
-devices_t *dpu_try_alloc_for(unsigned int nb_dpus, const char *opt_program);
+devices_t *dpu_try_alloc_for(unsigned int nb_dpus);
 
 /**
  * @brief Initializes the contents of an MRAM.

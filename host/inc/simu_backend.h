@@ -30,7 +30,7 @@ void run_dpu_simulation(dispatch_request_t *dispatch, devices_t *devices, unsign
  * @brief Index the reference genome.
  */
 void init_backend_simulation(
-    unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, const char *dpu_binary, index_seed_t ***index_seed);
+    unsigned int *nb_rank, devices_t **devices, unsigned int nb_dpu_per_run, index_seed_t ***index_seed);
 
 /**
  * @brief Free structure used by simulation.

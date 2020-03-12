@@ -14,7 +14,7 @@ typedef struct backends_functions_struct {
     void (*run_dpu)(dispatch_request_t *, devices_t *, unsigned int, unsigned int, int, sem_t *, sem_t *, times_ctx_t *);
     void (*add_seed_to_requests)(dispatch_request_t *, int, int, index_seed_t *, int8_t *);
 
-    void (*init_backend)(unsigned int *, devices_t **, unsigned int, const char *, index_seed_t ***);
+    void (*init_backend)(unsigned int *, devices_t **, unsigned int, index_seed_t ***);
     void (*free_backend)(devices_t *, unsigned int);
     void (*load_mram)(unsigned int, unsigned int, int, devices_t *, times_ctx_t *);
 } backends_functions_t;

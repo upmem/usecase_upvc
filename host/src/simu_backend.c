@@ -365,8 +365,7 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __
 }
 
 void init_backend_simulation(unsigned int *nb_rank, __attribute__((unused)) devices_t **devices,
-    __attribute__((unused)) unsigned int nb_dpu_per_run, __attribute__((unused)) const char *dpu_binary,
-    index_seed_t ***index_seed)
+    __attribute__((unused)) unsigned int nb_dpu_per_run, index_seed_t ***index_seed)
 {
     *index_seed = load_index_seeds();
     *nb_rank = 1;
