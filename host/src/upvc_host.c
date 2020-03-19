@@ -27,7 +27,7 @@
 
 #include "backends_functions.h"
 
-#define MAX_NB_PASS (1600 / (MAX_READS_BUFFER / (1024 * 1024ULL))) /* Whole genomee is less than 1600 pass of 1Mreq. */
+#define MAX_NB_PASS (3200 / (MAX_READS_BUFFER / (1024 * 1024ULL))) /* Whole genomee is less than 3200 pass of 1Mreq. */
 #define NB_READS_BUFFER (4)
 
 static volatile unsigned int global_thread_process_each_pass_mod_start;

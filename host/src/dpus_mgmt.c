@@ -90,6 +90,7 @@ void dpu_try_free(devices_t *devices)
     DPU_ASSERT(dpu_free(devices->all_ranks));
     pthread_mutex_destroy(&devices->log_mutex);
     fclose(devices->log_file);
+    free(devices->rank_mram_offset);
     free(devices->ranks);
     free(devices->nb_dpus_per_rank);
     free(devices);
