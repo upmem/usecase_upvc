@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include "genome.h"
+#include "parse_args.h"
 #include "upvc.h"
 #include "vartree.h"
 
@@ -42,22 +43,21 @@ static int print_variant_tree(variant_tree_t *variant_tree, int8_t *mapping_cove
     return nb_variant;
 }
 
-void create_vcf(char *chromosome_name, genome_t *ref_genome, variant_tree_t **variant_list, int *substitution_list,
-    int8_t *mapping_coverage, times_ctx_t *times_ctx)
+void create_vcf()
 {
-    double t1, t2;
+    double start_time = my_clock();
+    printf("%s:\n", __func__);
+
     FILE *vcf_file, *variant_file;
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     int nb_variant;
     char filename[MAX_BUFFER_SIZE];
+    genome_t *ref_genome = genome_get();
 
-    printf("Create VCF\n");
-    t1 = my_clock();
-
-    sprintf(filename, "%svars_upvc.vcf", chromosome_name);
+    sprintf(filename, "%svars_upvc.vcf", get_input_path());
     vcf_file = fopen(filename, "w");
 
-    sprintf(filename, "%svars_upvc.var", chromosome_name);
+    sprintf(filename, "%svars_upvc.var", get_input_path());
     variant_file = fopen(filename, "w");
 
     /* ####### START OF HEADER ####### */
@@ -75,7 +75,7 @@ void create_vcf(char *chromosome_name, genome_t *ref_genome, variant_tree_t **va
     fprintf(vcf_file, "##fileDate=%s\n", filedate);
 
     /* print reference genome file name */
-    fprintf(vcf_file, "##reference=%s\n", ref_genome->fasta_file_name);
+    fprintf(vcf_file, "##reference=%s\n", get_input_fasta());
 
     /* print the column names (fields are tab-delimited in VCF) */
     fprintf(vcf_file, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n");
@@ -90,7 +90,7 @@ void create_vcf(char *chromosome_name, genome_t *ref_genome, variant_tree_t **va
         for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
             /* get the substitution at the `start_position+seq_position`th position in the genome */
             uint64_t current_position = start_position + seq_position;
-            int substitution = substitution_list[current_position];
+            int substitution = ref_genome->substitution_list[current_position];
             for (int i = 0; i < 4; i++) {
                 /* get number of substitutions for the base nt[i] at that position */
                 int nb_substitution = (substitution >> (i * 8)) & 0xFF;
@@ -104,19 +104,16 @@ void create_vcf(char *chromosome_name, genome_t *ref_genome, variant_tree_t **va
                     newvar->ref[1] = '\0';
                     newvar->alt[0] = nucleotide[i];
                     newvar->alt[1] = '\0';
-                    insert_variants(variant_list, newvar);
+                    insert_variants(newvar);
                 }
             }
         }
     }
 
-    nb_variant = print_variant_tree(*variant_list, mapping_coverage, vcf_file, variant_file);
+    nb_variant = print_variant_tree(variant_list_get(), ref_genome->mapping_coverage, vcf_file, variant_file);
 
     fclose(vcf_file);
 
-    t2 = my_clock();
-    times_ctx->vcf = t2 - t1;
-
-    printf(" - number of variants: %d\n", nb_variant);
-    printf(" - time: %lf sec.\n", times_ctx->vcf);
+    printf("\tnumber of variants: %d\n", nb_variant);
+    printf("\ttime: %lf s\n", my_clock() - start_time);
 }

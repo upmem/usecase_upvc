@@ -7,7 +7,7 @@
 
 #include <stdbool.h>
 
-typedef enum { goal_unknown, goal_index, goal_check, goal_map } goal_t;
+typedef enum { goal_unknown, goal_index, goal_map } goal_t;
 
 /**
  * @brief Get the path where to store temporary and final file

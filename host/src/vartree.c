@@ -13,6 +13,8 @@
  * @brief Most of this code is inspired by geeksforgeeks.org
  */
 
+static variant_tree_t *variant_list = NULL;
+
 static int max(int a, int b) { return (a > b) ? a : b; }
 
 static variant_tree_t *alloc_variant(int pos, variant_t *vars)
@@ -139,9 +141,11 @@ static variant_tree_t *insert(variant_tree_t *variant_tree, variant_t *var)
     return variant_tree;
 }
 
-void insert_variants(variant_tree_t **variant_list, variant_t *var) { *variant_list = insert(*variant_list, var); }
+void insert_variants(variant_t *var) {
+    variant_list = insert(variant_list, var);
+}
 
-void free_variant_tree(variant_tree_t *variant_tree)
+static void free_variant_tree_rec(variant_tree_t *variant_tree)
 {
     if (variant_tree == NULL) {
         return;
@@ -151,3 +155,9 @@ void free_variant_tree(variant_tree_t *variant_tree)
     free(variant_tree->vars);
     free(variant_tree);
 }
+
+void free_variant_tree() {
+    free_variant_tree_rec(variant_list);
+}
+
+variant_tree_t *variant_list_get() { return variant_list; }

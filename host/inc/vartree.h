@@ -26,19 +26,10 @@ typedef struct variant_tree {
     int height;
 } variant_tree_t;
 
-/**
- * @brief Insert a variant in the list (tree) of variant.
- *
- * @param variant_list  List (tree) of result variant.
- * @param var           Variant to be added in the list.
- */
-void insert_variants(variant_tree_t **variant_list, variant_t *var);
+void insert_variants(variant_t *var);
 
-/**
- * @brief Free all the variant in the list.
- *
- * @param variant_list  List of variant to be freed.
- */
-void free_variant_tree(variant_tree_t *variant_list);
+void free_variant_tree();
+
+variant_tree_t *variant_list_get();
 
 #endif /* __VARTREE_H__ */

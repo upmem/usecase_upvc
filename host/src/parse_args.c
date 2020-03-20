@@ -11,10 +11,10 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "dpu.h"
+#include <dpu.h>
 
-#include "parse_args.h"
 #include "upvc.h"
+#include "parse_args.h"
 
 static char *prog_name = NULL;
 static char *input_path = NULL;
@@ -34,7 +34,7 @@ static void usage()
         "\nusage: %s -i <input_prefix> -n <number_of_dpus> -g <goal> [-s] \n"
         "options:\n"
         "\t-i\tInput prefix that will be used to find the inputs files\n"
-        "\t-g\tGoal of the run - values=index|check|map\n"
+        "\t-g\tGoal of the run - values=index|map\n"
         "\t-s\tSimulation mode (not compatible with -g)\n"
         "\t-n\tNumber of DPUs to use\n",
         prog_name);
@@ -104,8 +104,6 @@ static void validate_goal(const char *goal_str)
         usage();
     } else if (strcmp(goal_str, "index") == 0) {
         goal = goal_index;
-    } else if (strcmp(goal_str, "check") == 0) {
-        goal = goal_check;
     } else if (strcmp(goal_str, "map") == 0) {
         goal = goal_map;
     } else {

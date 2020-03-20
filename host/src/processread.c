@@ -7,14 +7,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "accumulateread.h"
 #include "compare.h"
 #include "genome.h"
-#include "parse_args.h"
+#include "getread.h"
 #include "upvc.h"
-#include "upvc_dpu.h"
 #include "vartree.h"
-
-#include "common.h"
 
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
@@ -122,8 +120,7 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
     return code_idx;
 }
 
-static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **variant_list,
-    int *substitution_list, int8_t *mapping_coverage, unsigned int size_neighbour_in_symbols)
+static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer, unsigned int size_neighbour_in_symbols)
 {
     uint32_t code_result_idx;
     uint8_t code_result_tab[256];
@@ -134,7 +131,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 
     /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
     for (int i = 0; i < size_read; i++) {
-        mapping_coverage[genome_pos + i] += 1;
+        ref_genome->mapping_coverage[genome_pos + i] += 1;
     }
 
     /* Get the differences betweend the read and the sequence of the reference genome that match */
@@ -151,7 +148,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
             int snp = code_result_tab[code_result_idx + 2];
 
             /* substitution_list[pos_variant_genome] =  32 bits integer containning 4 counter of 8 bits */
-            substitution_list[pos_variant_genome] += 1 << (snp * 8);
+            ref_genome->substitution_list[pos_variant_genome] += 1 << (snp * 8);
 
             code_result_idx += 3;
         } else if (code_result == CODE_INS) {
@@ -189,7 +186,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
                 }
 
                 newvar->alt[k] = '\0';
-                insert_variants(variant_list, newvar);
+                insert_variants(newvar);
             }
         } else if (code_result == CODE_DEL) {
             int64_t ps_var_genome = pos_variant_genome;
@@ -226,7 +223,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
                 }
 
                 newvar->ref[k] = '\0';
-                insert_variants(variant_list, newvar);
+                insert_variants(newvar);
             }
         }
     }
@@ -275,20 +272,20 @@ static bool compute_read_pair(int type1, int type2, int *offset, int *nbread, dp
     return true;
 }
 
-int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **variant_list, int *substitution_list,
-    int8_t *mapping_coverage, dpu_result_out_t *result_tab, unsigned int result_tab_nb_read, FILE *fpe1, FILE *fpe2, int round,
-    times_ctx_t *times_ctx)
+void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 {
-    double t1, t2;
-    int nb_match = result_tab_nb_read;
+    unsigned int nb_match;
     int nb_read_map = 0;
     int offset[4]; /* offset in result_tab of the first read  */
     int nbread[4]; /* number of reads                        */
     unsigned int score[4];
     int result_tab_tmp[2];
     unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
+    dpu_result_out_t *result_tab;
+    int8_t *reads_buffer = get_reads_buffer(pass_id);
+    genome_t *ref_genome = genome_get();
 
-    t1 = my_clock();
+    accumulate_get_result(pass_id, &nb_match, &result_tab);
 
     /*
      * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -300,7 +297,7 @@ int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **va
      * The read pair to consider are [0, 3] and [1, 2].
      */
 
-    int i = 0;
+    unsigned int i = 0;
     while (i < nb_match) {
         int numpair = result_tab[i].num / 4;
         bool result_found = false;
@@ -334,21 +331,11 @@ int process_read(genome_t *ref_genome, int8_t *reads_buffer, variant_tree_t **va
         }
 
         if (result_found) { /* Mapped reads*/
-            set_variant(result_tab[result_tab_tmp[0]], ref_genome, reads_buffer, variant_list, substitution_list,
-                mapping_coverage, size_neighbour_in_symbols);
-            set_variant(result_tab[result_tab_tmp[1]], ref_genome, reads_buffer, variant_list, substitution_list,
-                mapping_coverage, size_neighbour_in_symbols);
+            set_variant(result_tab[result_tab_tmp[0]], ref_genome, reads_buffer, size_neighbour_in_symbols);
+            set_variant(result_tab[result_tab_tmp[1]], ref_genome, reads_buffer, size_neighbour_in_symbols);
             nb_read_map += 2;
         } else {
             add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
         }
     }
-
-    free(result_tab);
-
-    t2 = my_clock();
-    times_ctx->process_read = t2 - t1;
-    times_ctx->tot_process_read += t2 - t1;
-
-    return nb_read_map;
 }

@@ -5,8 +5,6 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "mram_dpu.h"
 #include "common.h"

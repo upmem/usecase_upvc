@@ -5,7 +5,6 @@
 #ifndef __UPVC_DPU_H__
 #define __UPVC_DPU_H__
 
-#include "upvc.h"
 #include <stdint.h>
 #include <stdio.h>
 

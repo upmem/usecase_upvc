@@ -4,8 +4,8 @@
 
 #include "compare.h"
 #include "upvc.h"
-#include <stdio.h>
-#include <stdlib.h>
+
+#include <stdint.h>
 
 #define PQD_INIT_VAL (99)
 

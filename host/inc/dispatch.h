@@ -20,41 +20,11 @@ typedef struct {
     int8_t *reads_area;
 } dispatch_request_t;
 
-#include "dpus_mgmt.h"
-#include "index.h"
-#include "upvc.h"
-#include "vmi.h"
+dispatch_request_t *dispatch_get(unsigned int dpu_id);
 
-#include "backends_functions.h"
+void dispatch_read(unsigned int pass_id);
 
-/**
- * @brief Dispatch reads amongst the list of DPUs, to create requests.
- *
- * @param index_seed       List of the seed of the reference genome.
- * @param read_buffer      Buffer containning the reads to dispatch.
- * @param nb_read          Number of reads to dispatch.
- * @param dispatch_requests  Table of dispatch_request_t to store the dispatching between the DPUs.
- * @param times_ctx        Times information for the whole application.
- * @param backends_functions  Functions to be use by the dispatcher depending on the backend.
- *
- * @return The dispatcher result.
- */
-void dispatch_read(index_seed_t **index_seed, int8_t *read_buffer, int nb_read, dispatch_request_t *dispatch_requests,
-    times_ctx_t *times_ctx, backends_functions_t *backends_functions);
-
-/**
- * @brief Create a table of requests to be filled with dispatch_read
- *
- * @param nb_dpu      Number of DPUs on which to dispatch the reads.
- */
-dispatch_request_t *dispatch_create(unsigned int nb_dpu);
-
-/**
- * @brief Frees the requests produced by dispatch_read.
- *
- * @param dispatch  The free structure.
- * @param nb_dpu    The number of DPUs to use to compute.
- */
-void dispatch_free(dispatch_request_t *dispatch, unsigned int nb_dpu);
+void dispatch_init(unsigned int nb_dpu);
+void dispatch_free(unsigned int nb_dpu);
 
 #endif /* __DISPATCH_H__ */

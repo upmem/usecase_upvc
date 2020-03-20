@@ -2,7 +2,6 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
-#include "upvc.h"
 #include <stdint.h>
 
 #include "common.h"

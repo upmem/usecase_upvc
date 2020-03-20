@@ -15,9 +15,6 @@
 #include "parse_args.h"
 #include "upvc.h"
 #include "upvc_dpu.h"
-#include "vmi.h"
-
-#include "backends_functions.h"
 
 #include "common.h"
 
@@ -304,26 +301,16 @@ void add_seed_to_simulation_requests(
     write_neighbour_read(seed->num_dpu, nb_read_written, nbr);
 }
 
-void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __attribute__((unused)) devices_t *devices,
-    __attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id, int delta_neighbour,
-    sem_t *dispatch_free_sem, sem_t *acc_wait_sem, times_ctx_t *times_ctx)
+void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
+    int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
-    double t1, t2;
     unsigned int nb_dpu = get_nb_dpu();
     pthread_t thread_id[nb_dpu];
     align_on_dpu_arg_t thread_args[nb_dpu];
-    unsigned int first_dpu = 0;
-
-    if (DEBUG_DPU != -1) {
-        first_dpu = DEBUG_DPU;
-        nb_dpu = DEBUG_DPU + 1;
-    }
-
-    t1 = my_clock();
 
     sem_wait(acc_wait_sem);
 
-    for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+    for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
         thread_args[numdpu].numdpu = numdpu;
         thread_args[numdpu].delta_neighbour = delta_neighbour;
 #ifdef PRINT_NODP_ODPD_TIME
@@ -334,10 +321,10 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __
 #endif
     }
 
-    for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+    for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
         pthread_create(&thread_id[numdpu], NULL, align_on_dpu, &thread_args[numdpu]);
     }
-    for (unsigned int numdpu = first_dpu; numdpu < nb_dpu; numdpu++) {
+    for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
         pthread_join(thread_id[numdpu], NULL);
     }
 
@@ -358,43 +345,23 @@ void run_dpu_simulation(__attribute__((unused)) dispatch_request_t *dispatch, __
 #endif
 
     sem_post(dispatch_free_sem);
-
-    t2 = my_clock();
-    times_ctx->map_read = t2 - t1;
-    times_ctx->tot_map_read += t2 - t1;
 }
 
-void init_backend_simulation(unsigned int *nb_rank, __attribute__((unused)) devices_t **devices,
-    __attribute__((unused)) unsigned int nb_dpu_per_run, index_seed_t ***index_seed)
+void init_backend_simulation()
 {
-    *index_seed = load_index_seeds();
-    *nb_rank = 1;
-
     malloc_dpu(get_nb_dpu());
 }
 
-void free_backend_simulation(__attribute__((unused)) devices_t *devices, unsigned int nb_dpu) { free_dpu(nb_dpu); }
+void free_backend_simulation(unsigned int nb_dpu) { free_dpu(nb_dpu); }
 
 void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned int rank_id,
-    __attribute__((unused)) int delta_neighbour, __attribute__((unused)) devices_t *devices, times_ctx_t *times_ctx)
+    __attribute__((unused)) int delta_neighbour)
 {
-    double t1, t2;
     mem_dpu_t *MDPU;
     unsigned int nb_dpu = get_nb_dpu();
-    unsigned int first_dpu = 0;
-    t1 = my_clock();
 
-    if (DEBUG_DPU != -1) {
-        first_dpu = DEBUG_DPU;
-        nb_dpu = DEBUG_DPU + 1;
-    }
-
-    for (unsigned int each_dpu = first_dpu; each_dpu < nb_dpu; each_dpu++) {
+    for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
         MDPU = get_mem_dpu(each_dpu);
         mram_load((uint8_t *)(MDPU->neighbour_idx), each_dpu);
     }
-
-    t2 = my_clock();
-    times_ctx->write_mram = t2 - t1;
-    times_ctx->tot_write_mram += t2 - t1;
 }

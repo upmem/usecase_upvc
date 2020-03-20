@@ -5,7 +5,6 @@
 #ifndef __COMPARE_H__
 #define __COMPARE_H__
 
-#include "upvc.h"
 #include <stdint.h>
 
 /**

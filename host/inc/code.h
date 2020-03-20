@@ -5,7 +5,6 @@
 #ifndef __CODE_H__
 #define __CODE_H__
 
-#include "upvc.h"
 #include <stdint.h>
 
 /**

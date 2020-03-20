@@ -10,15 +10,16 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "accumulateread.h"
 #include "dispatch.h"
 #include "dpu_backend.h"
+#include "dpus_mgmt.h"
 #include "genome.h"
 #include "getread.h"
 #include "index.h"
 #include "mram_dpu.h"
 #include "parse_args.h"
 #include "processread.h"
-#include "accumulateread.h"
 #include "simu_backend.h"
 #include "upvc.h"
 #include "upvc_dpu.h"
@@ -27,76 +28,48 @@
 
 #include "backends_functions.h"
 
-#define MAX_NB_PASS (3200 / (MAX_READS_BUFFER / (1024 * 1024ULL))) /* Whole genomee is less than 3200 pass of 1Mreq. */
-#define NB_READS_BUFFER (4)
+FILE *time_file;
+pthread_mutex_t time_file_mutex;
+backends_functions_t backends_functions;
 
-static volatile unsigned int global_thread_process_each_pass_mod_start;
+#define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < get_nb_dpu(); dpu_offset += get_nb_dpus_per_run())
+#define FOREACH_RANK(each_rank) for (unsigned int each_rank = 0; each_rank < dpu_get_nb_ranks_per_run(); each_rank++)
+#define FOREACH_PASS(each_pass) for (unsigned int each_pass = 0; get_reads_in_buffer(each_pass) != 0; each_pass++)
 
 typedef struct {
     sem_t *dispatch_free_sem;
     sem_t *acc_process_wait_sem;
-    int8_t **reads_buffer;
-    int *nb_read;
     FILE *fipe1;
     FILE *fipe2;
-    times_ctx_t *times_ctx;
 } thread_get_reads_arg_t;
 
 void *thread_get_reads(void *arg)
 {
     thread_get_reads_arg_t *args = (thread_get_reads_arg_t *)arg;
-    int8_t **reads_buffer = args->reads_buffer;
-    int *nb_read = args->nb_read;
     FILE *fipe1 = args->fipe1;
     FILE *fipe2 = args->fipe2;
     sem_t *dispatch_free_sem = args->dispatch_free_sem;
     sem_t *acc_process_wait_sem = args->acc_process_wait_sem;
-    times_ctx_t *times_ctx = args->times_ctx;
 
-    unsigned int nb_dpu = get_nb_dpu();
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-    unsigned int each_pass_mod = 0;
-
-    for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
+    FOREACH_RUN(dpu_offset)
+    {
         unsigned int each_pass = 0;
-
-        if (DEBUG_DPU == -1) {
+        do {
             sem_wait(acc_process_wait_sem);
-        }
 
-        PRINT_TIME_GET_READS(times_ctx);
-        reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * SIZE_READ);
-        assert(reads_buffer[each_pass_mod] != NULL);
-        nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx);
-        PRINT_TIME_GET_READS(times_ctx);
+            PRINT_TIME_GET_READS();
+            get_reads(fipe1, fipe2, each_pass);
+            PRINT_TIME_GET_READS();
 
-        sem_post(dispatch_free_sem);
-
-        while (nb_read[each_pass_mod] != 0) {
-            each_pass++;
-            each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
-            assert(each_pass < MAX_NB_PASS);
-
-            if (DEBUG_DPU == -1) {
-                sem_wait(acc_process_wait_sem);
-            }
-
-            PRINT_TIME_GET_READS(times_ctx);
-            reads_buffer[each_pass_mod] = (int8_t *)malloc(sizeof(int8_t) * MAX_READS_BUFFER * SIZE_READ);
-            assert(reads_buffer[each_pass_mod] != NULL);
-            nb_read[each_pass_mod] = get_reads(fipe1, fipe2, reads_buffer[each_pass_mod], times_ctx);
-            PRINT_TIME_GET_READS(times_ctx);
-
-            if (DEBUG_PASS != -1) {
-                if (each_pass == (DEBUG_PASS + 1)) {
-                    nb_read[each_pass_mod] = 0;
-                }
-            }
             sem_post(dispatch_free_sem);
-        }
+        } while (get_reads_in_buffer(each_pass++) != 0);
+
         fseek(fipe1, 0, SEEK_SET);
         fseek(fipe2, 0, SEEK_SET);
-        each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
+
+        // wait for run to be complete before starting the next one
+        for (unsigned int each_reads_buffer = 0; each_reads_buffer < NB_READS_BUFFER - 1; each_reads_buffer++)
+            sem_wait(acc_process_wait_sem);
     }
 
     return NULL;
@@ -109,12 +82,6 @@ typedef struct {
     sem_t *acc_free_sem;
     unsigned int rank_id;
     int round;
-    int *nb_read;
-    devices_t *devices;
-    dispatch_request_t *dispatch_requests;
-    backends_functions_t *backends_functions;
-    times_ctx_t *times_ctx;
-    uint32_t nb_rank;
 } thread_exec_rank_arg_t;
 
 void *thread_exec_rank(void *arg)
@@ -127,58 +94,41 @@ void *thread_exec_rank(void *arg)
     sem_t *acc_free_sem = args->acc_free_sem;
     unsigned int rank_id = args->rank_id;
     int round = args->round;
-    volatile int *nb_read = args->nb_read;
-    devices_t *devices = args->devices;
-    dispatch_request_t *dispatch_requests = args->dispatch_requests;
-    backends_functions_t *backends_functions = args->backends_functions;
-    times_ctx_t *times_ctx = args->times_ctx;
-    uint32_t nb_rank = args->nb_rank;
-
-    unsigned int nb_dpu = get_nb_dpu();
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-    unsigned int each_pass_mod = 0;
 
     unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
 
-    for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
-        print_line(rank_id, nb_rank);
-        print(rank_id, nb_rank, "M %u", dpu_offset);
-        PRINT_TIME_WRITE_MRAM(times_ctx, rank_id);
+    FOREACH_RUN(dpu_offset)
+    {
+        print_line(rank_id);
+        print(rank_id, "M %u", dpu_offset);
+        PRINT_TIME_WRITE_MRAM(rank_id);
         t1 = my_clock();
-        backends_functions->load_mram(dpu_offset, rank_id, delta_neighbour, devices, times_ctx);
+        backends_functions.load_mram(dpu_offset, rank_id, delta_neighbour);
         t2 = my_clock();
-        PRINT_TIME_WRITE_MRAM(times_ctx, rank_id);
-        print(rank_id, nb_rank, "%.2lf", t2 - t1);
+        PRINT_TIME_WRITE_MRAM(rank_id);
+        print(rank_id, "%.2lf", t2 - t1);
 
-        unsigned int each_pass = 0;
-
+        // wait for get_reads_in_buffer to mean something
         sem_wait(dispatch_wait_sem);
-        while (nb_read[each_pass_mod] != 0) {
-            print_line(rank_id, nb_rank);
 
-            if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
-                print(rank_id, nb_rank, "P %u", each_pass);
-                PRINT_TIME_MAP_READ(times_ctx, rank_id);
-                t1 = my_clock();
-                backends_functions->run_dpu(
-                    dispatch_requests, devices, dpu_offset, rank_id, delta_neighbour, dispatch_free_sem, acc_wait_sem, times_ctx);
-                t2 = my_clock();
-                PRINT_TIME_MAP_READ(times_ctx, rank_id);
-                print(rank_id, nb_rank, "T %.2lf", t2 - t1);
-            } else {
-                sem_post(dispatch_free_sem);
-                if (DEBUG_DPU == -1) {
-                    sem_wait(acc_wait_sem);
-                }
-            }
+        FOREACH_PASS(each_pass)
+        {
+            print_line(rank_id);
+
+            print(rank_id, "P %u", each_pass);
+            PRINT_TIME_MAP_READ(rank_id);
+            t1 = my_clock();
+            backends_functions.run_dpu(dpu_offset, rank_id, delta_neighbour, dispatch_free_sem, acc_wait_sem);
+            t2 = my_clock();
+            PRINT_TIME_MAP_READ(rank_id);
+            print(rank_id, "T %.2lf", t2 - t1);
 
             sem_post(acc_free_sem);
-            each_pass++;
-            each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
             sem_wait(dispatch_wait_sem);
         }
+
+        // let acc sees that this run is complete
         sem_post(acc_free_sem);
-        each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
     }
     return NULL;
 }
@@ -187,13 +137,6 @@ typedef struct {
     sem_t *get_reads_wait_sem;
     sem_t *exec_rank_wait_sem;
     sem_t *exec_rank_free_sem;
-    unsigned int nb_rank;
-    int *nb_read;
-    int8_t **reads_buffer;
-    index_seed_t **index_seed;
-    dispatch_request_t *dispatch_requests;
-    backends_functions_t *backends_functions;
-    times_ctx_t *times_ctx;
 } thread_dispatch_arg_t;
 
 void *thread_dispatch(void *arg)
@@ -202,47 +145,27 @@ void *thread_dispatch(void *arg)
     sem_t *get_reads_wait_sem = args->get_reads_wait_sem;
     sem_t *exec_rank_wait_sem = args->exec_rank_wait_sem;
     sem_t *exec_rank_free_sem = args->exec_rank_free_sem;
-    unsigned int nb_rank = args->nb_rank;
-    volatile int *nb_read = args->nb_read;
-    int8_t **reads_buffer = args->reads_buffer;
-    index_seed_t **index_seed = args->index_seed;
-    dispatch_request_t *dispatch_requests = args->dispatch_requests;
-    backends_functions_t *backends_functions = args->backends_functions;
-    times_ctx_t *times_ctx = args->times_ctx;
 
-    unsigned int nb_dpu = get_nb_dpu();
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-    unsigned int each_pass_mod = 0;
-
-    for (unsigned int dpu_offset = 0; dpu_offset < nb_dpu; dpu_offset += nb_dpus_per_run) {
-        unsigned int each_pass = 0;
-
+    FOREACH_RUN(dpu_offset)
+    {
+        // wait for get_reads_in_buffer to mean something
         sem_wait(get_reads_wait_sem);
 
-        while (nb_read[each_pass_mod] != 0) {
-            for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                sem_wait(&exec_rank_wait_sem[each_rank]);
-            }
+        FOREACH_PASS(each_pass)
+        {
+            FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
 
-            if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
-                PRINT_TIME_DISPATCH(times_ctx);
-                dispatch_read(index_seed, reads_buffer[each_pass_mod], nb_read[each_pass_mod], dispatch_requests, times_ctx,
-                    backends_functions);
-                PRINT_TIME_DISPATCH(times_ctx);
-            }
+            PRINT_TIME_DISPATCH();
+            dispatch_read(each_pass);
+            PRINT_TIME_DISPATCH();
 
-            for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                sem_post(&exec_rank_free_sem[each_rank]);
-            }
+            FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
 
-            each_pass++;
-            each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
             sem_wait(get_reads_wait_sem);
         }
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            sem_post(&exec_rank_free_sem[each_rank]);
-        }
-        each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
+
+        // let exec_rank sees that this run is complete
+        FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
     }
     return NULL;
 }
@@ -252,12 +175,8 @@ typedef struct {
     sem_t *exec_rank_free_sem;
     sem_t *process_free_sem;
     sem_t *get_reads_free_sem;
-    unsigned int nb_rank;
-    int *nb_read;
-    int8_t **reads_buffer;
     unsigned int *result_tab_nb_read;
     dpu_result_out_t **result_tab;
-    times_ctx_t *times_ctx;
 } thread_acc_arg_t;
 
 void *thread_acc(void *arg)
@@ -267,75 +186,48 @@ void *thread_acc(void *arg)
     sem_t *exec_rank_free_sem = args->exec_rank_free_sem;
     sem_t *process_free_sem = args->process_free_sem;
     sem_t *get_reads_free_sem = args->get_reads_free_sem;
-    unsigned int nb_rank = args->nb_rank;
-    volatile int *nb_read = args->nb_read;
-    int8_t **reads_buffer = args->reads_buffer;
-    unsigned int *result_tab_nb_read = args->result_tab_nb_read;
-    dpu_result_out_t **result_tab = args->result_tab;
-    times_ctx_t *times_ctx = args->times_ctx;
 
     unsigned int nb_dpu = get_nb_dpu();
     unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
     unsigned int dpu_offset = 0;
-    unsigned int each_pass_mod = 0;
 
     for (; dpu_offset < (nb_dpu - nb_dpus_per_run); dpu_offset += nb_dpus_per_run) {
-        unsigned int each_pass = 0;
-
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            sem_wait(&exec_rank_wait_sem[each_rank]);
-        }
-        while (nb_read[each_pass_mod] != 0) {
-
-            if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
-                PRINT_TIME_ACC_READ(times_ctx);
-                accumulate_read(&result_tab[each_pass], &result_tab_nb_read[each_pass], dpu_offset, times_ctx);
-                PRINT_TIME_ACC_READ(times_ctx);
-            }
-
-            free(reads_buffer[each_pass_mod]);
+        // allow get_reads to start the run
+        for (unsigned int each_reads_buffer = 0; each_reads_buffer < NB_READS_BUFFER; each_reads_buffer++)
             sem_post(get_reads_free_sem);
-            for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                sem_post(&exec_rank_free_sem[each_rank]);
-            }
-            each_pass++;
-            each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
+        // wait for get_read_in_buffer to mean something
+        FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
 
-            for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                sem_wait(&exec_rank_wait_sem[each_rank]);
-            }
+        FOREACH_PASS(each_pass)
+        {
+            PRINT_TIME_ACC_READ();
+            accumulate_read(each_pass, dpu_offset);
+            PRINT_TIME_ACC_READ();
+
+            sem_post(get_reads_free_sem);
+            FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
+            FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
         }
-        sem_post(get_reads_free_sem);
-        each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
     }
     {
-        unsigned int each_pass = 0;
-        global_thread_process_each_pass_mod_start = each_pass_mod;
+        // allow get_reads to start the run
+        for (unsigned int each_reads_buffer = 0; each_reads_buffer < NB_READS_BUFFER; each_reads_buffer++)
+            sem_post(get_reads_free_sem);
+        // wait for get_read_in_buffer to mean something
+        FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
 
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            sem_wait(&exec_rank_wait_sem[each_rank]);
-        }
-        while (nb_read[each_pass_mod] != 0) {
-
-            if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
-                PRINT_TIME_ACC_READ(times_ctx);
-                accumulate_read(&result_tab[each_pass], &result_tab_nb_read[each_pass], dpu_offset, times_ctx);
-                PRINT_TIME_ACC_READ(times_ctx);
-            }
+        FOREACH_PASS(each_pass)
+        {
+            PRINT_TIME_ACC_READ();
+            accumulate_read(each_pass, dpu_offset);
+            PRINT_TIME_ACC_READ();
 
             sem_post(process_free_sem);
-            for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                sem_post(&exec_rank_free_sem[each_rank]);
-            }
-            each_pass++;
-            each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
-
-            for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-                sem_wait(&exec_rank_wait_sem[each_rank]);
-            }
+            FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
+            FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
         }
+        // let process sees that this run is complete
         sem_post(process_free_sem);
-        each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
     }
     return NULL;
 }
@@ -343,18 +235,9 @@ void *thread_acc(void *arg)
 typedef struct {
     sem_t *acc_wait_sem;
     sem_t *get_reads_free_sem;
-    int round;
-    int *nb_read;
-    genome_t *ref_genome;
-    int8_t **reads_buffer;
-    variant_tree_t **variant_list;
-    int *substitution_list;
-    int8_t *mapping_coverage;
-    unsigned int *result_tab_nb_read;
-    dpu_result_out_t **result_tab;
     FILE *fope1;
     FILE *fope2;
-    times_ctx_t *times_ctx;
+    int round;
 } thread_process_arg_t;
 
 void *thread_process(void *arg)
@@ -362,56 +245,32 @@ void *thread_process(void *arg)
     thread_process_arg_t *args = (thread_process_arg_t *)arg;
     sem_t *acc_wait_sem = args->acc_wait_sem;
     sem_t *get_reads_free_sem = args->get_reads_free_sem;
-    int round = args->round;
-    volatile int *nb_read = args->nb_read;
-    genome_t *ref_genome = args->ref_genome;
-    int8_t **reads_buffer = args->reads_buffer;
-    variant_tree_t **variant_list = args->variant_list;
-    int *substitution_list = args->substitution_list;
-    int8_t *mapping_coverage = args->mapping_coverage;
-    unsigned int *result_tab_nb_read = args->result_tab_nb_read;
-    dpu_result_out_t **result_tab = args->result_tab;
     FILE *fope1 = args->fope1;
     FILE *fope2 = args->fope2;
-    times_ctx_t *times_ctx = args->times_ctx;
+    int round = args->round;
 
-    unsigned int each_pass = 0, each_pass_mod;
-
+    // wait for get_read_in_buffer to mean something
     sem_wait(acc_wait_sem);
-    each_pass_mod = global_thread_process_each_pass_mod_start;
-    while (nb_read[each_pass_mod] != 0) {
-        if (DEBUG_PASS == -1 || DEBUG_PASS == each_pass) {
-            PRINT_TIME_PROCESS_READ(times_ctx);
-            process_read(ref_genome, reads_buffer[each_pass_mod], variant_list, substitution_list, mapping_coverage,
-                result_tab[each_pass], result_tab_nb_read[each_pass], fope1, fope2, round, times_ctx);
-            PRINT_TIME_PROCESS_READ(times_ctx);
-        }
-        free(reads_buffer[each_pass_mod]);
+
+    FOREACH_PASS(each_pass)
+    {
+        PRINT_TIME_PROCESS_READ();
+        process_read(fope1, fope2, round, each_pass);
+        PRINT_TIME_PROCESS_READ();
         sem_post(get_reads_free_sem);
 
-        each_pass++;
-        each_pass_mod = (each_pass_mod + 1) % NB_READS_BUFFER;
         sem_wait(acc_wait_sem);
     }
+
     return NULL;
 }
 
-static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping_coverage, int *substitution_list,
-    dispatch_request_t *dispatch_requests, index_seed_t **index_seed, char *input_prefix, variant_tree_t **variant_list,
-    genome_t *ref_genome, devices_t *devices, times_ctx_t *times_ctx, backends_functions_t *backends_functions)
+static void exec_round(int round)
 {
     char filename[1024];
     FILE *fipe1, *fipe2, *fope1, *fope2;
-    int8_t *reads_buffer[NB_READS_BUFFER];
-    int nb_read[NB_READS_BUFFER];
-    unsigned int result_tab_nb_read[MAX_NB_PASS];
-    dpu_result_out_t *result_tab[MAX_NB_PASS];
-
-    for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
-        result_tab[each_pass] = malloc(sizeof(dpu_result_out_t));
-        result_tab[each_pass][0].num = -1;
-    }
-    memset(result_tab_nb_read, 0, sizeof(unsigned int) * MAX_NB_PASS);
+    char *input_prefix = get_input_path();
+    unsigned int nb_rank = dpu_get_nb_ranks_per_run();
 
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
     fope1 = fopen(filename, "w");
@@ -430,150 +289,123 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
         fipe2 = fopen(filename, "r");
     }
 
+    pthread_t tid_get_reads;
+    pthread_t tid_exec_rank[nb_rank];
+    pthread_t tid_dispatch;
+    pthread_t tid_acc;
+    pthread_t tid_process;
+
+    sem_t get_reads_dispatch_sem;
+    sem_t exec_rank_dispatch_sem[nb_rank];
+    sem_t exec_rank_acc_sem[nb_rank];
+    sem_t dispatch_exec_rank_sem[nb_rank];
+    sem_t acc_exec_rank_sem[nb_rank];
+    sem_t acc_process_sem;
+    sem_t acc_process_get_reads_sem;
+
+    thread_get_reads_arg_t get_reads_arg = {
+        .dispatch_free_sem = &get_reads_dispatch_sem,
+        .acc_process_wait_sem = &acc_process_get_reads_sem,
+        .fipe1 = fipe1,
+        .fipe2 = fipe2,
+    };
+    thread_exec_rank_arg_t exec_rank_arg[nb_rank];
+    FOREACH_RANK(each_rank)
     {
-        pthread_t tid_get_reads;
-        pthread_t tid_exec_rank[nb_rank];
-        pthread_t tid_dispatch;
-        pthread_t tid_acc;
-        pthread_t tid_process;
+        exec_rank_arg[each_rank].dispatch_wait_sem = &dispatch_exec_rank_sem[each_rank];
+        exec_rank_arg[each_rank].dispatch_free_sem = &exec_rank_dispatch_sem[each_rank];
+        exec_rank_arg[each_rank].acc_wait_sem = &acc_exec_rank_sem[each_rank];
+        exec_rank_arg[each_rank].acc_free_sem = &exec_rank_acc_sem[each_rank];
+        exec_rank_arg[each_rank].rank_id = each_rank;
+        exec_rank_arg[each_rank].round = round;
+    }
+    thread_dispatch_arg_t dispatch_arg = {
+        .get_reads_wait_sem = &get_reads_dispatch_sem,
+        .exec_rank_wait_sem = exec_rank_dispatch_sem,
+        .exec_rank_free_sem = dispatch_exec_rank_sem,
+    };
+    thread_acc_arg_t acc_arg = {
+        .exec_rank_wait_sem = exec_rank_acc_sem,
+        .exec_rank_free_sem = acc_exec_rank_sem,
+        .process_free_sem = &acc_process_sem,
+        .get_reads_free_sem = &acc_process_get_reads_sem,
+    };
+    thread_process_arg_t process_arg = {
+        .acc_wait_sem = &acc_process_sem,
+        .get_reads_free_sem = &acc_process_get_reads_sem,
+        .fope1 = fope1,
+        .fope2 = fope2,
+        .round = round,
+    };
+    int ret;
 
-        sem_t get_reads_dispatch_sem;
-        sem_t exec_rank_dispatch_sem[nb_rank];
-        sem_t exec_rank_acc_sem[nb_rank];
-        sem_t dispatch_exec_rank_sem[nb_rank];
-        sem_t acc_exec_rank_sem[nb_rank];
-        sem_t acc_process_sem;
-        sem_t acc_process_get_reads_sem;
-
-        thread_get_reads_arg_t get_reads_arg = {
-            .dispatch_free_sem = &get_reads_dispatch_sem,
-            .acc_process_wait_sem = &acc_process_get_reads_sem,
-            .reads_buffer = reads_buffer,
-            .nb_read = nb_read,
-            .fipe1 = fipe1,
-            .fipe2 = fipe2,
-            .times_ctx = times_ctx,
-        };
-        thread_exec_rank_arg_t exec_rank_arg[nb_rank];
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            exec_rank_arg[each_rank].dispatch_wait_sem = &dispatch_exec_rank_sem[each_rank];
-            exec_rank_arg[each_rank].dispatch_free_sem = &exec_rank_dispatch_sem[each_rank];
-            exec_rank_arg[each_rank].acc_wait_sem = &acc_exec_rank_sem[each_rank];
-            exec_rank_arg[each_rank].acc_free_sem = &exec_rank_acc_sem[each_rank];
-            exec_rank_arg[each_rank].rank_id = each_rank;
-            exec_rank_arg[each_rank].round = round;
-            exec_rank_arg[each_rank].nb_read = nb_read;
-            exec_rank_arg[each_rank].devices = devices;
-            exec_rank_arg[each_rank].dispatch_requests = dispatch_requests;
-            exec_rank_arg[each_rank].backends_functions = backends_functions;
-            exec_rank_arg[each_rank].times_ctx = times_ctx;
-            exec_rank_arg[each_rank].nb_rank = nb_rank;
-        }
-        thread_dispatch_arg_t dispatch_arg = {
-            .get_reads_wait_sem = &get_reads_dispatch_sem,
-            .exec_rank_wait_sem = exec_rank_dispatch_sem,
-            .exec_rank_free_sem = dispatch_exec_rank_sem,
-            .nb_rank = nb_rank,
-            .nb_read = nb_read,
-            .reads_buffer = reads_buffer,
-            .index_seed = index_seed,
-            .dispatch_requests = dispatch_requests,
-            .backends_functions = backends_functions,
-            .times_ctx = times_ctx,
-        };
-        thread_acc_arg_t acc_arg = {
-            .exec_rank_wait_sem = exec_rank_acc_sem,
-            .exec_rank_free_sem = acc_exec_rank_sem,
-            .process_free_sem = &acc_process_sem,
-            .get_reads_free_sem = &acc_process_get_reads_sem,
-            .nb_rank = nb_rank,
-            .nb_read = nb_read,
-            .reads_buffer = reads_buffer,
-            .result_tab_nb_read = result_tab_nb_read,
-            .result_tab = result_tab,
-            .times_ctx = times_ctx,
-        };
-        thread_process_arg_t process_arg = {
-            .acc_wait_sem = &acc_process_sem,
-            .get_reads_free_sem = &acc_process_get_reads_sem,
-            .round = round,
-            .nb_read = nb_read,
-            .ref_genome = ref_genome,
-            .reads_buffer = reads_buffer,
-            .variant_list = variant_list,
-            .substitution_list = substitution_list,
-            .mapping_coverage = mapping_coverage,
-            .result_tab_nb_read = result_tab_nb_read,
-            .result_tab = result_tab,
-            .fope1 = fope1,
-            .fope2 = fope2,
-            .times_ctx = times_ctx,
-        };
-        int ret;
-        ret = sem_init(&get_reads_dispatch_sem, 0, 0);
+    // INIT
+    ret = sem_init(&get_reads_dispatch_sem, 0, 0);
+    assert(ret == 0);
+    FOREACH_RANK(each_rank)
+    {
+        ret = sem_init(&exec_rank_dispatch_sem[each_rank], 0, 1);
         assert(ret == 0);
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            ret = sem_init(&exec_rank_dispatch_sem[each_rank], 0, 1);
-            assert(ret == 0);
-            ret = sem_init(&exec_rank_acc_sem[each_rank], 0, 0);
-            assert(ret == 0);
-            ret = sem_init(&dispatch_exec_rank_sem[each_rank], 0, 0);
-            assert(ret == 0);
-            ret = sem_init(&acc_exec_rank_sem[each_rank], 0, 1);
-            assert(ret == 0);
-        }
-        ret = sem_init(&acc_process_sem, 0, 0);
+        ret = sem_init(&exec_rank_acc_sem[each_rank], 0, 0);
         assert(ret == 0);
-        ret = sem_init(&acc_process_get_reads_sem, 0, NB_READS_BUFFER);
+        ret = sem_init(&dispatch_exec_rank_sem[each_rank], 0, 0);
         assert(ret == 0);
-
-        ret = pthread_create(&tid_get_reads, NULL, thread_get_reads, (void *)&get_reads_arg);
-        assert(ret == 0);
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            ret = pthread_create(&tid_exec_rank[each_rank], NULL, thread_exec_rank, (void *)&exec_rank_arg[each_rank]);
-            assert(ret == 0);
-        }
-        ret = pthread_create(&tid_dispatch, NULL, thread_dispatch, (void *)&dispatch_arg);
-        assert(ret == 0);
-        if (DEBUG_DPU == -1) {
-            ret = pthread_create(&tid_acc, NULL, thread_acc, (void *)&acc_arg);
-            assert(ret == 0);
-            ret = pthread_create(&tid_process, NULL, thread_process, (void *)&process_arg);
-            assert(ret == 0);
-        }
-
-        ret = pthread_join(tid_get_reads, NULL);
-        assert(ret == 0);
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            ret = pthread_join(tid_exec_rank[each_rank], NULL);
-            assert(ret == 0);
-        }
-        ret = pthread_join(tid_dispatch, NULL);
-        assert(ret == 0);
-        if (DEBUG_DPU == -1) {
-            ret = pthread_join(tid_acc, NULL);
-            assert(ret == 0);
-            ret = pthread_join(tid_process, NULL);
-            assert(ret == 0);
-        }
-
-        ret = sem_destroy(&get_reads_dispatch_sem);
-        assert(ret == 0);
-        for (unsigned int each_rank = 0; each_rank < nb_rank; each_rank++) {
-            ret = sem_destroy(&exec_rank_dispatch_sem[each_rank]);
-            assert(ret == 0);
-            ret = sem_destroy(&exec_rank_acc_sem[each_rank]);
-            assert(ret == 0);
-            ret = sem_destroy(&dispatch_exec_rank_sem[each_rank]);
-            assert(ret == 0);
-            ret = sem_destroy(&acc_exec_rank_sem[each_rank]);
-            assert(ret == 0);
-        }
-        ret = sem_destroy(&acc_process_sem);
-        assert(ret == 0);
-        ret = sem_destroy(&acc_process_get_reads_sem);
+        ret = sem_init(&acc_exec_rank_sem[each_rank], 0, 1);
         assert(ret == 0);
     }
+    ret = sem_init(&acc_process_sem, 0, 0);
+    assert(ret == 0);
+    ret = sem_init(&acc_process_get_reads_sem, 0, 0);
+    assert(ret == 0);
+
+    // CREATE
+    ret = pthread_create(&tid_get_reads, NULL, thread_get_reads, (void *)&get_reads_arg);
+    assert(ret == 0);
+    FOREACH_RANK(each_rank)
+    {
+        ret = pthread_create(&tid_exec_rank[each_rank], NULL, thread_exec_rank, (void *)&exec_rank_arg[each_rank]);
+        assert(ret == 0);
+    }
+    ret = pthread_create(&tid_dispatch, NULL, thread_dispatch, (void *)&dispatch_arg);
+    assert(ret == 0);
+    ret = pthread_create(&tid_acc, NULL, thread_acc, (void *)&acc_arg);
+    assert(ret == 0);
+    ret = pthread_create(&tid_process, NULL, thread_process, (void *)&process_arg);
+    assert(ret == 0);
+
+    // JOIN
+    ret = pthread_join(tid_get_reads, NULL);
+    assert(ret == 0);
+    FOREACH_RANK(each_rank)
+    {
+        ret = pthread_join(tid_exec_rank[each_rank], NULL);
+        assert(ret == 0);
+    }
+    ret = pthread_join(tid_dispatch, NULL);
+    assert(ret == 0);
+    ret = pthread_join(tid_acc, NULL);
+    assert(ret == 0);
+    ret = pthread_join(tid_process, NULL);
+    assert(ret == 0);
+
+    // DESTROY
+    ret = sem_destroy(&get_reads_dispatch_sem);
+    assert(ret == 0);
+    FOREACH_RANK(each_rank)
+    {
+        ret = sem_destroy(&exec_rank_dispatch_sem[each_rank]);
+        assert(ret == 0);
+        ret = sem_destroy(&exec_rank_acc_sem[each_rank]);
+        assert(ret == 0);
+        ret = sem_destroy(&dispatch_exec_rank_sem[each_rank]);
+        assert(ret == 0);
+        ret = sem_destroy(&acc_exec_rank_sem[each_rank]);
+        assert(ret == 0);
+    }
+    ret = sem_destroy(&acc_process_sem);
+    assert(ret == 0);
+    ret = sem_destroy(&acc_process_get_reads_sem);
+    assert(ret == 0);
 
     fclose(fipe1);
     fclose(fipe2);
@@ -581,108 +413,45 @@ static void exec_round(unsigned int round, unsigned int nb_rank, int8_t *mapping
     fclose(fope2);
 }
 
-static void reload_and_verify_mram_images()
+static void init_time_file_and_mutex()
 {
-    index_seed_t **index_seed;
-    FILE *seed_file;
-    unsigned int nb_dpu = get_nb_dpu();
-    malloc_dpu(nb_dpu);
-    index_seed = load_index_seeds();
-    seed_file = fopen(SEED_FILE_LOG, "w");
-    print_index_seeds(index_seed, seed_file);
-    fclose(seed_file);
-    printf("Please check %s to verify that the indexing is OK\n", SEED_FILE_LOG);
-
-    free_index(index_seed);
-    free_dpu(nb_dpu);
-}
-
-static void load_index_save_genome(times_ctx_t *times_ctx)
-{
-    genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
-    index_seed_t **index_seed = index_genome(ref_genome, get_nb_dpu(), times_ctx);
-    save_index_seeds(index_seed);
-
-    free_genome(ref_genome);
-    free_index(index_seed);
-}
-
-static void do_mapping(backends_functions_t *backends_functions, times_ctx_t *times_ctx)
-{
-    unsigned int nb_dpu;
-    unsigned int nb_rank;
-    index_seed_t **index_seed;
-    char *input_prefix = get_input_path();
-    variant_tree_t *variant_list = NULL;
-    genome_t *ref_genome = get_genome(get_input_fasta(), times_ctx);
-    devices_t *devices = NULL;
     char filename[1024];
-
-    int8_t *mapping_coverage = (int8_t *)calloc(sizeof(int8_t), ref_genome->fasta_file_size);
-    int *substitution_list = (int *)calloc(sizeof(int), ref_genome->fasta_file_size);
-    dispatch_request_t *dispatch_requests;
-
-    backends_functions->init_backend(&nb_rank, &devices, get_nb_dpus_per_run(), &index_seed);
-
-    nb_dpu = get_nb_dpu();
-    dispatch_requests = dispatch_create(nb_dpu);
-
-    sprintf(filename, "%s_time.csv", input_prefix);
-    times_ctx->time_file = fopen(filename, "w");
-    fprintf(times_ctx->time_file,
+    sprintf(filename, "%s_time.csv", get_input_path());
+    time_file = fopen(filename, "w");
+    fprintf(time_file,
         "time, get_reads, dispatch, accumulate_read, process_read, "
         "write_mram, write_reads, compute, read_result, map_read\n");
 
-    for (unsigned int round = 0; round < 3; round++) {
-        if (DEBUG_ROUND != -1 && DEBUG_ROUND != round) {
-            continue;
-        }
+    pthread_mutex_init(&time_file_mutex, NULL);
+}
 
+static void close_time_file_and_mutex()
+{
+    fclose(time_file);
+    pthread_mutex_destroy(&time_file_mutex);
+}
+
+static void do_mapping()
+{
+    init_time_file_and_mutex();
+    backends_functions.init_backend();
+    unsigned int nb_dpu = get_nb_dpu();
+    dispatch_init(nb_dpu);
+
+    for (int round = 0; round < 3; round++) {
         printf("#################\n"
                "starting round %u\n"
                "#################\n",
             round);
-        if (devices != NULL) {
-            fprintf(devices->log_file, "round %i\n", round);
-        }
-        exec_round(round, nb_rank, mapping_coverage, substitution_list, dispatch_requests, index_seed, input_prefix,
-            &variant_list, ref_genome, devices, times_ctx, backends_functions);
-
-        if (DEBUG_PASS != -1) {
-            FILE *res_file;
-            unsigned int first_dpu = 0;
-            unsigned int last_dpu = nb_dpu;
-            sprintf(filename, "%s_%u_res.txt", input_prefix, round);
-            res_file = fopen(filename, "w");
-            if (DEBUG_DPU != -1) {
-                first_dpu = DEBUG_DPU;
-                last_dpu = DEBUG_DPU + 1;
-            }
-            for (unsigned int numdpu = first_dpu; numdpu < last_dpu; numdpu++) {
-                int k = 0;
-                fprintf(res_file, "dpu %i\n", numdpu);
-                while (read_out_num(numdpu, k) != -1) {
-                    fprintf(res_file, "R: %u %u %llx\n", read_out_num(numdpu, k), read_out_score(numdpu, k),
-                        (unsigned long long)read_out_coord(numdpu, k).coord);
-                    k++;
-                }
-            }
-            fclose(res_file);
-        }
+        accumulate_init();
+        exec_round(round);
+        accumulate_free();
     }
+    create_vcf();
 
-    fclose(times_ctx->time_file);
-
-    backends_functions->free_backend(devices, nb_dpu);
-
-    create_vcf(input_prefix, ref_genome, &variant_list, substitution_list, mapping_coverage, times_ctx);
-
-    free_variant_tree(variant_list);
-    free_genome(ref_genome);
-    free_index(index_seed);
-    dispatch_free(dispatch_requests, nb_dpu);
-    free(substitution_list);
-    free(mapping_coverage);
+    dispatch_free(nb_dpu);
+    backends_functions.free_backend(nb_dpu);
+    close_time_file_and_mutex();
 }
 
 static void print_time()
@@ -700,20 +469,14 @@ static void print_time()
 
 int main(int argc, char *argv[])
 {
-    times_ctx_t times_ctx;
-    backends_functions_t backends_functions;
-
-    memset(&times_ctx, 0, sizeof(times_ctx_t));
-    pthread_mutex_init(&times_ctx.time_file_mutex, NULL);
-
     validate_args(argc, argv);
 
     printf("%s\n", VERSION);
     print_time();
 
     assert(get_read_size(get_input_pe1()) == SIZE_READ);
-    printf("Information\n");
-    printf(" - read size: %d\n", SIZE_READ);
+    printf("Information:\n");
+    printf("\tread size: %d\n", SIZE_READ);
 
     if (get_simulation_mode()) {
         backends_functions.init_backend = init_backend_simulation;
@@ -729,22 +492,24 @@ int main(int argc, char *argv[])
         backends_functions.load_mram = load_mram_dpu;
     }
 
+    genome_init(get_input_fasta());
+
     switch (get_goal()) {
     case goal_index:
-        load_index_save_genome(&times_ctx);
-        break;
-    case goal_check:
-        reload_and_verify_mram_images();
+        index_init(get_nb_dpu());
+        index_save();
         break;
     case goal_map:
-        do_mapping(&backends_functions, &times_ctx);
+        index_load();
+        do_mapping();
         break;
     case goal_unknown:
     default:
         ERROR_EXIT(23, "goal has not been specified!");
     }
 
-    pthread_mutex_destroy(&times_ctx.time_file_mutex);
+    index_free();
+    genome_free();
     free_args();
 
     return 0;

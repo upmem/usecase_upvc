@@ -2,17 +2,20 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "upvc.h"
-
 #include "common.h"
 
 #define MAX_SEQ_SIZE (512)
 #define MAX_BUF_SIZE (1024)
+
+static int nb_reads[NB_READS_BUFFER];
+static int8_t *reads_buffers[NB_READS_BUFFER];
 
 /**
  * @brief Parse the file "f" to get the next read in the file and its pair.
@@ -65,13 +68,18 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2)
     return size_read;
 }
 
-int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_ctx)
+void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
 {
-    double t1, t2;
     int nb_read = 0;
     int size_read = SIZE_READ;
+    pass_id %= NB_READS_BUFFER;
 
-    t1 = my_clock();
+    int8_t *reads_buffer = reads_buffers[pass_id];
+    if (reads_buffer == NULL) {
+        reads_buffer = (int8_t *)malloc(MAX_READS_BUFFER * SIZE_READ);
+        assert(reads_buffer != NULL);
+        reads_buffers[pass_id] = reads_buffer;
+    }
 
     while (nb_read < MAX_READS_BUFFER) {
         if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * size_read], &reads_buffer[(nb_read + 1) * size_read]) <= 0)
@@ -80,12 +88,12 @@ int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_c
         nb_read += 4;
     }
 
-    t2 = my_clock();
-    times_ctx->get_reads = t2 - t1;
-    times_ctx->tot_get_reads += t2 - t1;
-
-    return nb_read;
+    nb_reads[pass_id] = nb_read;
 }
+
+int get_reads_in_buffer(unsigned int pass_id) { return nb_reads[pass_id % NB_READS_BUFFER]; }
+
+int8_t *get_reads_buffer(unsigned int pass_id) { return reads_buffers[pass_id % NB_READS_BUFFER]; }
 
 int get_read_size(char *input_pe1_file)
 {
