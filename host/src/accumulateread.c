@@ -3,13 +3,13 @@
 #include "upvc.h"
 #include "upvc_dpu.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/queue.h>
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
-static unsigned int *result_tab_nb_read;
-static dpu_result_out_t **result_tab;
+static FILE **result_file;
 
 SLIST_HEAD(min_heap_head, min_heap);
 struct min_heap {
@@ -85,6 +85,30 @@ static void merge_result_list(
     }
 }
 
+void accumulate_get_result(unsigned int pass_id, unsigned int *nb_res, dpu_result_out_t **results)
+{
+    if (result_file[pass_id] == NULL) {
+        static const dpu_result_out_t dummy_res = { .num = -1 };
+        char result_filename[512];
+        sprintf(result_filename, "result_%u.bin", pass_id);
+
+        result_file[pass_id] = fopen(result_filename, "w+");
+        fwrite(&dummy_res, sizeof(dummy_res), 1, result_file[pass_id]);
+    }
+
+    fseek(result_file[pass_id], 0, SEEK_END);
+    size_t size = ftell(result_file[pass_id]);
+    rewind(result_file[pass_id]);
+
+    dpu_result_out_t *results_tmp = (dpu_result_out_t *)malloc(size);
+    assert(results_tmp != NULL);
+    *results = results_tmp;
+    size_t size_read = fread(results_tmp, size, 1, result_file[pass_id]);
+    assert(size_read == 1);
+
+    *nb_res = (size / sizeof(dpu_result_out_t)) - 1;
+}
+
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
     unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
@@ -115,44 +139,40 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     for (unsigned int numdpu = dpu_offset; numdpu < dpu_offset + get_nb_dpus_per_run() && numdpu < get_nb_dpu(); numdpu++) {
         total_nb_res += nb_res[numdpu - dpu_offset];
     }
-    result_tab_nb_read[pass_id] += total_nb_res;
+
+    // Get data from FILE *
+    unsigned int result_tab_nb_read;
+    dpu_result_out_t *result_tab;
+    accumulate_get_result(pass_id, &result_tab_nb_read, &result_tab);
+    result_tab_nb_read += total_nb_res;
+    size_t size = sizeof(dpu_result_out_t) * (result_tab_nb_read + 1);
 
     // Alloc the merged and sorted tab of result for this pass
-    dpu_result_out_t *merged_result_tab = malloc((result_tab_nb_read[pass_id] + 1) * sizeof(dpu_result_out_t));
+    dpu_result_out_t *merged_result_tab = malloc(size);
     assert(merged_result_tab != NULL);
 
     // Merge and sort all the result for this pass
-    result_list[nb_dpus_used_current_run] = result_tab[pass_id];
-    merge_result_list(merged_result_tab, result_list, nb_dpus_used_current_run + 1, result_tab_nb_read[pass_id]);
+    result_list[nb_dpus_used_current_run] = result_tab;
+    merge_result_list(merged_result_tab, result_list, nb_dpus_used_current_run + 1, result_tab_nb_read);
 
-    free(result_tab[pass_id]);
-    result_tab[pass_id] = merged_result_tab;
-    merged_result_tab[result_tab_nb_read[pass_id]].num = -1;
-}
-
-void accumulate_get_result(unsigned int pass_id, unsigned int *nb_res, dpu_result_out_t **results)
-{
-    *nb_res = result_tab_nb_read[pass_id];
-    *results = result_tab[pass_id];
+    // update FILE *
+    free(result_tab);
+    merged_result_tab[result_tab_nb_read].num = -1;
+    rewind(result_file[pass_id]);
+    size_t written_size = fwrite(merged_result_tab, size, 1, result_file[pass_id]);
+    assert( written_size == 1);
+    free(merged_result_tab);
 }
 
 void accumulate_free() {
     for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
-        free(result_tab[each_pass]);
+        if (result_file[each_pass] != NULL)
+            fclose(result_file[each_pass]);
     }
-    free(result_tab_nb_read);
-    free(result_tab);
+    free(result_file);
 }
 
 void accumulate_init() {
-    result_tab_nb_read = (unsigned int *)malloc(sizeof(unsigned int) * MAX_NB_PASS);
-    assert(result_tab_nb_read != NULL);
-    result_tab = (dpu_result_out_t **)malloc(sizeof(dpu_result_out_t *) * MAX_NB_PASS);
-    assert(result_tab != NULL);
-    for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
-        result_tab[each_pass] = (dpu_result_out_t *)malloc(sizeof(dpu_result_out_t));
-        assert(result_tab[each_pass] != NULL);
-        result_tab[each_pass][0].num = -1;
-    }
-    memset(result_tab_nb_read, 0, sizeof(unsigned int) * MAX_NB_PASS);
+    result_file = (FILE **)calloc(MAX_NB_PASS, sizeof(FILE *));
+    assert(result_file != NULL);
 }

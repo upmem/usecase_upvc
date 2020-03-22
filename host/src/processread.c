@@ -338,4 +338,5 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
             add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
         }
     }
+    free(result_tab);
 }
