@@ -496,7 +496,7 @@ int main(int argc, char *argv[])
 
     switch (get_goal()) {
     case goal_index:
-        index_init(get_nb_dpu());
+        index_init(get_nb_dpus_per_run());
         index_save();
         break;
     case goal_map:
