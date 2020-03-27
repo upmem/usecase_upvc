@@ -4,7 +4,7 @@ project(dpu C ASM)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json)
 
-set(CMAKE_C_FLAGS "-O2 -g -fstack-size-section -DNR_TASKLETS=${NR_TASKLETS} -DSTACK_SIZE_DEFAULT=256")
+set(CMAKE_C_FLAGS "-O2 -g -fstack-size-section -DNR_TASKLETS=${NR_TASKLETS} -DSTACK_SIZE_DEFAULT=272")
 
 INCLUDE_DIRECTORIES(inc)
 INCLUDE_DIRECTORIES(../common/inc/)

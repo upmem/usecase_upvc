@@ -215,6 +215,56 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
     result_pool_finish(&tasklet_stats);
 }
 
+#define SEQREAD_CACHE_SIZE 64
+#include <seqread.h>
+static seqreader_buffer_t cache[NR_TASKLETS];
+uint32_t compute_checksum(__mram_ptr void *mram_addr, size_t size) {
+    sysname_t tid = me();
+
+    size_t size_per_tasklets = ((((size + NR_TASKLETS - 1) / NR_TASKLETS) + 7) >> 3 ) << 3;
+    uintptr_t current_addr = (uintptr_t)mram_addr + size_per_tasklets * tid;
+    uintptr_t end_addr = current_addr + size_per_tasklets;
+    if (end_addr > ((uintptr_t)mram_addr + size)) {
+        end_addr = ((uintptr_t)mram_addr + size);
+    }
+
+    uint32_t *ptr;
+    seqreader_t reader = seqread_init(cache[tid], (__mram_ptr void *)current_addr, (void **)&ptr);
+
+    uint32_t checksum = 0;
+    while (current_addr < end_addr) {
+        checksum += *ptr;
+        current_addr += sizeof(uint32_t);
+        ptr = seqread_get(ptr, sizeof(uint32_t), &reader);
+    }
+
+    barrier_wait(&init_barrier);
+
+    static uint32_t checksums[NR_TASKLETS];
+    checksums[tid] = checksum;
+
+    barrier_wait(&init_barrier);
+
+    uint32_t checksum_acc = 0;
+    if (tid == 0) {
+        for (unsigned int each_tasklet = 0; each_tasklet < NR_TASKLETS; each_tasklet++) {
+            checksum_acc += checksums[each_tasklet];
+        }
+    }
+    return checksum_acc;
+}
+
+void assert_checksum(uint32_t checksum, __mram_ptr void *mram_addr, size_t size, const char *str) {
+    uint32_t computed_checksum = compute_checksum(mram_addr, size);
+    if (me() == 0) {
+        if (computed_checksum != checksum) {
+            printf("ERROR while asserting checksum %s (0x%x != 0x%x)\n", str, computed_checksum, checksum);
+            halt();
+        }
+    }
+}
+
+__host uint32_t mram_checksum, input_checksum, output_checksum, mram_size;
 /**
  * @brief Common main: gather the seed mapping for this DPU, then start processing the requests on every tasklet.
  *
@@ -241,12 +291,19 @@ int main()
     }
 
     barrier_wait(&init_barrier);
+    cache[tasklet_id] = seqread_alloc();
+
+    assert_checksum(mram_checksum, DPU_MRAM_HEAP_POINTER, mram_size, "mram");
+    assert_checksum(input_checksum, get_request_addr(), get_request_size(), "input");
 
     run_align(tasklet_id, &DPU_COMPUTE_TIME_VAR, &current_time);
 
     barrier_wait(&init_barrier);
 
+    uint32_t checksum =  compute_checksum(get_result_addr(), get_result_size());
+
     if (tasklet_id == 0) {
+        output_checksum = checksum;
         get_time_and_accumulate(&DPU_COMPUTE_TIME_VAR, &current_time);
         DPU_COMPUTE_TIME_VAR = (DPU_COMPUTE_TIME_VAR + current_time) - start_time;
     }

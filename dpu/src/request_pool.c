@@ -41,6 +41,9 @@ __mram_noinit dpu_request_t DPU_REQUEST_VAR[MAX_DPU_REQUEST];
 static request_pool_t request_pool;
 MUTEX_INIT(request_pool_mutex);
 
+__mram_ptr void *get_request_addr() { return DPU_REQUEST_VAR; }
+size_t get_request_size() { return DPU_NB_REQUEST_VAR * sizeof(dpu_request_t); }
+
 void request_pool_init()
 {
     request_pool.rdidx = 0;

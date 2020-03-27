@@ -8,6 +8,11 @@
 #include "common.h"
 #include "dout.h"
 
+#include <mram.h>
+
+__mram_ptr void *get_result_addr();
+size_t get_result_size();
+
 /**
  * @brief Pushes a bunch of results.
  *

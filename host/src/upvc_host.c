@@ -84,6 +84,7 @@ typedef struct {
     int round;
 } thread_exec_rank_arg_t;
 
+volatile int dpus_mgmt_pass[10];
 void *thread_exec_rank(void *arg)
 {
     double t1, t2;
@@ -113,6 +114,7 @@ void *thread_exec_rank(void *arg)
 
         FOREACH_PASS(each_pass)
         {
+            dpus_mgmt_pass[rank_id] = each_pass;
             print_line(rank_id);
 
             print(rank_id, "P %u", each_pass);
@@ -431,6 +433,7 @@ static void close_time_file_and_mutex()
     pthread_mutex_destroy(&time_file_mutex);
 }
 
+volatile int dpus_mgmt_round;
 static void do_mapping()
 {
     init_time_file_and_mutex();
@@ -439,6 +442,7 @@ static void do_mapping()
     dispatch_init(nb_dpu);
 
     for (int round = 0; round < 3; round++) {
+        dpus_mgmt_round = round;
         printf("#################\n"
                "starting round %u\n"
                "#################\n",

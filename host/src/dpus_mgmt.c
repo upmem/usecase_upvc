@@ -15,6 +15,14 @@
 #include "upvc.h"
 #include "upvc_dpu.h"
 
+uint32_t compute_checksum(uint32_t *buffer, size_t size_in_bytes) {
+    uint32_t checksum = 0;
+    for (unsigned int i = 0; i < (size_in_bytes / sizeof(uint32_t)); i++) {
+        checksum += buffer[i];
+    }
+    return checksum;
+}
+
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 DPU_INCBIN(upvc_dpu_program, DPU_BINARY);
@@ -30,6 +38,16 @@ typedef struct {
 } devices_t;
 
 static devices_t devices = { .nb_ranks_per_run = 1 };
+
+#define CHECKSUM_REF_ELEM (640*250*3)
+static uint32_t *checksums_ref;
+extern volatile int dpus_mgmt_round;
+extern volatile int dpus_mgmt_pass[10];
+#if 1
+#define GENERATE_CHECKUM_REF
+#else
+#define ASSERT_CHECKSUM_REF
+#endif
 
 unsigned int dpu_get_nb_ranks_per_run() { return devices.nb_ranks_per_run; }
 
@@ -60,6 +78,14 @@ unsigned int dpu_try_alloc_for()
     pthread_mutex_init(&devices.log_mutex, NULL);
     devices.log_file = fopen("upvc_log.txt", "w");
 
+    checksums_ref = malloc(sizeof(uint32_t) * CHECKSUM_REF_ELEM);
+    assert(checksums_ref != NULL);
+#ifdef ASSERT_CHECKSUM_REF
+    FILE *checksum_file = fopen("checksum_ref.bin", "r");
+    fread(checksums_ref, sizeof(uint32_t), CHECKSUM_REF_ELEM, checksum_file);
+    fclose(checksum_file);
+#endif
+
     return devices.nb_ranks_per_run;
 }
 
@@ -69,9 +95,9 @@ void dpu_try_write_mram(unsigned int rank_id, unsigned int dpu_offset, delta_inf
     struct dpu_set_t rank = devices.ranks[rank_id];
     unsigned int nb_dpus_per_rank = devices.nb_dpus_per_rank[rank_id];
     uint8_t *mram[nb_dpus_per_rank];
-    size_t mram_size[nb_dpus_per_rank];
+    uint32_t mram_size[nb_dpus_per_rank];
 
-    memset(mram_size, 0, sizeof(size_t) * nb_dpus_per_rank);
+    memset(mram_size, 0, sizeof(uint32_t) * nb_dpus_per_rank);
 
     unsigned int each_dpu;
     struct dpu_set_t dpu;
@@ -84,6 +110,17 @@ void dpu_try_write_mram(unsigned int rank_id, unsigned int dpu_offset, delta_inf
             mram_size[each_dpu] = mram_load(mram[each_dpu], this_dpu);
         }
     }
+
+    uint32_t checksums[nb_dpus_per_rank];
+    DPU_FOREACH (rank, dpu, each_dpu) {
+        checksums[each_dpu] = compute_checksum((uint32_t *)(mram[each_dpu]), mram_size[each_dpu]);
+        DPU_ASSERT(dpu_prepare_xfer(dpu, &checksums[each_dpu]));
+    }
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, "mram_checksum",  0, sizeof(uint32_t), DPU_XFER_DEFAULT));
+    DPU_FOREACH (rank, dpu, each_dpu) {
+        DPU_ASSERT(dpu_prepare_xfer(dpu, &mram_size[each_dpu]));
+    }
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, "mram_size", 0, sizeof(uint32_t), DPU_XFER_DEFAULT));
 
     unsigned int max_mram_size = 0;
     DPU_FOREACH (rank, dpu, each_dpu) {
@@ -104,6 +141,12 @@ void dpu_try_free()
     DPU_ASSERT(dpu_free(devices.all_ranks));
     pthread_mutex_destroy(&devices.log_mutex);
     fclose(devices.log_file);
+#ifdef GENERATE_CHECKSUM_REF
+    FILE *checksum_file = fopen("checksum_ref.bin", "w");
+    fwrite(checksums_ref, sizeof(uint32_t), CHECKSUM_REF_ELEM, checksum_file);
+    fclose(checksum_file);
+#endif
+    free(checksums_ref);
 }
 
 void dpu_try_run(unsigned int rank_id)
@@ -149,6 +192,15 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_off
         }
         max_dispatch_size = MAX(max_dispatch_size, io_header[each_dpu]->nb_reads * sizeof(dpu_request_t));
     }
+
+    uint32_t checksums[nb_dpus_per_rank];
+    DPU_FOREACH(rank, dpu, each_dpu) {
+        checksums[each_dpu] = compute_checksum(
+            (uint32_t *)(io_header[each_dpu]->reads_area), io_header[each_dpu]->nb_reads * sizeof(dpu_request_t));
+        DPU_ASSERT(dpu_prepare_xfer(dpu, &checksums[each_dpu]));
+    }
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, "input_checksum", 0, sizeof(uint32_t), DPU_XFER_DEFAULT));
+
     DPU_FOREACH (rank, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &io_header[each_dpu]->nb_reads));
     }
@@ -283,6 +335,30 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset)
     }
     DPU_ASSERT(dpu_push_xfer(
         rank, DPU_XFER_FROM_DPU, XSTR(DPU_RESULT_VAR), 0, (max_nb_result + 1) * sizeof(dpu_result_out_t), DPU_XFER_DEFAULT));
+
+    uint32_t checksums[nb_dpus_per_rank];
+    DPU_FOREACH(rank, dpu, each_dpu) {
+        DPU_ASSERT(dpu_prepare_xfer(dpu, &checksums[each_dpu]));
+    }
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_FROM_DPU, "output_checksum", 0, sizeof(uint32_t), DPU_XFER_DEFAULT));
+    DPU_FOREACH(rank, dpu, each_dpu) {
+        uint32_t host_checksum = compute_checksum((uint32_t *)(results[each_dpu]), nb_res[each_dpu] * sizeof(dpu_result_out_t));
+        if (checksums[each_dpu] != host_checksum) {
+            fprintf(stderr, "ERROR in checksum of dpu %u.%u (DPU#%u) (0x%x != 0x%x): mram_read failed\n", rank_id, each_dpu,
+                dpu_offset + each_dpu, checksums[each_dpu], host_checksum);
+        }
+#ifdef ASSERT_CHECKSUM_REF
+        if (checksums[each_dpu]
+            != checksums_ref[(dpu_offset + each_dpu) + 640 * (dpus_mgmt_pass[rank_id] + 250 * (dpus_mgmt_round))]) {
+            fprintf(stderr, "ERROR in checksum of dpu %u.%u (DPU#%u) (0x%x != 0x%x): compute on dpu failed\n", rank_id, each_dpu,
+                dpu_offset + each_dpu, checksums[each_dpu],
+                checksums_ref[(dpu_offset + each_dpu) + 640 * (dpus_mgmt_pass[rank_id] + 250 * (dpus_mgmt_round))]);
+        }
+#endif
+#ifdef GENERATE_CHECKSUM_REF
+        checksums_ref[(dpu_offset + each_dpu) + 640 * (dpus_mgmt_pass[rank_id] + 250 * (dpus_mgmt_round))] = checksums[each_dpu];
+#endif
+    }
 
     dpu_try_log(rank_id, dpu_offset);
 }

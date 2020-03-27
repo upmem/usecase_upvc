@@ -10,6 +10,9 @@
 #include "common.h"
 #include "dout.h"
 
+__mram_ptr void *get_request_addr();
+size_t get_request_size();
+
 /**
  * @brief Gets the next read from the request pool, if any.
  *

@@ -40,6 +40,9 @@ MUTEX_INIT(result_pool_mutex);
  */
 __mram_noinit dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
 
+__mram_ptr void *get_result_addr() { return DPU_RESULT_VAR;}
+size_t get_result_size() { return DPU_NB_RESULT_VAR * sizeof(dpu_result_out_t); }
+
 void result_pool_init()
 {
     DPU_NB_RESULT_VAR = 0;
