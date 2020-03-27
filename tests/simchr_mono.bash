@@ -39,7 +39,7 @@ java -jar $VCF2DIPLOID -id "chr${num}" -seed "${seed}" -nochains -chr "chr${num}
 # Simulate reads for each reference genome
 for paternal in *chr${num}_paternal.fa
 do
-    prefix=$(echo ${paternal} | sed 's/^\(.*\)_chr${num}_paternal.fa/\1/')
+    prefix=$(echo ${paternal} | sed 's/^\(.*\)_[^_]*_paternal.fa/\1/')
     $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "paternal_${prefix}_PE" -i "${paternal}" &
 done
 
@@ -48,18 +48,19 @@ rm -rf *chr${num}_paternal.fa
 
 for maternal in *chr${num}_maternal.fa
 do
-    prefix=$(echo ${maternal} | sed 's/^\(.*\)_chr${num}_maternal.fa/\1/')
+    prefix=$(echo ${maternal} | sed 's/^\(.*\)_[^_]*_maternal.fa/\1/')
     $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "maternal_${prefix}_PE" -i "${maternal}" &
 done
 
 wait_jobs
 rm -rf *chr${num}_maternal.fa
 
-PATH=${GENOME_HOME}:$PATH python ${GENOME_HOME}/combineFastq.py "maternal_chr${num}_PE" "parternal_chr${num}_PE" "chr${num}_PE" "${seed}"
+PATH=${GENOME_HOME}:$PATH python ${GENOME_HOME}/combineFastq.py "maternal_chr${num}_PE" "paternal_chr${num}_PE" "chr${num}_PE" "${seed}"
 
 
 mv "chr${num}vars_filtered.vcf" "chr${num}vars_ref.vcf"
 # Print the output file names to the user
 echo "Created chr${num}_PE1.fastq, chr${num}_PE2.fastq and chr${num}vars_ref.vcf"
+rm -f maternal* paternal* *.map chr${num}vars.vcf
 
 ################## END OF SIMULATION ##################
