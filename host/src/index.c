@@ -10,6 +10,7 @@
 #include "upvc.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdint.h>
@@ -113,7 +114,7 @@ static void init_vmis(unsigned int nb_dpu)
         char file_name[FILE_NAME_SIZE];
         vmis[dpuno] = open(make_mram_file_name(file_name, dpuno), O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
         if (vmis[dpuno] == -1) {
-            ERROR_EXIT(-1, "VMI: open failed");
+            ERROR_EXIT(-1, "%s: open failed (%s)", file_name, strerror(errno));
         }
     }
 }
@@ -136,9 +137,11 @@ static void write_vmi(unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_resul
 
     vmi_t vmi = vmis[dpuno];
     lseek(vmi, k * out_len, SEEK_SET);
-    size_t write_size = write(vmi, temp_buff, out_len);
+    ssize_t write_size = write(vmi, temp_buff, out_len);
     if (write_size != out_len) {
-        ERROR_EXIT(-1, "VMI: did not write the expected number of bytes");
+        char file_name[FILE_NAME_SIZE];
+        ERROR_EXIT(-1, "%s: did not write the expected number of bytes (expected %u got %li, errno: %s)",
+            make_mram_file_name(file_name, dpuno), out_len, write_size, strerror(errno));
     }
 }
 
