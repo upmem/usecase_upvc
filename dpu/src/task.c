@@ -228,8 +228,8 @@ uint32_t compute_checksum(__mram_ptr void *mram_addr, size_t size) {
         end_addr = ((uintptr_t)mram_addr + size);
     }
 
-    uint32_t *ptr;
-    seqreader_t reader = seqread_init(cache[tid], (__mram_ptr void *)current_addr, (void **)&ptr);
+    seqreader_t reader;
+    uint32_t *ptr = seqread_init(cache[tid], (__mram_ptr void *)current_addr, &reader);
 
     uint32_t checksum = 0;
     while (current_addr < end_addr) {
