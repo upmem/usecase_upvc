@@ -40,7 +40,7 @@ java -jar $VCF2DIPLOID -id "chr${num}" -seed "${seed}" -nochains -chr "chr${num}
 for paternal in *chr${num}_paternal.fa
 do
     prefix=$(echo ${paternal} | sed 's/^\(.*\)_[^_]*_paternal.fa/\1/')
-    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "paternal_${prefix}_PE" -i "${paternal}" &
+    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 15 -rs "${seed}" -na -o "paternal_${prefix}_PE" -i "${paternal}" &
 done
 
 wait_jobs
@@ -49,7 +49,7 @@ rm -rf *chr${num}_paternal.fa
 for maternal in *chr${num}_maternal.fa
 do
     prefix=$(echo ${maternal} | sed 's/^\(.*\)_[^_]*_maternal.fa/\1/')
-    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "maternal_${prefix}_PE" -i "${maternal}" &
+    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 15 -rs "${seed}" -na -o "maternal_${prefix}_PE" -i "${maternal}" &
 done
 
 wait_jobs
