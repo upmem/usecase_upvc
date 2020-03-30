@@ -30,13 +30,13 @@ Data-set must consist of 3 files:
 Run once to create the MRAM for the reference genomee to compare to:
 
 ```
-./<path_to_build>/host/upvc -i <dataset_prefix> -d <number_of_virtual_dpus_during_execution> -g index -s
+./<path_to_build>/host/upvc -i <dataset_prefix> -n <number_of_virtual_dpus_during_execution> -g index
 ```
 
 Then run:
 
 ```
-./<path_to_build>/host/upvc -i <dataset_prefix> -g map -t <target=simulator|hw> -b <dpu_binary> [-n <number_of_physical_dpus_available>]
+./<path_to_build>/host/upvc -i <dataset_prefix> -g map  [-n <number_of_physical_dpus_available>]
 ```
 
 If the number of physical dpus available is not specified, the program will try to alloc every dpus available at runtime.
