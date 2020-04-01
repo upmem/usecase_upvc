@@ -6,8 +6,8 @@
 #define __UPVC_H__
 
 #define VERSION "VERSION 1.7"
-#define MAX_READS_BUFFER 1048576 /* Maximum number of read by round        */
-#define MAX_NB_PASS (3200 / (MAX_READS_BUFFER / (1024 * 1024ULL))) /* Whole genomee is less than 3200 pass of 1Mreq. */
+#define MAX_READS_BUFFER (1048576) /* Maximum number of read by round        */
+#define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
 #define NB_READS_BUFFER (4)
 
 #define COST_SUB 10
