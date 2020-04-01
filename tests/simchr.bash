@@ -23,10 +23,10 @@ wait_jobs() {
 ################## START OF SIMULATION ##################
 
 # Get the user-defined seed from input
-if [ $2 ]; then
-	seed=$2
+if [ $1 ]; then
+	seed=$1
 else
-	seed=$RANDOM
+	seed=64189 # 0xfabd
 fi
 
 # If the common variants do not already exist on disk, download them
