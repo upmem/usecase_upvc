@@ -22,7 +22,6 @@
 typedef struct {
     int8_t *data;
     int32_t *mapping_coverage;
-    int *substitution_list;
     uint32_t nb_seq;
     uint64_t pt_seq[MAX_SEQ_GEN];
     uint64_t len_seq[MAX_SEQ_GEN];

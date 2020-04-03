@@ -143,22 +143,22 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
         int code_result = code_result_tab[code_result_idx];
         int64_t pos_variant_read = code_result_tab[code_result_idx + 1];
         int64_t pos_variant_genome = genome_pos + pos_variant_read;
+        int ref_pos = 0;
+        int alt_pos = 0;
+        variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
+        newvar->depth=1;
+        newvar->score = result_match.score;
+        newvar->next = NULL;
         if (code_result == CODE_SUB) {
             /* SNP = 0,1,2,3  (code A,C,T,G) */
             int snp = code_result_tab[code_result_idx + 2];
-
-            /* substitution_list[pos_variant_genome] =  32 bits integer containning 4 counter of 8 bits */
-            ref_genome->substitution_list[pos_variant_genome] += 1 << (snp * 8);
+            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+            newvar->alt[alt_pos++] = nucleotide[snp & 3];
 
             code_result_idx += 3;
         } else if (code_result == CODE_INS) {
             int64_t ps_var_genome = pos_variant_genome;
             int64_t ps_var_read = pos_variant_read;
-            variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
-
-            newvar->offset = ref_genome->pt_seq[result_match.coord.seq_nr];
-            newvar->chr = ref_genome->seq_name[result_match.coord.seq_nr];
-            newvar->depth = 1;
             code_result_idx += 2;
 
             while (code_result_tab[code_result_idx] < 4) {
@@ -173,29 +173,16 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
                 pos_variant_read--;
             }
 
-            newvar->pos = pos_variant_genome;
-            newvar->ref[0] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-            newvar->ref[1] = '\0';
+            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
 
-            {
-                int k = 0;
-                while (pos_variant_read <= ps_var_read) {
-                    newvar->alt[k] = nucleotide[read[pos_variant_read] & 3];
-                    k++;
-                    pos_variant_read++;
-                }
-
-                newvar->alt[k] = '\0';
-                insert_variants(newvar);
+            while (pos_variant_read <= ps_var_read) {
+                newvar->alt[alt_pos++] = nucleotide[read[pos_variant_read] & 3];
+                pos_variant_read++;
             }
+
         } else if (code_result == CODE_DEL) {
             int64_t ps_var_genome = pos_variant_genome;
             int64_t ps_var_read = pos_variant_read;
-            variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
-
-            newvar->offset = ref_genome->pt_seq[result_match.coord.seq_nr];
-            newvar->chr = ref_genome->seq_name[result_match.coord.seq_nr];
-            newvar->depth = 1;
             code_result_idx += 2;
 
             while (code_result_tab[code_result_idx] < 4) {
@@ -210,22 +197,17 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
                 pos_variant_read--;
             }
 
-            newvar->pos = pos_variant_genome;
-            newvar->alt[0] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-            newvar->alt[1] = '\0';
+            newvar->alt[alt_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
 
-            {
-                int k = 0;
-                while (pos_variant_genome <= ps_var_genome) {
-                    newvar->ref[k] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-                    k++;
-                    pos_variant_genome++;
-                }
-
-                newvar->ref[k] = '\0';
-                insert_variants(newvar);
+            while (pos_variant_genome <= ps_var_genome) {
+                newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+                pos_variant_genome++;
             }
         }
+        newvar->ref[ref_pos] = '\0';
+        newvar->alt[alt_pos] = '\0';
+        variant_tree_insert(
+            newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
     }
 }
 

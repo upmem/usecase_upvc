@@ -500,6 +500,7 @@ int main(int argc, char *argv[])
         index_save();
         break;
     case goal_map:
+        variant_tree_init();
         index_load();
         do_mapping();
         break;

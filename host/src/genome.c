@@ -33,8 +33,7 @@ void genome_init(char *fasta_file)
 
     genome.data = (int8_t *)malloc(sizeof(int8_t) * genome.fasta_file_size);
     genome.mapping_coverage = (int32_t *) calloc(sizeof(int32_t), genome.fasta_file_size);
-    genome.substitution_list = (int *)calloc(sizeof(int), genome.fasta_file_size);
-    assert(genome.data != NULL && genome.mapping_coverage != NULL && genome.substitution_list != NULL);
+    assert(genome.data != NULL && genome.mapping_coverage != NULL);
     genome.nb_seq = 0;
 
 
@@ -70,5 +69,4 @@ void genome_free()
     }
     free(genome.data);
     free(genome.mapping_coverage);
-    free(genome.substitution_list);
 }
