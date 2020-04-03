@@ -13,7 +13,7 @@
 
 #define MAX_BUFFER_SIZE (1024)
 
-static int print_variant_tree(variant_tree_t *variant_tree, int8_t *mapping_coverage, FILE *vcf_file, FILE *variant_file)
+static int print_variant_tree(variant_tree_t *variant_tree, int32_t *mapping_coverage, FILE *vcf_file, FILE *variant_file)
 {
     variant_t *variant;
     int nb_variant = 0;
