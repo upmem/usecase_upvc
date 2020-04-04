@@ -120,7 +120,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
             } else if (path[i][j] == PATH_DELETION) {
                 i--;
             } else {
-                ERROR_EXIT(1, "Error during deletion of indels");
+                return -1;
             }
         }
 

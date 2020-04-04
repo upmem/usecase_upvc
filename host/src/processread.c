@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "accumulateread.h"
 #include "compare.h"
@@ -83,6 +84,10 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
 
     /* Otherwise, re-compute the matrix (only some diagonals) and put in backtrack the path */
     backtrack_idx = DPD(&gen[SIZE_SEED], &read[SIZE_SEED], backtrak, size_neighbour_in_symbols);
+    if (backtrack_idx == -1) {
+        code[0] = CODE_ERR;
+        return 1;
+    }
 
     backtrack_idx--;
     code_idx = 0;
@@ -129,14 +134,16 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
     uint64_t genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
     int size_read = SIZE_READ;
 
+    /* Get the differences betweend the read and the sequence of the reference genome that match */
+    read = &reads_buffer[result_match.num * size_read];
+    code_alignment(code_result_tab, result_match.score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols);
+    if (code_result_tab[0] == CODE_ERR)
+        return;
+
     /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
     for (int i = 0; i < size_read; i++) {
         ref_genome->mapping_coverage[genome_pos + i] += 1;
     }
-
-    /* Get the differences betweend the read and the sequence of the reference genome that match */
-    read = &reads_buffer[result_match.num * size_read];
-    code_alignment(code_result_tab, result_match.score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols);
 
     code_result_idx = 0;
     while (code_result_tab[code_result_idx] != CODE_END) {
@@ -177,6 +184,10 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 
             while (pos_variant_read <= ps_var_read) {
                 newvar->alt[alt_pos++] = nucleotide[read[pos_variant_read] & 3];
+                if (alt_pos >= MAX_SIZE_ALLELE) {
+                    free(newvar);
+                    return;
+                }
                 pos_variant_read++;
             }
 
@@ -201,8 +212,13 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 
             while (pos_variant_genome <= ps_var_genome) {
                 newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+                if (ref_pos >= MAX_SIZE_ALLELE) {
+                    free(newvar);
+                    return;
+                }
                 pos_variant_genome++;
             }
+            pos_variant_genome -= ref_pos;
         }
         newvar->ref[ref_pos] = '\0';
         newvar->alt[alt_pos] = '\0';
@@ -211,8 +227,10 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
     }
 }
 
+static pthread_mutex_t non_mapped_mutex;
 static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
 {
+    pthread_mutex_lock(&non_mapped_mutex);
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     int size_read = SIZE_READ;
     int8_t *read = &reads_buffer[numread * size_read];
@@ -233,41 +251,60 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
         fprintf(fpe2, "A");
     }
     fprintf(fpe2, "\n");
+    pthread_mutex_unlock(&non_mapped_mutex);
 }
 
-static bool compute_read_pair(int type1, int type2, int *offset, int *nbread, dpu_result_out_t *result_tab, int *result_tab_tmp,
-    int numpair, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, bool *result_found)
+static bool compute_read_pair(
+    int type1, int type2, int *offset, int *nbread, dpu_result_out_t *result_tab, int *pa_found, int *pb_found, bool *found)
 {
     for (int pa = offset[type1]; pa < offset[type1] + nbread[type1]; pa++) {
         for (int pb = offset[type2]; pb < offset[type2] + nbread[type2]; pb++) {
             if (check_pair(result_tab[pa], result_tab[pb])) {
-                if (*result_found) {
-                    add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
+                if (*found)
                     return false;
-                }
-                result_tab_tmp[0] = pa;
-                result_tab_tmp[1] = pb;
-                *result_found = true;
+                *found = true;
+                *pa_found = pa;
+                *pb_found = pb;
             }
         }
     }
     return true;
 }
 
-void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
+static volatile unsigned int curr_match;
+static pthread_mutex_t curr_match_mutex;
+unsigned int acquire_curr_match()
 {
-    unsigned int nb_match;
-    int nb_read_map = 0;
-    int offset[4]; /* offset in result_tab of the first read  */
-    int nbread[4]; /* number of reads                        */
-    unsigned int score[4];
-    int result_tab_tmp[2];
-    unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
-    dpu_result_out_t *result_tab;
-    int8_t *reads_buffer = get_reads_buffer(pass_id);
-    genome_t *ref_genome = genome_get();
+    pthread_mutex_lock(&curr_match_mutex);
+    return curr_match;
+}
+void release_curr_match(unsigned int new_curr_match)
+{
+    curr_match = new_curr_match;
+    pthread_mutex_unlock(&curr_match_mutex);
+    return;
+}
 
-    accumulate_get_result(pass_id, &nb_match, &result_tab);
+#define PROCESS_READ_THREAD (8)
+typedef struct {
+    const unsigned int nb_match;
+    dpu_result_out_t *result_tab;
+    int round;
+    int8_t *reads_buffer;
+    genome_t *ref_genome;
+    FILE *fpe1;
+    FILE *fpe2;
+} process_read_arg_t;
+
+void * process_read_thread_fct(void *arg) {
+    const unsigned int nb_match = ((process_read_arg_t *)arg)->nb_match;
+    dpu_result_out_t *result_tab = ((process_read_arg_t *)arg)->result_tab;
+    int round = ((process_read_arg_t *)arg)->round;
+    int8_t *reads_buffer = ((process_read_arg_t *)arg)->reads_buffer;
+    genome_t *ref_genome = ((process_read_arg_t *)arg)->ref_genome;
+    FILE * fpe1 = ((process_read_arg_t *)arg)->fpe1;
+    FILE * fpe2 = ((process_read_arg_t *)arg)->fpe2;
+    unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
 
     /*
      * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -279,16 +316,24 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
      * The read pair to consider are [0, 3] and [1, 2].
      */
 
-    unsigned int i = 0;
-    while (i < nb_match) {
-        int numpair = result_tab[i].num / 4;
-        bool result_found = false;
-        for (int k = 0; k < 4; k++) {
-            score[k] = 1000;
-            offset[k] = -1;
-            nbread[k] = 0;
+    while (true) {
+        int offset[4] = { -1, -1, -1, -1 }; /* offset in result_tab of the first read  */
+        int nbread[4] = { 0, 0, 0, 0 }; /* number of reads                        */
+        unsigned int score[4] = { 1000, 1000, 1000, 1000 };
+
+        unsigned int i;
+        if ((i = acquire_curr_match()) >= nb_match) {
+            release_curr_match(i);
+            return NULL;
         }
-        while ((i < nb_match) && (numpair == result_tab[i].num / 4)) {
+        int numpair = result_tab[i].num / 4;
+        unsigned int j = i;
+        while ((j < nb_match) && (numpair == result_tab[j].num / 4)) {
+            j++;
+        }
+        release_curr_match(j);
+
+        for (; i < j; i++) {
             int type = result_tab[i].num % 4;
             if (result_tab[i].score < score[type]) {
                 score[type] = result_tab[i].score;
@@ -297,28 +342,65 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
             } else if (result_tab[i].score == score[type]) {
                 nbread[type]++;
             }
-            i++;
         }
 
+        bool found = false;
+        int pa;
+        int pb;
         /* Compute a [0, 3] read pair */
-        if (!compute_read_pair(
-                0, 3, offset, nbread, result_tab, result_tab_tmp, numpair, round, fpe1, fpe2, reads_buffer, &result_found)) {
+        if (!compute_read_pair(0, 3, offset, nbread, result_tab, &pa, &pb, &found)) {
+            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
             continue;
         }
-
         /* Compute a [1, 2] read pair */
-        if (!compute_read_pair(
-                2, 1, offset, nbread, result_tab, result_tab_tmp, numpair, round, fpe1, fpe2, reads_buffer, &result_found)) {
+        if (!compute_read_pair(2, 1, offset, nbread, result_tab, &pa, &pb, &found)) {
+            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
             continue;
         }
 
-        if (result_found) { /* Mapped reads*/
-            set_variant(result_tab[result_tab_tmp[0]], ref_genome, reads_buffer, size_neighbour_in_symbols);
-            set_variant(result_tab[result_tab_tmp[1]], ref_genome, reads_buffer, size_neighbour_in_symbols);
-            nb_read_map += 2;
+        if (found) {
+            set_variant(result_tab[pa], ref_genome, reads_buffer, size_neighbour_in_symbols);
+            set_variant(result_tab[pb], ref_genome, reads_buffer, size_neighbour_in_symbols);
         } else {
             add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
         }
     }
+}
+
+void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
+{
+    unsigned int nb_match;
+    dpu_result_out_t *result_tab;
+    int8_t *reads_buffer = get_reads_buffer(pass_id);
+    genome_t *ref_genome = genome_get();
+
+    accumulate_get_result(pass_id, &nb_match, &result_tab);
+
+    pthread_mutex_init(&curr_match_mutex, NULL);
+    pthread_mutex_init(&non_mapped_mutex, NULL);
+    curr_match = 0;
+
+    process_read_arg_t args = {
+        .nb_match = nb_match,
+        .result_tab = result_tab,
+        .round = round,
+        .reads_buffer = reads_buffer,
+        .ref_genome = ref_genome,
+        .fpe1 = fpe1,
+        .fpe2 = fpe2,
+    };
+    int ret;
+    pthread_t thread_id[PROCESS_READ_THREAD];
+    for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD; each_thread++) {
+        ret = pthread_create(&thread_id[each_thread], NULL, process_read_thread_fct, &args);
+        assert(ret == 0);
+    }
+    for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD; each_thread++) {
+        ret = pthread_join(thread_id[each_thread], NULL);
+        assert(ret == 0);
+    }
+
+    pthread_mutex_destroy(&curr_match_mutex);
+    pthread_mutex_destroy(&non_mapped_mutex);
     free(result_tab);
 }

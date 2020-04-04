@@ -19,6 +19,7 @@
 #define CODE_DEL 11
 #define CODE_INS 12
 #define CODE_END 13
+#define CODE_ERR 14
 
 #define CODE_A 0 /* ('A'>>1)&3   41H  0100 0001 */
 #define CODE_C 1 /* ('C'>>1)&3   43H  0100 0011 */

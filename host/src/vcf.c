@@ -14,11 +14,18 @@
 #define MAX_BUFFER_SIZE (1024)
 
 static void print_variant_tree(
-    variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file, FILE *variant_file)
+    variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
 {
     char *chr = ref_genome->seq_name[seq_nr];
-    fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos, var->ref, var->alt, var->depth,
-        ref_genome->mapping_coverage[seq_pos + ref_genome->pt_seq[seq_nr]], var->score);
+    uint32_t cov = ref_genome->mapping_coverage[seq_pos + ref_genome->pt_seq[seq_nr]];
+    uint32_t depth = var->depth;
+    uint32_t score = var->score;
+    uint32_t percentage = depth / cov;
+    if (depth < 3)
+        return;
+
+    fprintf(
+        vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos, var->ref, var->alt, depth, cov, score);
 }
 
 void create_vcf()
@@ -26,16 +33,13 @@ void create_vcf()
     double start_time = my_clock();
     printf("%s:\n", __func__);
 
-    FILE *vcf_file, *variant_file;
+    FILE *vcf_file;
     int nb_variant = 0;
     char filename[MAX_BUFFER_SIZE];
     genome_t *ref_genome = genome_get();
 
     sprintf(filename, "%svars_upvc.vcf", get_input_path());
     vcf_file = fopen(filename, "w");
-
-    sprintf(filename, "%svars_upvc.var", get_input_path());
-    variant_file = fopen(filename, "w");
 
     /* ####### START OF HEADER ####### */
 
@@ -67,7 +71,7 @@ void create_vcf()
             variant_t *var = variant_tree[seq_number][seq_position];
             while (var != NULL) {
                 nb_variant++;
-                print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file, variant_file);
+                print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file);
                 var = var->next;
             }
         }
