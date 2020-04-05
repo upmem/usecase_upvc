@@ -20,9 +20,6 @@ static void print_variant_tree(
     uint32_t cov = ref_genome->mapping_coverage[seq_pos + ref_genome->pt_seq[seq_nr]];
     uint32_t depth = var->depth;
     uint32_t score = var->score;
-    uint32_t percentage = depth / cov;
-    if (depth < 3)
-        return;
 
     fprintf(
         vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos, var->ref, var->alt, depth, cov, score);
