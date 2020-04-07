@@ -26,7 +26,7 @@ def extract_info(info):
     percentage = 100.0
     if cov != 0:
         percentage = int(per(depth, cov))
-    return depth, percentage, (score / depth)
+    return depth, percentage, score
 
 
 def update_stat_no_check(stat, v):
@@ -245,9 +245,9 @@ def get_data(filename, filter_enable, per_filter, score_filter):
 ref_file = sys.argv[1]
 upvc_file = sys.argv[2]
 SUB_ref, INS_ref, DEL_ref, len_ref_sub, len_ref_ins, len_ref_del = get_data(
-    ref_file, False)
+    ref_file, False, 0, 0)
 SUB_upvc, INS_upvc, DEL_upvc, len_upvc_sub, len_upvc_ins, len_upvc_del = get_data(
-    upvc_file, False)
+    upvc_file, False, 0, 0)
 
 print("\nsubstitution")
 compute_data(SUB_ref, SUB_upvc, len_ref_sub, len_upvc_sub)

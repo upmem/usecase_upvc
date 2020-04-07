@@ -438,7 +438,7 @@ static void do_mapping()
     unsigned int nb_dpu = get_nb_dpu();
     dispatch_init(nb_dpu);
 
-    for (int round = 0; round < 3; round++) {
+    for (int round = 0; round < NB_ROUND; round++) {
         printf("#################\n"
                "starting round %u\n"
                "#################\n",

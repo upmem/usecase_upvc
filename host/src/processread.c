@@ -184,7 +184,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 
             while (pos_variant_read <= ps_var_read) {
                 newvar->alt[alt_pos++] = nucleotide[read[pos_variant_read] & 3];
-                if (alt_pos >= MAX_SIZE_ALLELE) {
+                if (alt_pos >= MAX_SIZE_ALLELE - 1) {
                     free(newvar);
                     return;
                 }
@@ -212,7 +212,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 
             while (pos_variant_genome <= ps_var_genome) {
                 newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-                if (ref_pos >= MAX_SIZE_ALLELE) {
+                if (ref_pos >= MAX_SIZE_ALLELE - 1) {
                     free(newvar);
                     return;
                 }
@@ -228,6 +228,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 }
 
 static pthread_mutex_t non_mapped_mutex;
+#if NB_ROUND > 1
 static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
 {
     pthread_mutex_lock(&non_mapped_mutex);
@@ -253,6 +254,12 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     fprintf(fpe2, "\n");
     pthread_mutex_unlock(&non_mapped_mutex);
 }
+#else
+static void add_to_non_mapped_read(__attribute__((unused)) int numread, __attribute__((unused)) int round,
+    __attribute__((unused)) FILE *fpe1, __attribute__((unused)) FILE *fpe2, __attribute__((unused)) int8_t *reads_buffer)
+{
+}
+#endif
 
 static bool compute_read_pair(
     int type1, int type2, int *offset, int *nbread, dpu_result_out_t *result_tab, int *pa_found, int *pb_found, bool *found)
@@ -349,21 +356,21 @@ void * process_read_thread_fct(void *arg) {
         int pb;
         /* Compute a [0, 3] read pair */
         if (!compute_read_pair(0, 3, offset, nbread, result_tab, &pa, &pb, &found)) {
-            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
-            continue;
+            goto add_to_non_mapped_read_label;
         }
         /* Compute a [1, 2] read pair */
         if (!compute_read_pair(2, 1, offset, nbread, result_tab, &pa, &pb, &found)) {
-            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
-            continue;
+            goto add_to_non_mapped_read_label;
         }
 
         if (found) {
             set_variant(result_tab[pa], ref_genome, reads_buffer, size_neighbour_in_symbols);
             set_variant(result_tab[pb], ref_genome, reads_buffer, size_neighbour_in_symbols);
-        } else {
-            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
+            continue;
         }
+
+    add_to_non_mapped_read_label:
+        add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
     }
 }
 

@@ -8,7 +8,8 @@
 #define VERSION "VERSION 1.7"
 #define MAX_READS_BUFFER (1048576) /* Maximum number of read by round        */
 #define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
-#define NB_READS_BUFFER (4)
+#define NB_READS_BUFFER (8)
+#define NB_ROUND (1)
 
 #define COST_SUB 10
 #define COST_GAPO 11
