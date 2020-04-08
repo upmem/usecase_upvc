@@ -155,6 +155,8 @@ void index_init(int nb_dpu)
     index_seed = (index_seed_t **)malloc(sizeof(index_seed_t *) * NB_SEED);
     assert(index_seed != NULL);
 
+    init_vmis(nb_dpu);
+
     /* Initialize the seed_counter table */
     {
         double init_seed_counter_time = my_clock();
@@ -269,7 +271,6 @@ void index_init(int nb_dpu)
         double write_in_memories_time = my_clock();
         printf("\tWriting data in DPUs memories\n");
 
-        init_vmis(nb_dpu);
         memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
         genome_t *ref_genome = genome_get();
         for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
