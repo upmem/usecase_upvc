@@ -67,7 +67,10 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
     uint32_t cov = ref_genome->mapping_coverage[seq_pos + ref_genome->pt_seq[seq_nr]];
     uint32_t depth = var->depth;
     uint32_t score = var->score / depth;
-    uint32_t percentage = depth * 100 / cov;
+    uint32_t percentage = 100;
+    if (cov != 0) {
+        percentage = depth * 100 / cov;
+    }
 
     if (strlen(var->ref) == 1 && strlen(var->alt) == 1) { /* SUBSTITUTION */
         if (depth < 3) {
