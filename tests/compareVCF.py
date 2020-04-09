@@ -368,6 +368,8 @@ chr_str_to_val = {"1": 1,
                   "chr20": 20,
                   "chr21": 21,
                   "chr22": 22,
+                  "chr23": 23,
+                  "chr24": 24,
                   "X": 23,
                   "Y": 24,
 }
@@ -375,7 +377,7 @@ chr_str_to_val = {"1": 1,
 
 def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del):
     if len(line) < 1 or line[0] == "#":
-        return len_sub, len_del, len_ins
+        return len_sub, len_ins, len_del
 
     chr_str, pos_str, _, ref, alt, _, _, info = line.split("\t")
 
@@ -393,7 +395,7 @@ def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del):
     elif alt_len > 1 and ref_len <= 1:
         INS.setdefault((chr, pos), {})[(ref, alt)] = info
         len_ins += 1
-    return len_sub, len_del, len_ins
+    return len_sub, len_ins, len_del
 
 
 def get_data(filename):
