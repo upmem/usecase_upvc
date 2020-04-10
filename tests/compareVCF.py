@@ -28,18 +28,6 @@ parser.add_argument(
     help="The power to use for TP during auto compute of UPVC filter",
     default=2.0)
 parser.add_argument(
-    "-p",
-    dest="tp_fp_prop",
-    type=float,
-    help="A threshold for the proportion of TP and FP to use during auto compute of UPVC filter",
-    default=1.0)
-parser.add_argument(
-    "-d",
-    dest="score_dropback_threshold",
-    type=float,
-    help="A threshold to stop calculation during auto compute of UPVC filter",
-    default=1.0)
-parser.add_argument(
     "-a",
     dest="enable_stat",
     help="Enable auto compute of UPVC filter",
@@ -58,10 +46,10 @@ def per(val, total):
 ###############################################################################
 
 
-def compute_score(tp_var, fp_var, tp):
-    tp_per = tp_var / (tp_var + fp_var + 1.0)
-    cm_per = tp_var / (tp + 1.0)
-    return (tp_per ** args.tp_power) * cm_per
+def compute_score(tp_var, fp_var, tp, tp_power):
+    tp_per = (tp_var / (tp_var + fp_var)) if tp_var + fp_var != 0 else 0
+    cm_per = (tp_var / tp) if tp != 0 else 0
+    return (tp_per ** tp_power) * cm_per
 
 
 def compute_best_filter_for_depth_per_score(
@@ -69,7 +57,7 @@ def compute_best_filter_for_depth_per_score(
         nb_tp, nb_fp,
         percentage, score,
         tp_context, fp_context,
-        tp):
+        tp, tp_power):
     tp_var = tp_context[(percentage + 1, score)] \
         + tp_context[(percentage, score - 1)] \
         - tp_context[(percentage + 1, score - 1)] \
@@ -80,23 +68,18 @@ def compute_best_filter_for_depth_per_score(
         + nb_fp
     tp_context[(percentage, score)] = tp_var
     fp_context[(percentage, score)] = fp_var
-    if tp_var < fp_var * args.tp_fp_prop:
-        return best_filter, filter_score
 
-    new_score = compute_score(tp_var, fp_var, tp)
+    new_score = compute_score(tp_var, fp_var, tp, tp_power)
 
-    if new_score + args.score_dropback_threshold < filter_score:
-        tp_context[(percentage, score)] = -tp
-        return best_filter, -1
-    if new_score > filter_score:
+    if new_score >= filter_score:
         return (percentage, score), new_score
     else:
         return best_filter, filter_score
 
 
-def compute_best_filter_for_depth(tp_stat, fp_stat, tp, depth_filter):
+def compute_best_filter_for_depth(tp_stat, fp_stat, tp, depth_filter, tp_power):
     best_filter = (100, 0)
-    filter_score = 0
+    filter_score = compute_score(1, 1, 2, tp_power) # 50%tp/50%cm
     tp_context = {}
     fp_context = {}
     for score in range(9, 41):
@@ -109,12 +92,10 @@ def compute_best_filter_for_depth(tp_stat, fp_stat, tp, depth_filter):
             best_filter, filter_score = compute_best_filter_for_depth_per_score(
                 best_filter, filter_score,
                 tp_stat[(percentage, score)] if (percentage, score) in tp_stat else 0,
-                fp_stat[(percentage, score)] if (percentage, score) in tp_stat else 0,
+                fp_stat[(percentage, score)] if (percentage, score) in fp_stat else 0,
                 percentage, score,
                 tp_context, fp_context,
-                tp)
-            if filter_score == -1:
-                break
+                tp, tp_power)
 
     tp_filtered = sum([val for (per, sc), val in tp_stat.items()
                        if per >= best_filter[0] and sc <= best_filter[1]])
@@ -126,9 +107,9 @@ def compute_best_filter_for_depth(tp_stat, fp_stat, tp, depth_filter):
 depth_limit = 21
 
 
-def compute_best_filter(stat):
+def compute_best_filter(stat, tp_power):
     print("--------------------------------------------------------")
-    print("depth\tper\tscore\ttp\t\tcm")
+    print("depth\tper\tscore\ttp\t\tcm\ttp_power=%f" % tp_power)
     tp_filtered = 0
     fp_filtered = 0
     for d in range(depth_limit):
@@ -141,7 +122,7 @@ def compute_best_filter(stat):
         tp = sum(tp_stat.values())
 
         filter, tp_f, fp_f = compute_best_filter_for_depth(
-            tp_stat, fp_stat, tp, d)
+            tp_stat, fp_stat, tp, d, tp_power)
         tp_filtered += tp_f
         fp_filtered += fp_f
         print("%d\t(%d,\t%d)\t(%.2f%%,\t%.2f%%)" %
@@ -155,18 +136,6 @@ def compute_best_filter(stat):
 ###############################################################################
 
 
-extract_info_re = re.compile("DEPTH=(.*);COV=(.*);SCORE=(.*)")
-
-
-def extract_info(info):
-    regex = re.search(extract_info_re, info)
-    depth = int(regex.group(1))
-    cov = int(regex.group(2))
-    score = int(regex.group(3))
-    percentage = 100.0
-    if cov != 0:
-        percentage = int(per(depth, cov))
-    return depth, percentage, score
 
 
 ###############################################################################
@@ -177,7 +146,7 @@ def extract_info(info):
 def update_stat_no_check(stat, info):
     percentage_limit = 100
     score_limit = 41
-    depth, percentage, score = extract_info(info)
+    depth, percentage, score = info
     key = (depth if depth < depth_limit else depth_limit - 1,
            percentage if percentage < percentage_limit else percentage_limit - 1,
            score if score < score_limit else score_limit - 1)
@@ -290,6 +259,13 @@ def compute(V1, V2, tp_stat, fp_stat):
     return tp, fp
 
 
+def print_VCF_quality(tp, fp, fn, cm, len_upvc, len_ref):
+    print("tp:\t%.2f%%\t(%d/%d)" % (per(tp, len_upvc), tp, len_upvc))
+    print("fp:\t%.2f%%\t(%d/%d)" % (per(fp, len_upvc), fp, len_upvc))
+    print("fn:\t%.2f%%\t(%d/%d)" % (per(fn, len_ref), fn, len_ref))
+    print("cm:\t%.2f%%\t(%d/%d)" % (per(cm, len_ref), cm, len_ref))
+
+
 def compute_data(V_ref, V_upvc, len_ref, len_upvc):
     stats = {"tp": {}, "fp": {}} if args.enable_stat else None
     tp_stat = stats["tp"] if args.enable_stat else None
@@ -307,19 +283,19 @@ def compute_data(V_ref, V_upvc, len_ref, len_upvc):
     if cm + fn != len_ref:
         print("ERROR while computing CM and FN")
 
+    tp_power_tab = [0.5, 0.8, 1, 1.2, 1.5, 1.8, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8]
     if args.enable_stat:
-        tp, fp = compute_best_filter(stats)
-        len_upvc = tp + fp
-        fn = cm + fn - tp
-        cm = tp
+        for tp_power in tp_power_tab:
+            tp, fp = compute_best_filter(stats, tp_power)
+            len_upvc = tp + fp
+            new_fn = cm + fn - tp
+            new_cm = tp
 
-    if cm + fn != len_ref:
-        print("ERROR while computing CM and FN")
-
-    print("tp:\t%.2f%%\t(%d/%d)" % (per(tp, len_upvc), tp, len_upvc))
-    print("fp:\t%.2f%%\t(%d/%d)" % (per(fp, len_upvc), fp, len_upvc))
-    print("fn:\t%.2f%%\t(%d/%d)" % (per(fn, len_ref), fn, len_ref))
-    print("cm:\t%.2f%%\t(%d/%d)" % (per(cm, len_ref), cm, len_ref))
+            if new_cm + new_fn != len_ref:
+                print("ERROR while computing CM and FN")
+            print_VCF_quality(tp, fp, new_fn, new_cm, len_upvc, len_ref)
+    else:
+        print_VCF_quality(tp, fp, fn, cm, len_upvc, len_ref)
 
 
 chr_str_to_val = {"1": 1,
@@ -375,7 +351,21 @@ chr_str_to_val = {"1": 1,
 }
 
 
-def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del):
+extract_info_re = re.compile("DEPTH=(.*);COV=(.*);SCORE=(.*)")
+
+
+def extract_info(info):
+    regex = re.search(extract_info_re, info)
+    depth = int(regex.group(1))
+    cov = int(regex.group(2))
+    score = int(regex.group(3))
+    percentage = 100.0
+    if cov != 0:
+        percentage = int(per(depth, cov))
+    return (depth, percentage, score)
+
+
+def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del, extract):
     if len(line) < 1 or line[0] == "#":
         return len_sub, len_ins, len_del
 
@@ -386,6 +376,10 @@ def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del):
 
     ref_len = len(ref)
     alt_len = len(alt)
+    if args.enable_stat and extract:
+        info = extract_info(info)
+    else:
+        info = 0
     if ref_len == 1 and alt_len == 1:
         SUB.setdefault((chr, pos), {})[(ref, alt)] = info
         len_sub += 1
@@ -398,7 +392,7 @@ def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del):
     return len_sub, len_ins, len_del
 
 
-def get_data(filename):
+def get_data(filename, extract):
     print("\nreading " + filename)
 
     SUB = {}
@@ -412,19 +406,19 @@ def get_data(filename):
         with tqdm.tqdm(range(os.path.getsize(filename)), ascii = True) as progress_bar:
             for line in open(filename, "r").readlines():
                 progress_bar.update(len(line))
-                len_sub, len_ins, len_del = process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del)
+                len_sub, len_ins, len_del = process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del, extract)
     else:
         for line in open(filename, "r").readlines():
-            len_sub, len_ins, len_del = process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del)
+            len_sub, len_ins, len_del = process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del, extract)
 
     print(len_sub, len_ins, len_del)
     return SUB, INS, DEL, len_sub, len_ins, len_del
 
 
 SUB_ref, INS_ref, DEL_ref, len_ref_sub, len_ref_ins, len_ref_del = get_data(
-    args.ref_file)
+    args.ref_file, False)
 SUB_upvc, INS_upvc, DEL_upvc, len_upvc_sub, len_upvc_ins, len_upvc_del = get_data(
-    args.upvc_file)
+    args.upvc_file, True)
 
 print("\nsubstitution")
 compute_data(SUB_ref, SUB_upvc, len_ref_sub, len_upvc_sub)
