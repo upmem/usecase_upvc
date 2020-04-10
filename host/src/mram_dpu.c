@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "mram_dpu.h"
 #include "common.h"
+#include "mram_dpu.h"
 
 char *make_mram_file_name(char *str, unsigned int dpu_id)
 {

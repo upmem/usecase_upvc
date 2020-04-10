@@ -2,16 +2,17 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 #include "accumulateread.h"
 #include "compare.h"
 #include "genome.h"
 #include "getread.h"
+#include "processread.h"
 #include "upvc.h"
 #include "vartree.h"
 
@@ -125,7 +126,8 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
     return code_idx;
 }
 
-static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer, unsigned int size_neighbour_in_symbols)
+static void set_variant(
+    dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer, unsigned int size_neighbour_in_symbols)
 {
     uint32_t code_result_idx;
     uint8_t code_result_tab[256];
@@ -153,7 +155,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
         int ref_pos = 0;
         int alt_pos = 0;
         variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
-        newvar->depth=1;
+        newvar->depth = 1;
         newvar->score = result_match.score;
         newvar->next = NULL;
         if (code_result == CODE_SUB) {
@@ -303,14 +305,15 @@ typedef struct {
     FILE *fpe2;
 } process_read_arg_t;
 
-void * process_read_thread_fct(void *arg) {
+void *process_read_thread_fct(void *arg)
+{
     const unsigned int nb_match = ((process_read_arg_t *)arg)->nb_match;
     dpu_result_out_t *result_tab = ((process_read_arg_t *)arg)->result_tab;
     int round = ((process_read_arg_t *)arg)->round;
     int8_t *reads_buffer = ((process_read_arg_t *)arg)->reads_buffer;
     genome_t *ref_genome = ((process_read_arg_t *)arg)->ref_genome;
-    FILE * fpe1 = ((process_read_arg_t *)arg)->fpe1;
-    FILE * fpe2 = ((process_read_arg_t *)arg)->fpe2;
+    FILE *fpe1 = ((process_read_arg_t *)arg)->fpe1;
+    FILE *fpe2 = ((process_read_arg_t *)arg)->fpe2;
     unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
 
     /*
@@ -376,20 +379,17 @@ void * process_read_thread_fct(void *arg) {
 
 void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 {
-    unsigned int nb_match;
-    dpu_result_out_t *result_tab;
     int8_t *reads_buffer = get_reads_buffer(pass_id);
+    acc_results_t acc_res = accumulate_get_result(pass_id);
     genome_t *ref_genome = genome_get();
-
-    accumulate_get_result(pass_id, &nb_match, &result_tab);
 
     pthread_mutex_init(&curr_match_mutex, NULL);
     pthread_mutex_init(&non_mapped_mutex, NULL);
     curr_match = 0;
 
     process_read_arg_t args = {
-        .nb_match = nb_match,
-        .result_tab = result_tab,
+        .nb_match = acc_res.nb_res,
+        .result_tab = acc_res.results,
         .round = round,
         .reads_buffer = reads_buffer,
         .ref_genome = ref_genome,
@@ -409,5 +409,5 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 
     pthread_mutex_destroy(&curr_match_mutex);
     pthread_mutex_destroy(&non_mapped_mutex);
-    free(result_tab);
+    free(acc_res.results);
 }

@@ -9,7 +9,9 @@
 #include <dpu.h>
 #include <dpu_log.h>
 
+#include "accumulateread.h"
 #include "dispatch.h"
+#include "dpus_mgmt.h"
 #include "mram_dpu.h"
 #include "parse_args.h"
 #include "upvc.h"
@@ -126,7 +128,7 @@ void dpu_try_run(unsigned int rank_id)
     DPU_ASSERT(status);
 }
 
-void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset)
+void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id)
 {
     static const dpu_request_t dummy_reads_area[MAX_DPU_REQUEST];
     static dispatch_request_t dummy_dispatch = { .nb_reads = 0, .reads_area = (int8_t *)dummy_reads_area };
@@ -143,7 +145,7 @@ void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_off
     DPU_FOREACH (rank, dpu, each_dpu) {
         unsigned int this_dpu = each_dpu + dpu_offset;
         if (this_dpu < nb_dpu) {
-            io_header[each_dpu] = dispatch_get(this_dpu);
+            io_header[each_dpu] = dispatch_get(this_dpu, pass_id);
         } else {
             io_header[each_dpu] = &dummy_dispatch;
         }
@@ -236,7 +238,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset)
     pthread_mutex_unlock(&devices.log_mutex);
 }
 
-void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset)
+void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id)
 {
     static dpu_result_out_t dummy_results[MAX_DPU_RESULTS];
     static nb_result_t dummy_nb_results;
@@ -249,33 +251,25 @@ void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset)
     unsigned int each_dpu;
     unsigned int nb_dpu = get_nb_dpu();
 
-    dpu_offset += devices.rank_mram_offset[rank_id];
-
-    dpu_result_out_t *results_buffer[nb_dpus_per_rank];
-    nb_result_t *nb_res = get_mem_dpu_nb_res(dpu_offset);
-    DPU_FOREACH (rank, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_offset + each_dpu;
-        if (this_dpu >= nb_dpu)
-            continue;
-        results_buffer[each_dpu] = get_mem_dpu_res(this_dpu);
-    }
+    unsigned int mram_offset = devices.rank_mram_offset[rank_id];
+    dpu_offset += mram_offset;
 
     DPU_FOREACH (rank, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_offset + each_dpu;
-        if (this_dpu < nb_dpu) {
-            results[each_dpu] = (uint8_t *)&nb_res[each_dpu];
+        if ((each_dpu + dpu_offset) < nb_dpu) {
+            results[each_dpu] = (uint8_t *)&(accumulate_get_buffer(each_dpu + mram_offset, pass_id)->nb_res);
         } else {
             results[each_dpu] = (uint8_t *)&dummy_nb_results;
         }
         DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
     }
     DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_FROM_DPU, XSTR(DPU_NB_RESULT_VAR), 0, sizeof(nb_result_t), DPU_XFER_DEFAULT));
+
     unsigned int max_nb_result = 0;
     DPU_FOREACH (rank, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_offset + each_dpu;
-        if (this_dpu < nb_dpu) {
-            results[each_dpu] = (uint8_t *)results_buffer[each_dpu];
-            max_nb_result = MAX(max_nb_result, nb_res[each_dpu]);
+        if ((each_dpu + dpu_offset) < nb_dpu) {
+            acc_results_t *acc_res = accumulate_get_buffer(each_dpu + mram_offset, pass_id);
+            results[each_dpu] = (uint8_t *)acc_res->results;
+            max_nb_result = MAX(max_nb_result, acc_res->nb_res);
         } else {
             results[each_dpu] = (uint8_t *)dummy_results;
         }

@@ -3,9 +3,9 @@
  */
 
 #define _POSIX_C_SOURCE 200809L
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include "genome.h"
 #include "upvc.h"
@@ -32,10 +32,9 @@ void genome_init(char *fasta_file)
     rewind(genome_file);
 
     genome.data = (int8_t *)malloc(sizeof(int8_t) * genome.fasta_file_size);
-    genome.mapping_coverage = (int32_t *) calloc(sizeof(int32_t), genome.fasta_file_size);
+    genome.mapping_coverage = (int32_t *)calloc(sizeof(int32_t), genome.fasta_file_size);
     assert(genome.data != NULL && genome.mapping_coverage != NULL);
     genome.nb_seq = 0;
-
 
     uint64_t current_data_idx = 0;
     while (fgets(genome_file_line, MAX_BUF_SIZE, genome_file) != NULL) {

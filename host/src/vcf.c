@@ -10,6 +10,7 @@
 #include "parse_args.h"
 #include "upvc.h"
 #include "vartree.h"
+#include "vcf.h"
 
 #define MAX_BUFFER_SIZE (1024)
 

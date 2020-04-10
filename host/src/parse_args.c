@@ -13,8 +13,8 @@
 
 #include <dpu.h>
 
-#include "upvc.h"
 #include "parse_args.h"
+#include "upvc.h"
 
 static char *prog_name = NULL;
 static char *input_path = NULL;
@@ -48,8 +48,7 @@ static void check_args()
         || goal == goal_unknown) {
         ERROR("missing option");
         usage();
-    } else if (simulation_mode
-        && goal != goal_unknown) {
+    } else if (simulation_mode && goal != goal_unknown) {
         ERROR("simulation mode is not compatible with -g option");
         usage();
     }

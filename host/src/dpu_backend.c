@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "dispatch.h"
+#include "dpu_backend.h"
 #include "dpus_mgmt.h"
 #include "index.h"
 #include "parse_args.h"
@@ -31,13 +32,13 @@ void add_seed_to_dpu_requests(
     dispatch_request_add(this_request, (unsigned int)seed->offset, (unsigned int)seed->nb_nbr, (unsigned int)num_read, nbr);
 }
 
-void run_on_dpu(unsigned int dpu_offset, unsigned int rank_id, __attribute__((unused)) int delta_neighbour,
+void run_on_dpu(unsigned int dpu_offset, unsigned int rank_id, unsigned int pass_id, __attribute__((unused)) int delta_neighbour,
     sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
     double t1, t2, t3, t4, t5;
     PRINT_TIME_WRITE_READS(rank_id);
     t1 = my_clock();
-    dpu_try_write_dispatch_into_mram(rank_id, dpu_offset);
+    dpu_try_write_dispatch_into_mram(rank_id, dpu_offset, pass_id);
     sem_post(dispatch_free_sem);
 
     t2 = my_clock();
@@ -53,7 +54,7 @@ void run_on_dpu(unsigned int dpu_offset, unsigned int rank_id, __attribute__((un
 
     t4 = my_clock();
     PRINT_TIME_READ_RES(rank_id);
-    dpu_try_get_results_and_log(rank_id, dpu_offset);
+    dpu_try_get_results_and_log(rank_id, dpu_offset, pass_id);
     PRINT_TIME_READ_RES(rank_id);
     t5 = my_clock();
 

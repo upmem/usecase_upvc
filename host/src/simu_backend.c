@@ -13,6 +13,7 @@
 #include "index.h"
 #include "mram_dpu.h"
 #include "parse_args.h"
+#include "simu_backend.h"
 #include "upvc.h"
 #include "upvc_dpu.h"
 
@@ -302,7 +303,7 @@ void add_seed_to_simulation_requests(
 }
 
 void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
-    int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
+    __attribute__((unused)) unsigned int pass_id, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
     unsigned int nb_dpu = get_nb_dpu();
     pthread_t thread_id[nb_dpu];
@@ -347,10 +348,7 @@ void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attri
     sem_post(dispatch_free_sem);
 }
 
-void init_backend_simulation()
-{
-    malloc_dpu(get_nb_dpu());
-}
+void init_backend_simulation() { malloc_dpu(get_nb_dpu()); }
 
 void free_backend_simulation(unsigned int nb_dpu) { free_dpu(nb_dpu); }
 

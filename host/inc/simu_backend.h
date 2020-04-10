@@ -19,8 +19,8 @@ void add_seed_to_simulation_requests(
 /**
  * @brief Compute one pass in simulation mode.
  */
-void run_dpu_simulation(
-    unsigned int dpu_offset, unsigned int rank_id, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem);
+void run_dpu_simulation(unsigned int dpu_offset, unsigned int rank_id, unsigned int pass_id, int delta_neighbour,
+    sem_t *dispatch_free_sem, sem_t *acc_wait_sem);
 
 /**
  * @brief Index the reference genome.

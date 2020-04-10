@@ -20,7 +20,7 @@ typedef struct {
     int8_t *reads_area;
 } dispatch_request_t;
 
-dispatch_request_t *dispatch_get(unsigned int dpu_id);
+dispatch_request_t *dispatch_get(unsigned int dpu_id, unsigned int pass_id);
 
 void dispatch_read(unsigned int pass_id);
 

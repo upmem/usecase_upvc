@@ -17,8 +17,8 @@ void dpu_try_free();
 
 void dpu_try_run(unsigned int rank_id);
 
-void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset);
+void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id);
 
-void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset);
+void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id);
 
 #endif /* __INTEGRATION_DPUS_H__ */

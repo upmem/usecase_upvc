@@ -10,8 +10,8 @@
  *
  * Defines the structures representing the DPU MRAMs on both the host and DPU side.
  */
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define FILE_NAME_SIZE 24
 

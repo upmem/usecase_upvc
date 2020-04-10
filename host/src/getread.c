@@ -8,8 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "upvc.h"
 #include "common.h"
+#include "getread.h"
+#include "upvc.h"
 
 #define MAX_SEQ_SIZE (512)
 #define MAX_BUF_SIZE (1024)

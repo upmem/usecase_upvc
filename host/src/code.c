@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "code.h"
 #include "common.h"
 
 #define CODE_SIZE (4)

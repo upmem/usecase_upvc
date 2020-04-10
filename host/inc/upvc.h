@@ -8,7 +8,8 @@
 #define VERSION "VERSION 1.7"
 #define MAX_READS_BUFFER (1048576) /* Maximum number of read by round        */
 #define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
-#define NB_READS_BUFFER (8)
+#define NB_READS_BUFFER (16)
+#define NB_DISPATCH_AND_ACC_BUFFER (4)
 #define NB_ROUND (1)
 
 #define COST_SUB 10
@@ -28,9 +29,9 @@
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
 #include <pthread.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <stddef.h>
@@ -113,8 +114,6 @@ static inline void print(const uint32_t rank_id, const char *fmt, ...)
     fprintf(stdout, "%s", str);
 }
 
-static inline void print_line(const uint32_t rank_id) {
-    print(rank_id, LINE);
-}
+static inline void print_line(const uint32_t rank_id) { print(rank_id, LINE); }
 
 #endif /* __UPVC_H__ */

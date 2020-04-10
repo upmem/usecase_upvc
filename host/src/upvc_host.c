@@ -32,9 +32,11 @@ FILE *time_file;
 pthread_mutex_t time_file_mutex;
 backends_functions_t backends_functions;
 
+#define LAST_RUN(dpu_offset) (((dpu_offset) + get_nb_dpus_per_run()) >= get_nb_dpu())
 #define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < get_nb_dpu(); dpu_offset += get_nb_dpus_per_run())
 #define FOREACH_RANK(each_rank) for (unsigned int each_rank = 0; each_rank < dpu_get_nb_ranks_per_run(); each_rank++)
 #define FOREACH_PASS(each_pass) for (unsigned int each_pass = 0; get_reads_in_buffer(each_pass) != 0; each_pass++)
+#define FOR(loop) for (unsigned int _i = 0; _i < (loop); _i++)
 
 typedef struct {
     sem_t *dispatch_free_sem;
@@ -53,6 +55,8 @@ void *thread_get_reads(void *arg)
 
     FOREACH_RUN(dpu_offset)
     {
+        FOR(NB_READS_BUFFER) { sem_post(acc_process_wait_sem); }
+
         unsigned int each_pass = 0;
         do {
             sem_wait(acc_process_wait_sem);
@@ -67,9 +71,7 @@ void *thread_get_reads(void *arg)
         fseek(fipe1, 0, SEEK_SET);
         fseek(fipe2, 0, SEEK_SET);
 
-        // wait for run to be complete before starting the next one
-        for (unsigned int each_reads_buffer = 0; each_reads_buffer < NB_READS_BUFFER - 1; each_reads_buffer++)
-            sem_wait(acc_process_wait_sem);
+        FOR(NB_READS_BUFFER - 1) { sem_wait(acc_process_wait_sem); }
     }
 
     return NULL;
@@ -118,7 +120,7 @@ void *thread_exec_rank(void *arg)
             print(rank_id, "P %u", each_pass);
             PRINT_TIME_MAP_READ(rank_id);
             t1 = my_clock();
-            backends_functions.run_dpu(dpu_offset, rank_id, delta_neighbour, dispatch_free_sem, acc_wait_sem);
+            backends_functions.run_dpu(dpu_offset, rank_id, each_pass, delta_neighbour, dispatch_free_sem, acc_wait_sem);
             t2 = my_clock();
             PRINT_TIME_MAP_READ(rank_id);
             print(rank_id, "T %.2lf", t2 - t1);
@@ -148,6 +150,11 @@ void *thread_dispatch(void *arg)
 
     FOREACH_RUN(dpu_offset)
     {
+        FOR(NB_DISPATCH_AND_ACC_BUFFER)
+        {
+            FOREACH_RANK(each_rank) { sem_post(&exec_rank_wait_sem[each_rank]); }
+        }
+
         // wait for get_reads_in_buffer to mean something
         sem_wait(get_reads_wait_sem);
 
@@ -166,6 +173,11 @@ void *thread_dispatch(void *arg)
 
         // let exec_rank sees that this run is complete
         FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
+
+        FOR(NB_DISPATCH_AND_ACC_BUFFER - 1)
+        {
+            FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
+        }
     }
     return NULL;
 }
@@ -187,32 +199,13 @@ void *thread_acc(void *arg)
     sem_t *process_free_sem = args->process_free_sem;
     sem_t *get_reads_free_sem = args->get_reads_free_sem;
 
-    unsigned int nb_dpu = get_nb_dpu();
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-    unsigned int dpu_offset = 0;
-
-    for (; dpu_offset < (nb_dpu - nb_dpus_per_run); dpu_offset += nb_dpus_per_run) {
-        // allow get_reads to start the run
-        for (unsigned int each_reads_buffer = 0; each_reads_buffer < NB_READS_BUFFER; each_reads_buffer++)
-            sem_post(get_reads_free_sem);
-        // wait for get_read_in_buffer to mean something
-        FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
-
-        FOREACH_PASS(each_pass)
-        {
-            PRINT_TIME_ACC_READ();
-            accumulate_read(each_pass, dpu_offset);
-            PRINT_TIME_ACC_READ();
-
-            sem_post(get_reads_free_sem);
-            FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
-            FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
-        }
-    }
+    FOREACH_RUN(dpu_offset)
     {
-        // allow get_reads to start the run
-        for (unsigned int each_reads_buffer = 0; each_reads_buffer < NB_READS_BUFFER; each_reads_buffer++)
-            sem_post(get_reads_free_sem);
+        FOR(NB_DISPATCH_AND_ACC_BUFFER)
+        {
+            FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
+        }
+
         // wait for get_read_in_buffer to mean something
         FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
 
@@ -222,12 +215,21 @@ void *thread_acc(void *arg)
             accumulate_read(each_pass, dpu_offset);
             PRINT_TIME_ACC_READ();
 
-            sem_post(process_free_sem);
             FOREACH_RANK(each_rank) { sem_post(&exec_rank_free_sem[each_rank]); }
+            if (LAST_RUN(dpu_offset)) {
+                sem_post(process_free_sem);
+            } else {
+                sem_post(get_reads_free_sem);
+            }
             FOREACH_RANK(each_rank) { sem_wait(&exec_rank_wait_sem[each_rank]); }
         }
-        // let process sees that this run is complete
-        sem_post(process_free_sem);
+        if (LAST_RUN(dpu_offset)) {
+            sem_post(process_free_sem);
+        }
+        FOR(NB_DISPATCH_AND_ACC_BUFFER - 1)
+        {
+            FOREACH_RANK(each_rank) { sem_wait(&exec_rank_free_sem[each_rank]); }
+        }
     }
     return NULL;
 }
@@ -344,13 +346,13 @@ static void exec_round(int round)
     assert(ret == 0);
     FOREACH_RANK(each_rank)
     {
-        ret = sem_init(&exec_rank_dispatch_sem[each_rank], 0, 1);
+        ret = sem_init(&exec_rank_dispatch_sem[each_rank], 0, 0);
         assert(ret == 0);
         ret = sem_init(&exec_rank_acc_sem[each_rank], 0, 0);
         assert(ret == 0);
         ret = sem_init(&dispatch_exec_rank_sem[each_rank], 0, 0);
         assert(ret == 0);
-        ret = sem_init(&acc_exec_rank_sem[each_rank], 0, 1);
+        ret = sem_init(&acc_exec_rank_sem[each_rank], 0, 0);
         assert(ret == 0);
     }
     ret = sem_init(&acc_process_sem, 0, 0);
@@ -436,6 +438,7 @@ static void do_mapping()
     init_time_file_and_mutex();
     backends_functions.init_backend();
     unsigned int nb_dpu = get_nb_dpu();
+    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
     dispatch_init(nb_dpu);
 
     for (int round = 0; round < NB_ROUND; round++) {
@@ -443,9 +446,9 @@ static void do_mapping()
                "starting round %u\n"
                "#################\n",
             round);
-        accumulate_init();
+        accumulate_init(nb_dpus_per_run);
         exec_round(round);
-        accumulate_free();
+        accumulate_free(nb_dpus_per_run);
     }
     create_vcf();
 

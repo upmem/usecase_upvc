@@ -2,19 +2,20 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 
+#include "genome.h"
 #include "upvc.h"
 #include "vartree.h"
-#include "genome.h"
 
-static variant_t **variant_list[MAX_SEQ_GEN] = {NULL};
+static variant_t **variant_list[MAX_SEQ_GEN] = { NULL };
 static pthread_mutex_t mutex;
 
-void variant_tree_init() {
+void variant_tree_init()
+{
     genome_t *genome = genome_get();
     pthread_mutex_init(&mutex, NULL);
     for (unsigned int each_seq = 0; each_seq < genome->nb_seq; each_seq++) {
@@ -22,7 +23,8 @@ void variant_tree_init() {
     }
 }
 
-void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr) {
+void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr)
+{
     pthread_mutex_lock(&mutex);
     variant_t **entry = &variant_list[seq_nr][offset_in_chr];
     variant_t *vars = *entry;
@@ -42,7 +44,8 @@ end:
     pthread_mutex_unlock(&mutex);
 }
 
-void variant_tree_free() {
+void variant_tree_free()
+{
     genome_t *genome = genome_get();
     pthread_mutex_destroy(&mutex);
     for (unsigned int each_seq = 0; each_seq < genome->nb_seq; each_seq++) {
