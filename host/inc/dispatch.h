@@ -17,7 +17,7 @@
  */
 typedef struct {
     nb_request_t nb_reads;
-    int8_t *reads_area;
+    dpu_request_t *dpu_requests;
 } dispatch_request_t;
 
 dispatch_request_t *dispatch_get(unsigned int dpu_id, unsigned int pass_id);

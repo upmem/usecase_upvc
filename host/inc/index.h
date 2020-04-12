@@ -30,6 +30,8 @@ void index_init(int nb_dpu);
 
 void index_free();
 
-index_seed_t **index_get();
+index_seed_t *index_get(int8_t *read);
+
+void index_copy_neighbour(int8_t *dst, int8_t *src);
 
 #endif /* __INDEX_H__ */

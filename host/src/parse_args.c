@@ -31,28 +31,26 @@ static unsigned int nb_dpus_per_run = DPU_ALLOCATE_ALL;
 static void usage()
 {
     ERROR_EXIT(24,
-        "\nusage: %s -i <input_prefix> -n <number_of_dpus> -g <goal> [-s] \n"
+        "\nusage: %s -i <input_prefix> -g <goal> [-s | -n <number_of_dpus>] \n"
         "options:\n"
         "\t-i\tInput prefix that will be used to find the inputs files\n"
         "\t-g\tGoal of the run - values=index|map\n"
-        "\t-s\tSimulation mode (not compatible with -g)\n"
-        "\t-n\tNumber of DPUs to use\n",
+        "\t-s\tSimulation mode (not compatible with -n)\n"
+        "\t-n\tNumber of DPUs to use when not in simulation mode\n",
         prog_name);
 }
 
 static void check_args()
 {
-    if (simulation_mode && nb_dpus_per_run == DPU_ALLOCATE_ALL)
-        nb_dpus_per_run = 1;
+    if (simulation_mode && nb_dpus_per_run != DPU_ALLOCATE_ALL) {
+        ERROR("-n is not compatible with simulation mode");
+        usage();
+    }
     if (prog_name == NULL || input_path == NULL || input_fasta == NULL || input_pe1 == NULL || input_pe2 == NULL
         || goal == goal_unknown) {
         ERROR("missing option");
         usage();
-    } else if (simulation_mode && goal != goal_unknown) {
-        ERROR("simulation mode is not compatible with -g option");
-        usage();
     }
-
     if (goal == goal_index && nb_dpus_per_run == 0) {
         ERROR("missing option (number of dpus)");
         usage();

@@ -3,7 +3,6 @@
  */
 
 #include "index.h"
-#include "code.h"
 #include "genome.h"
 #include "mram_dpu.h"
 #include "parse_args.h"
@@ -16,23 +15,44 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "common.h"
+
+#define CODE_SIZE (4)
+#define MASK (CODE_SIZE - 1)
+
+int code_seed(int8_t *sequence)
+{
+    int seed = 0;
+    for (int i = 0; i < SIZE_SEED; i++) {
+        if (sequence[i] >= CODE_SIZE) {
+            return -1;
+        }
+        seed = (seed * CODE_SIZE) + sequence[i];
+    }
+    return seed;
+}
+
+void code_neighbour(int8_t *sequence, int8_t *code)
+{
+    for (int i = 0; i < SIZE_NEIGHBOUR_IN_BYTES; i++) {
+        int j = i * 4;
+        code[i] = ((sequence[j + 3] & MASK) * (CODE_SIZE * CODE_SIZE * CODE_SIZE))
+            + ((sequence[j + 2] & MASK) * (CODE_SIZE * CODE_SIZE)) + ((sequence[j + 1] & MASK) * (CODE_SIZE))
+            + ((sequence[j] & MASK));
+    }
+}
+
+void index_copy_neighbour(int8_t *dst, int8_t *src) { code_neighbour(&src[SIZE_SEED], dst); }
 
 #define NB_SEED (1 << (SIZE_SEED << 1)) /* NB_SEED = 4 ^ (SIZE_SEED) */
 
 #define MAX_SIZE_IDX_SEED (1000)
 #define SEED_FILE ("seeds.txt")
 
-typedef int vmi_t;
-
 static index_seed_t **index_seed;
-static vmi_t *vmis = NULL;
 
-index_seed_t **index_get() { return index_seed; }
+index_seed_t *index_get(int8_t *read) { return index_seed[code_seed(read)]; }
 
 typedef struct seed_counter {
     int nb_seed;
@@ -104,45 +124,6 @@ void index_save()
 
     fclose(f);
     printf("\ttime: %lf\n", my_clock() - start_time);
-}
-
-static void init_vmis(unsigned int nb_dpu)
-{
-    vmis = (vmi_t *)calloc(nb_dpu, sizeof(vmi_t));
-    assert(vmis != NULL);
-    for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-        char file_name[FILE_NAME_SIZE];
-        vmis[dpuno] = open(make_mram_file_name(file_name, dpuno), O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
-        if (vmis[dpuno] == -1) {
-            ERROR_EXIT(-1, "%s: open failed (%s)", file_name, strerror(errno));
-        }
-    }
-}
-
-static void free_vmis(unsigned int nb_dpu)
-{
-    for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-        close(vmis[dpuno]);
-    }
-    free(vmis);
-}
-
-static void write_vmi(unsigned int dpuno, unsigned int k, int8_t *nbr, dpu_result_coord_t coord)
-{
-    unsigned int out_len = ALIGN_DPU(sizeof(dpu_result_coord_t) + SIZE_NEIGHBOUR_IN_BYTES);
-    uint64_t temp_buff[out_len / sizeof(uint64_t)];
-    memset(temp_buff, 0, out_len);
-    temp_buff[0] = coord.coord;
-    memcpy(&temp_buff[1], nbr, SIZE_NEIGHBOUR_IN_BYTES);
-
-    vmi_t vmi = vmis[dpuno];
-    lseek(vmi, k * out_len, SEEK_SET);
-    ssize_t write_size = write(vmi, temp_buff, out_len);
-    if (write_size != out_len) {
-        char file_name[FILE_NAME_SIZE];
-        ERROR_EXIT(-1, "%s: did not write the expected number of bytes (expected %u got %li, errno: %s)",
-            make_mram_file_name(file_name, dpuno), out_len, write_size, strerror(errno));
-    }
 }
 
 void index_init(int nb_dpu)

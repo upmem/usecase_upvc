@@ -13,18 +13,14 @@
 #include "accumulateread.h"
 #include "dispatch.h"
 #include "dpu_backend.h"
-#include "dpus_mgmt.h"
 #include "genome.h"
 #include "getread.h"
 #include "index.h"
-#include "mram_dpu.h"
 #include "parse_args.h"
 #include "processread.h"
 #include "simu_backend.h"
 #include "upvc.h"
-#include "upvc_dpu.h"
 #include "vartree.h"
-#include "vcf.h"
 
 #include "backends_functions.h"
 
@@ -34,9 +30,10 @@ backends_functions_t backends_functions;
 
 #define LAST_RUN(dpu_offset) (((dpu_offset) + get_nb_dpus_per_run()) >= get_nb_dpu())
 #define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < get_nb_dpu(); dpu_offset += get_nb_dpus_per_run())
-#define FOREACH_RANK(each_rank) for (unsigned int each_rank = 0; each_rank < dpu_get_nb_ranks_per_run(); each_rank++)
+#define FOREACH_RANK(each_rank)                                                                                                  \
+    for (unsigned int each_rank = 0; each_rank < backends_functions.get_nb_ranks_per_run(); each_rank++)
 #define FOREACH_PASS(each_pass) for (unsigned int each_pass = 0; get_reads_in_buffer(each_pass) != 0; each_pass++)
-#define FOR(loop) for (unsigned int _i = 0; _i < (loop); _i++)
+#define FOR(loop) for (int _i = 0; _i < (loop); _i++)
 
 typedef struct {
     sem_t *dispatch_free_sem;
@@ -272,7 +269,7 @@ static void exec_round(int round)
     char filename[1024];
     FILE *fipe1, *fipe2, *fope1, *fope2;
     char *input_prefix = get_input_path();
-    unsigned int nb_rank = dpu_get_nb_ranks_per_run();
+    unsigned int nb_rank = backends_functions.get_nb_ranks_per_run();
 
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
     fope1 = fopen(filename, "w");
@@ -453,7 +450,7 @@ static void do_mapping()
     create_vcf();
 
     dispatch_free(nb_dpu);
-    backends_functions.free_backend(nb_dpu);
+    backends_functions.free_backend();
     close_time_file_and_mutex();
 }
 
@@ -485,14 +482,14 @@ int main(int argc, char *argv[])
         backends_functions.init_backend = init_backend_simulation;
         backends_functions.free_backend = free_backend_simulation;
         backends_functions.run_dpu = run_dpu_simulation;
-        backends_functions.add_seed_to_requests = add_seed_to_simulation_requests;
         backends_functions.load_mram = load_mram_simulation;
+        backends_functions.get_nb_ranks_per_run = get_nb_ranks_per_run_simulation;
     } else {
         backends_functions.init_backend = init_backend_dpu;
         backends_functions.free_backend = free_backend_dpu;
         backends_functions.run_dpu = run_on_dpu;
-        backends_functions.add_seed_to_requests = add_seed_to_dpu_requests;
         backends_functions.load_mram = load_mram_dpu;
+        backends_functions.get_nb_ranks_per_run = get_nb_ranks_per_run_dpu;
     }
 
     genome_init(get_input_fasta());

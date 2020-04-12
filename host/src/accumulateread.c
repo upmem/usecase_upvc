@@ -2,7 +2,6 @@
 #include "common.h"
 #include "parse_args.h"
 #include "upvc.h"
-#include "upvc_dpu.h"
 
 #include <stdio.h>
 #include <stdlib.h>

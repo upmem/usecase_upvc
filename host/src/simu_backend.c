@@ -7,15 +7,16 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "accumulateread.h"
 #include "dispatch.h"
-#include "dpus_mgmt.h"
 #include "genome.h"
 #include "index.h"
 #include "mram_dpu.h"
 #include "parse_args.h"
 #include "simu_backend.h"
 #include "upvc.h"
-#include "upvc_dpu.h"
+
+#include <dpu.h>
 
 #include "common.h"
 
@@ -61,6 +62,8 @@
 
 #define MAX_SCORE 40
 
+static coords_and_nbr_t **mrams;
+
 /**
  * @brief Arguments needed for the thread that will be offload onto a DPU.
  */
@@ -71,6 +74,7 @@ typedef struct align_on_dpu_arg {
     unsigned int nodp_call;
     unsigned int odpd_call;
     int delta_neighbour;
+    int pass_id;
 } align_on_dpu_arg_t;
 
 static int min(int a, int b) { return a < b ? a : b; }
@@ -238,25 +242,21 @@ static void *align_on_dpu(void *arg)
     align_on_dpu_arg_t *dpu_arg = (align_on_dpu_arg_t *)arg;
     int numdpu = dpu_arg->numdpu;
     int delta_neighbour = dpu_arg->delta_neighbour;
-    int size_neighbour = SIZE_NEIGHBOUR_IN_BYTES;
+    int pass_id = dpu_arg->pass_id;
     int size_neighbour_in_symbols = SIZE_IN_SYMBOLS(delta_neighbour);
-    int aligned_nbr_size = ALIGN_DPU(size_neighbour);
-    int size_nbr_coord = aligned_nbr_size + sizeof(dpu_result_coord_t);
-    mem_dpu_t *M = get_mem_dpu(numdpu);
-    dpu_result_out_t *M_res = get_mem_dpu_res(numdpu);
-    int current_read = 0;
+    dispatch_request_t *requests = dispatch_get(numdpu, pass_id);
+    acc_results_t *acc_res = accumulate_get_buffer(numdpu, pass_id);
     TIME_VAR;
 
-    M_res[nb_map].num = -1;
-    while (M->num[current_read] != -1) {
-        int offset = M->offset[current_read]; /* address of the first neighbour */
+    for (unsigned int each_request_read = 0; each_request_read < requests->nb_reads; each_request_read++) {
+        dpu_request_t *curr_request = &(requests->dpu_requests[each_request_read]);
+        int offset = curr_request->offset;
         int min = MAX_SCORE;
         int nb_map_start = nb_map;
-        for (int nb_neighbour = 0; nb_neighbour < M->count[current_read]; nb_neighbour++) {
-            dpu_result_coord_t curr_coord
-                = *((dpu_result_coord_t *)(&M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord]));
-            int8_t *curr_nbr = &M->neighbour_idx[(offset + nb_neighbour) * size_nbr_coord + sizeof(dpu_result_coord_t)];
-            int8_t *curr_read = &M->neighbour_read[current_read * size_neighbour];
+        int8_t *curr_read = (int8_t *)&curr_request->nbr[0];
+        for (unsigned int nb_neighbour = 0; nb_neighbour < curr_request->count; nb_neighbour++) {
+            coords_and_nbr_t *coord_and_nbr = &(mrams[numdpu][offset + nb_neighbour]);
+            int8_t *curr_nbr = (int8_t *)&coord_and_nbr->nbr[0];
 
             GET_TIME;
             int score_noDP = noDP(curr_read, curr_nbr, min, delta_neighbour);
@@ -275,35 +275,27 @@ static void *align_on_dpu(void *arg)
                     nb_map = nb_map_start;
                 }
                 if (nb_map < MAX_DPU_RESULTS - 1) {
-                    M_res[nb_map].num = M->num[current_read];
-                    M_res[nb_map].coord = curr_coord;
-                    M_res[nb_map].score = score;
-                    nb_map++;
-                    M_res[nb_map].num = -1;
+                    dpu_result_out_t *result = &acc_res->results[nb_map++];
+                    result->num = curr_request->num;
+                    result->coord = coord_and_nbr->coord;
+                    result->score = score;
                 } else {
                     fprintf(stderr, "MAX_DPU_RESULTS reached!\n");
                     exit(-42);
                 }
             }
         }
-        current_read++;
     }
+
+    acc_res->results[nb_map].num = -1;
+    acc_res->nb_res = nb_map;
+
     WRITE_BACK_TIME(dpu_arg);
     return NULL;
 }
 
-void add_seed_to_simulation_requests(
-    __attribute__((unused)) dispatch_request_t *requests, int num_read, int nb_read_written, index_seed_t *seed, int8_t *nbr)
-{
-    write_count(seed->num_dpu, nb_read_written, seed->nb_nbr);
-    write_offset(seed->num_dpu, nb_read_written, seed->offset);
-    write_num(seed->num_dpu, nb_read_written, num_read);
-    write_num(seed->num_dpu, nb_read_written + 1, -1);
-    write_neighbour_read(seed->num_dpu, nb_read_written, nbr);
-}
-
 void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
-    __attribute__((unused)) unsigned int pass_id, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
+    unsigned int pass_id, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
     unsigned int nb_dpu = get_nb_dpu();
     pthread_t thread_id[nb_dpu];
@@ -314,6 +306,7 @@ void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attri
     for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
         thread_args[numdpu].numdpu = numdpu;
         thread_args[numdpu].delta_neighbour = delta_neighbour;
+        thread_args[numdpu].pass_id = pass_id;
 #ifdef PRINT_NODP_ODPD_TIME
         thread_args[numdpu].nodp_time = 0.0;
         thread_args[numdpu].odpd_time = 0.0;
@@ -348,18 +341,28 @@ void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attri
     sem_post(dispatch_free_sem);
 }
 
-void init_backend_simulation() { malloc_dpu(get_nb_dpu()); }
+void init_backend_simulation()
+{
+    unsigned int nb_dpu = get_nb_dpu();
+    mrams = (coords_and_nbr_t **)malloc(nb_dpu * sizeof(coords_and_nbr_t *));
+    set_nb_dpus_per_run(nb_dpu);
+}
 
-void free_backend_simulation(unsigned int nb_dpu) { free_dpu(nb_dpu); }
+void free_backend_simulation()
+{
+    unsigned int nb_dpu = get_nb_dpu();
+    for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
+        free(mrams[each_dpu]);
+    }
+    free(mrams);
+}
 
 void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned int rank_id,
     __attribute__((unused)) int delta_neighbour)
 {
-    mem_dpu_t *MDPU;
-    unsigned int nb_dpu = get_nb_dpu();
-
-    for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-        MDPU = get_mem_dpu(each_dpu);
-        mram_load((uint8_t *)(MDPU->neighbour_idx), each_dpu);
+    for (unsigned int each_dpu = 0; each_dpu < get_nb_dpu(); each_dpu++) {
+        mram_load((uint8_t **)&mrams[each_dpu], each_dpu);
     }
 }
+
+unsigned int get_nb_ranks_per_run_simulation() { return 1; }

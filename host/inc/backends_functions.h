@@ -15,13 +15,10 @@
  */
 typedef struct backends_functions_struct {
     void (*run_dpu)(unsigned int, unsigned int, unsigned int, int, sem_t *, sem_t *);
-    void (*add_seed_to_requests)(dispatch_request_t *, int, int, index_seed_t *, int8_t *);
-
     void (*init_backend)(void);
-    void (*free_backend)(unsigned int);
+    void (*free_backend)(void);
     void (*load_mram)(unsigned int, unsigned int, int);
+    unsigned int (*get_nb_ranks_per_run)(void);
 } backends_functions_t;
-
-extern backends_functions_t backends_functions;
 
 #endif /* __BACKENDS_FUNCTIONS_H__ */

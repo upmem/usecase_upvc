@@ -22,6 +22,6 @@ void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr
 void variant_tree_init();
 void variant_tree_free();
 
-variant_t ***variant_tree_get();
+void create_vcf();
 
 #endif /* __VARTREE_H__ */

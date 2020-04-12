@@ -69,11 +69,6 @@ __host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
  */
 __dma_aligned static dout_t global_dout[NR_TASKLETS];
 
-typedef struct {
-    dpu_result_coord_t coord;
-    uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
-} coords_and_nbr_t;
-
 __dma_aligned coords_and_nbr_t coords_and_nbr[NR_TASKLETS][NB_REF_PER_READ];
 __dma_aligned dpu_request_t requests[NR_TASKLETS];
 

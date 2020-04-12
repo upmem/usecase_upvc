@@ -109,4 +109,9 @@ typedef struct {
 } dpu_request_t;
 #define DPU_REQUEST_VAR m_dpu_request
 
+typedef struct {
+    dpu_result_coord_t coord;
+    uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
+} coords_and_nbr_t;
+
 #endif /* __COMMON_H__ */

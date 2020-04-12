@@ -8,7 +8,6 @@
 #include <string.h>
 
 #include "backends_functions.h"
-#include "code.h"
 #include "dispatch.h"
 #include "getread.h"
 #include "index.h"
@@ -26,7 +25,7 @@ void dispatch_init(unsigned int nb_dpu)
         assert(requests_buffers[each_pass] != NULL);
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-            requests_buffers[each_pass][each_dpu].reads_area = malloc(sizeof(dpu_request_t) * MAX_DPU_REQUEST);
+            requests_buffers[each_pass][each_dpu].dpu_requests = malloc(sizeof(dpu_request_t) * MAX_DPU_REQUEST);
         }
     }
 }
@@ -35,29 +34,35 @@ void dispatch_free(unsigned int nb_dpu)
 {
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
-            free(requests_buffers[each_pass][each_dpu].reads_area);
+            free(requests_buffers[each_pass][each_dpu].dpu_requests);
         }
         free(requests_buffers[each_pass]);
+    }
+}
+
+static void add_seed_to_requests(dispatch_request_t *reads, int num_read, index_seed_t *seed, int8_t *read, unsigned int num_dpu)
+{
+    dpu_request_t *new_read = &(reads->dpu_requests[reads->nb_reads]);
+    new_read->offset = seed->offset;
+    new_read->count = seed->nb_nbr;
+    new_read->num = num_read;
+
+    index_copy_neighbour((int8_t *)&new_read->nbr[0], read);
+    reads->nb_reads++;
+    if (++reads->nb_reads > MAX_DPU_REQUEST) {
+        ERROR_EXIT(28, "\nDispatch: Buffer full (DPU %d)", num_dpu);
     }
 }
 
 static void write_mem_DPU(
     dispatch_request_t *requests, index_seed_t *seed, int8_t *read, int num_read, pthread_mutex_t *dispatch_mutex)
 {
-    int8_t buf[SIZE_NEIGHBOUR_IN_BYTES];
-
     while (seed != NULL) {
-        pthread_mutex_lock(&dispatch_mutex[seed->num_dpu]);
-        {
-            int nb_read_written = requests[seed->num_dpu].nb_reads;
-            if ((nb_read_written + 1) > MAX_DPU_REQUEST) {
-                ERROR_EXIT(28, "\nBuffer full (DPU %d)", seed->num_dpu);
-            }
+        unsigned int num_dpu = seed->num_dpu;
 
-            code_neighbour(&read[SIZE_SEED], buf);
-            backends_functions.add_seed_to_requests(requests, num_read, nb_read_written, seed, buf);
-        }
-        pthread_mutex_unlock(&dispatch_mutex[seed->num_dpu]);
+        pthread_mutex_lock(&dispatch_mutex[num_dpu]);
+        add_seed_to_requests(&requests[num_dpu], num_read, seed, read, num_dpu);
+        pthread_mutex_unlock(&dispatch_mutex[num_dpu]);
 
         seed = seed->next;
     }
@@ -66,7 +71,6 @@ static void write_mem_DPU(
 #define DISPATCHING_THREAD (8)
 
 typedef struct {
-    index_seed_t **index_seed;
     int8_t *read_buffer;
     int nb_read;
     pthread_mutex_t *dispatch_mutex;
@@ -82,7 +86,6 @@ static void *dispatch_read_thread_fct(void *arg)
 {
     dispatch_thread_arg_t *args = (dispatch_thread_arg_t *)arg;
     int thread_id = args->thread_id;
-    index_seed_t **index_seed = args->common_arg->index_seed;
     int8_t *read_buffer = args->common_arg->read_buffer;
     int nb_read = args->common_arg->nb_read;
     pthread_mutex_t *dispatch_mutex = args->common_arg->dispatch_mutex;
@@ -92,7 +95,7 @@ static void *dispatch_read_thread_fct(void *arg)
     for (int num_read = nb_read_per_thread * thread_id;
          (num_read < nb_read) && (num_read < (nb_read_per_thread * (thread_id + 1))); num_read++) {
         int8_t *read = &read_buffer[num_read * SIZE_READ];
-        index_seed_t *seed = index_seed[code_seed(read)];
+        index_seed_t *seed = index_get(read);
         write_mem_DPU(requests, seed, read, num_read, dispatch_mutex);
     }
     return NULL;
@@ -105,7 +108,6 @@ void dispatch_read(unsigned int pass_id)
     pthread_mutex_t dispatch_mutex[nb_dpu];
     dispatch_request_t *requests = REQUESTS_BUFFERS(pass_id);
     dispatch_thread_common_arg_t common_arg = {
-        .index_seed = index_get(),
         .read_buffer = get_reads_buffer(pass_id),
         .nb_read = get_reads_in_buffer(pass_id),
         .dispatch_mutex = dispatch_mutex,
