@@ -25,15 +25,18 @@ static vmi_t *vmis = NULL;
 
 static char *make_mram_file_name(unsigned int dpu_id)
 {
-    static char file_name[FILE_NAME_SIZE];
+    char file_name[FILE_NAME_SIZE];
     sprintf(file_name, "mram_%04u.bin", dpu_id);
-    return file_name;
+    return strdup(file_name);
 }
 
 size_t mram_load(uint8_t **mram, unsigned int dpu_id)
 {
-    FILE *f = fopen(make_mram_file_name(dpu_id), "rb");
+    char * file_name = make_mram_file_name(dpu_id);
+    assert(file_name != NULL);
+    FILE *f = fopen(file_name, "rb");
     assert(f != NULL);
+    free(file_name);
 
     fseek(f, 0, SEEK_END);
     size_t size = ftell(f);
@@ -42,7 +45,7 @@ size_t mram_load(uint8_t **mram, unsigned int dpu_id)
     *mram = malloc(mram_size);
     assert(*mram != NULL);
 
-    size_t read_size = fread(*mram, sizeof(uint8_t), mram_size, f);
+    size_t read_size = fread(*mram, sizeof(uint8_t), size, f);
     assert(read_size == size);
 
     fclose(f);
@@ -55,10 +58,12 @@ void init_vmis(unsigned int nb_dpu)
     assert(vmis != NULL);
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
         char *file_name = make_mram_file_name(dpuno);
+        assert(file_name != NULL);
         vmis[dpuno] = open(file_name, O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
         if (vmis[dpuno] == -1) {
             ERROR_EXIT(-1, "%s: open failed (%s)", file_name, strerror(errno));
         }
+        free(file_name);
     }
 }
 
