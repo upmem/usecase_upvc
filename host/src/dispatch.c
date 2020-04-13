@@ -26,6 +26,7 @@ void dispatch_init(unsigned int nb_dpu)
 
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
             requests_buffers[each_pass][each_dpu].dpu_requests = malloc(sizeof(dpu_request_t) * MAX_DPU_REQUEST);
+            assert(requests_buffers[each_pass][each_dpu].dpu_requests != NULL);
         }
     }
 }
@@ -42,13 +43,12 @@ void dispatch_free(unsigned int nb_dpu)
 
 static void add_seed_to_requests(dispatch_request_t *reads, int num_read, index_seed_t *seed, int8_t *read, unsigned int num_dpu)
 {
-    dpu_request_t *new_read = &(reads->dpu_requests[reads->nb_reads]);
+    dpu_request_t *new_read = &reads->dpu_requests[reads->nb_reads];
     new_read->offset = seed->offset;
     new_read->count = seed->nb_nbr;
     new_read->num = num_read;
 
-    index_copy_neighbour((int8_t *)&new_read->nbr[0], read);
-    reads->nb_reads++;
+    index_copy_neighbour((int8_t *)new_read->nbr, read);
     if (++reads->nb_reads > MAX_DPU_REQUEST) {
         ERROR_EXIT(28, "\nDispatch: Buffer full (DPU %d)", num_dpu);
     }
