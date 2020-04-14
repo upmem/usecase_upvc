@@ -18,6 +18,17 @@
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
 
+#define CODE_SUB 10
+#define CODE_DEL 11
+#define CODE_INS 12
+#define CODE_END 13
+#define CODE_ERR 14
+
+#define CODE_A 0 /* ('A'>>1)&3   41H  0100 0001 */
+#define CODE_C 1 /* ('C'>>1)&3   43H  0100 0011 */
+#define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
+#define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
+
 static int check_pair(dpu_result_out_t A1, dpu_result_out_t A2)
 {
     int pos1, pos2;

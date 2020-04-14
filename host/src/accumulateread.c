@@ -9,6 +9,8 @@
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
+#define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
+
 static FILE **result_file;
 static dpu_result_out_t **result_list;
 static acc_results_t *results_buffers[NB_DISPATCH_AND_ACC_BUFFER];

@@ -15,6 +15,7 @@
 #include "upvc.h"
 
 static dispatch_request_t *requests_buffers[NB_DISPATCH_AND_ACC_BUFFER];
+static unsigned int dispatch_pass_id;
 #define REQUESTS_BUFFERS(pass_id) requests_buffers[(pass_id) % NB_DISPATCH_AND_ACC_BUFFER]
 
 void dispatch_init()
@@ -51,7 +52,7 @@ static void add_seed_to_requests(dispatch_request_t *reads, int num_read, index_
 
     index_copy_neighbour((int8_t *)new_read->nbr, read);
     if (++reads->nb_reads > MAX_DPU_REQUEST) {
-        ERROR_EXIT(28, "\nDispatch: Buffer full (DPU %d)", num_dpu);
+        ERROR_EXIT(28, "%s:[P%u]: Buffer full (DPU#%u)", __func__, dispatch_pass_id, num_dpu);
     }
 }
 
@@ -116,6 +117,7 @@ void dispatch_read(unsigned int pass_id)
     };
     pthread_t thread_id[DISPATCHING_THREAD];
     dispatch_thread_arg_t thread_arg[DISPATCHING_THREAD];
+    dispatch_pass_id = pass_id;
 
     for (int numdpu = 0; numdpu < nb_dpu; numdpu++) {
         requests[numdpu].nb_reads = 0;

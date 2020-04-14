@@ -2,6 +2,7 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#define _GNU_SOURCE
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,22 +19,22 @@
 #include "mram_dpu.h"
 #include "upvc.h"
 
-#define FILE_NAME_SIZE 24
-
-static const int mram_size = MRAM_SIZE - MAX_DPU_REQUEST * sizeof(dpu_request_t) - MAX_DPU_RESULTS * sizeof(dpu_result_out_t);
+#define MRAM_SIZE_AVAILABLE (MRAM_SIZE - MAX_DPU_REQUEST * sizeof(dpu_request_t) - MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
+static const int mram_size = MRAM_SIZE_AVAILABLE;
 static vmi_t *vmis = NULL;
+_Static_assert(MRAM_SIZE_AVAILABLE > 0, "Too many request and/or result compare to MRAM_SIZE");
 
 static char *make_mram_file_name(unsigned int dpu_id)
 {
-    char file_name[FILE_NAME_SIZE];
-    sprintf(file_name, "mram_%04u.bin", dpu_id);
-    return strdup(file_name);
+    char *file_name;
+    asprintf(&file_name, "mram_%04u.bin", dpu_id);
+    assert(file_name != NULL);
+    return file_name;
 }
 
 size_t mram_load(uint8_t **mram, unsigned int dpu_id)
 {
     char * file_name = make_mram_file_name(dpu_id);
-    assert(file_name != NULL);
     FILE *f = fopen(file_name, "rb");
     assert(f != NULL);
     free(file_name);
@@ -58,7 +59,6 @@ void init_vmis(unsigned int nb_dpu)
     assert(vmis != NULL);
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
         char *file_name = make_mram_file_name(dpuno);
-        assert(file_name != NULL);
         vmis[dpuno] = open(file_name, O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
         if (vmis[dpuno] == -1) {
             ERROR_EXIT(-1, "%s: open failed (%s)", file_name, strerror(errno));

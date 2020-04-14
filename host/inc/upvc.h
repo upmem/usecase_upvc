@@ -5,9 +5,8 @@
 #ifndef __UPVC_H__
 #define __UPVC_H__
 
-#define VERSION "VERSION 1.7"
+#define VERSION "VERSION 1.8"
 #define MAX_READS_BUFFER (1048576) /* Maximum number of read by round        */
-#define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
 #define NB_READS_BUFFER (16)
 #define NB_DISPATCH_AND_ACC_BUFFER (4)
 #define NB_ROUND (1)
@@ -16,17 +15,6 @@
 #define COST_GAPO 11
 #define COST_GAPE 1
 #define NB_DIAG 15
-
-#define CODE_SUB 10
-#define CODE_DEL 11
-#define CODE_INS 12
-#define CODE_END 13
-#define CODE_ERR 14
-
-#define CODE_A 0 /* ('A'>>1)&3   41H  0100 0001 */
-#define CODE_C 1 /* ('C'>>1)&3   43H  0100 0011 */
-#define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
-#define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
 #include <pthread.h>
 #include <stdarg.h>
@@ -65,10 +53,6 @@ extern pthread_mutex_t time_file_mutex;
 
 #include <stdlib.h>
 
-#define WARNING(fmt, ...)                                                                                                        \
-    do {                                                                                                                         \
-        fprintf(stderr, "WARNING: " fmt "\n", ##__VA_ARGS__);                                                                    \
-    } while (0)
 #define ERROR(fmt, ...)                                                                                                          \
     do {                                                                                                                         \
         fprintf(stderr, "ERROR: " fmt "\n", ##__VA_ARGS__);                                                                      \
@@ -86,8 +70,8 @@ extern pthread_mutex_t time_file_mutex;
 
 #include "backends_functions.h"
 extern backends_functions_t backends_functions;
-#define TABULATION "          "
-#define LINE       "----------"
+#define TABULATION "         "
+#define LINE       "---------"
 #define SEPARATOR  '|'
 #define ENDLINE    "|\n\0"
 static inline void print(const uint32_t rank_id, const char *fmt, ...)
