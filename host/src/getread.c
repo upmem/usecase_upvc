@@ -17,6 +17,7 @@
 
 static int nb_reads[NB_READS_BUFFER];
 static int8_t *reads_buffers[NB_READS_BUFFER];
+#define PASS(pass_id) (pass_id % NB_READS_BUFFER)
 
 /**
  * @brief Parse the file "f" to get the next read in the file and its pair.
@@ -29,11 +30,10 @@ static int8_t *reads_buffers[NB_READS_BUFFER];
  */
 static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2)
 {
+    static const int invnt[4] = { 2, 3, 0, 1 };
     int offset = 0;
-    int size_read = SIZE_READ;
     char comment[MAX_BUF_SIZE];
     char sequence_buffer[MAX_SEQ_SIZE];
-    int invnt[4] = { 2, 3, 0, 1 };
 
     if (fgets(comment, MAX_BUF_SIZE, f) == NULL) { /* Commentary */
         return -1;
@@ -42,23 +42,24 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2)
         return -1;
     }
 
-    /* If the comment start with ">>12"
-     * it means that we need the skip the first 12 characters of the read.
+    /* If the comment start with ">>14"
+     * it means that we need the skip the first 14 characters of the read.
      */
     if (comment[1] == '>') {
         sscanf(&comment[2], "%d", &offset);
     }
-    for (int i = 0; i < size_read - offset; i++) {
+    int i;
+    for (i = 0; i < SIZE_READ - offset; i++) {
         read1[i] = (((int)sequence_buffer[i]) >> 1) & 3;
-        read2[size_read - i - 1 - offset] = invnt[read1[i]];
+        read2[SIZE_READ - i - 1 - offset] = invnt[read1[i]];
     }
-    for (int i = size_read - offset; i < size_read; i++) {
+    for (; i < SIZE_READ; i++) {
         read1[i] = 0;
         read2[i] = 0;
     }
 
     if (comment[0] == '>') {
-        return size_read;
+        return SIZE_READ;
     }
     if (fgets(comment, MAX_BUF_SIZE, f) == NULL) { /* Commentary */
         return -1;
@@ -66,14 +67,13 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2)
     if (fgets(sequence_buffer, MAX_SEQ_SIZE, f) == NULL) { /* Line with sequence quality information (unused) */
         return -1;
     }
-    return size_read;
+    return SIZE_READ;
 }
 
 void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
 {
     int nb_read = 0;
-    int size_read = SIZE_READ;
-    pass_id %= NB_READS_BUFFER;
+    pass_id = PASS(pass_id);
 
     int8_t *reads_buffer = reads_buffers[pass_id];
     if (reads_buffer == NULL) {
@@ -83,8 +83,8 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
     }
 
     while (nb_read < MAX_READS_BUFFER) {
-        if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * size_read], &reads_buffer[(nb_read + 1) * size_read]) <= 0)
-            || (get_seq_fast_AQ(fpe2, &reads_buffer[(nb_read + 2) * size_read], &reads_buffer[(nb_read + 3) * size_read]) <= 0))
+        if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * SIZE_READ], &reads_buffer[(nb_read + 1) * SIZE_READ]) <= 0)
+            || (get_seq_fast_AQ(fpe2, &reads_buffer[(nb_read + 2) * SIZE_READ], &reads_buffer[(nb_read + 3) * SIZE_READ]) <= 0))
             break;
         nb_read += 4;
     }
@@ -92,9 +92,9 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
     nb_reads[pass_id] = nb_read;
 }
 
-int get_reads_in_buffer(unsigned int pass_id) { return nb_reads[pass_id % NB_READS_BUFFER]; }
+int get_reads_in_buffer(unsigned int pass_id) { return nb_reads[PASS(pass_id)]; }
 
-int8_t *get_reads_buffer(unsigned int pass_id) { return reads_buffers[pass_id % NB_READS_BUFFER]; }
+int8_t *get_reads_buffer(unsigned int pass_id) { return reads_buffers[PASS(pass_id)]; }
 
 int get_read_size(char *input_pe1_file)
 {
