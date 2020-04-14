@@ -68,8 +68,8 @@ extern pthread_mutex_t time_file_mutex;
 
 #define NB_RANKS_MAX (64)
 
-#include "backends_functions.h"
-extern backends_functions_t backends_functions;
+extern unsigned int nb_dpus_per_run;
+extern unsigned int nb_ranks_per_run;
 #define TABULATION "         "
 #define LINE       "---------"
 #define SEPARATOR  '|'
@@ -90,7 +90,7 @@ static inline void print(const uint32_t rank_id, const char *fmt, ...)
     int fmt_size = vsprintf(&str[str_i], fmt, args);
     memcpy(&str[str_i + fmt_size], TABULATION, strlen(TABULATION) - fmt_size);
     str_i += strlen(TABULATION);
-    for (each_rank++; each_rank < backends_functions.get_nb_ranks_per_run(); each_rank++) {
+    for (each_rank++; each_rank < nb_ranks_per_run; each_rank++) {
         str[str_i++] = SEPARATOR;
         memcpy(&str[str_i], TABULATION, strlen(TABULATION));
         str_i += strlen(TABULATION);

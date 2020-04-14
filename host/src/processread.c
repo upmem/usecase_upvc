@@ -398,9 +398,10 @@ static void set_variant(
 }
 
 static pthread_mutex_t non_mapped_mutex;
-#if NB_ROUND > 1
 static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
 {
+    if (fpe1 == NULL || fpe2 == NULL)
+        return;
     pthread_mutex_lock(&non_mapped_mutex);
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     int size_read = SIZE_READ;
@@ -424,12 +425,6 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     fprintf(fpe2, "\n");
     pthread_mutex_unlock(&non_mapped_mutex);
 }
-#else
-static void add_to_non_mapped_read(__attribute__((unused)) int numread, __attribute__((unused)) int round,
-    __attribute__((unused)) FILE *fpe1, __attribute__((unused)) FILE *fpe2, __attribute__((unused)) int8_t *reads_buffer)
-{
-}
-#endif
 
 static bool compute_read_pair(
     int type1, int type2, int *offset, int *nbread, dpu_result_out_t *result_tab, int *pa_found, int *pb_found, bool *found)

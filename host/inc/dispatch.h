@@ -5,8 +5,6 @@
 #ifndef __DISPATCH_H__
 #define __DISPATCH_H__
 
-#include <stdint.h>
-
 #include "common.h"
 
 /**

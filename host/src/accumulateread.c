@@ -1,10 +1,16 @@
+/**
+ * Copyright 2016-2019 - Dominique Lavenier & UPMEM
+ */
+
 #include "accumulateread.h"
 #include "common.h"
-#include "parse_args.h"
+#include "index.h"
 #include "upvc.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/queue.h>
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
@@ -98,6 +104,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
         sprintf(result_filename, "result_%u.bin", pass_id);
 
         result_file[pass_id] = fopen(result_filename, "w+");
+        assert(unlink(result_filename) == 0);
         fwrite(&dummy_res, sizeof(dummy_res), 1, result_file[pass_id]);
     }
 
@@ -115,7 +122,6 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
-    unsigned int nb_dpus_per_run = backends_functions.get_nb_dpus_per_run();
     unsigned int nb_dpus = index_get_nb_dpu();
     acc_results_t *acc_res = RESULTS_BUFFERS(pass_id);
 
@@ -165,7 +171,6 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 
 void accumulate_free()
 {
-    unsigned int nb_dpu = backends_functions.get_nb_dpus_per_run();
     for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
         if (result_file[each_pass] != NULL)
             fclose(result_file[each_pass]);
@@ -173,7 +178,7 @@ void accumulate_free()
     free(result_file);
 
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
             free(results_buffers[each_pass][each_dpu].results);
         }
         free(results_buffers[each_pass]);
@@ -184,20 +189,19 @@ void accumulate_free()
 
 void accumulate_init()
 {
-    unsigned int nb_dpu = backends_functions.get_nb_dpus_per_run();
     result_file = (FILE **)calloc(MAX_NB_PASS, sizeof(FILE *));
     assert(result_file != NULL);
 
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
-        results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpu);
+        results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpus_per_run);
         assert(results_buffers[each_pass] != NULL);
-        for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
             results_buffers[each_pass][each_dpu].results = (dpu_result_out_t *)malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
             assert(results_buffers[each_pass][each_dpu].results != NULL);
         }
     }
 
-    result_list = (dpu_result_out_t **)malloc(sizeof(dpu_result_out_t *) * (nb_dpu + 1));
+    result_list = (dpu_result_out_t **)malloc(sizeof(dpu_result_out_t *) * (nb_dpus_per_run + 1));
     assert(result_list != NULL);
 }
 

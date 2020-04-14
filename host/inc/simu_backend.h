@@ -7,20 +7,13 @@
 
 #include <semaphore.h>
 
-#include "dispatch.h"
-#include "index.h"
-
 void run_dpu_simulation(
     unsigned int dpu_offset, unsigned int rank_id, unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem);
 
-void init_backend_simulation();
+void init_backend_simulation(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_run);
 
 void free_backend_simulation();
 
 void load_mram_simulation(unsigned int dpu_offset, unsigned int rank_id, int delta_neighbour);
-
-unsigned int get_nb_ranks_per_run_simulation();
-
-unsigned int get_nb_dpus_per_run_simulation();
 
 #endif /* __SIMU_BACKEND_H__ */

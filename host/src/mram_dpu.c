@@ -34,7 +34,7 @@ static char *make_mram_file_name(unsigned int dpu_id)
 
 size_t mram_load(uint8_t **mram, unsigned int dpu_id)
 {
-    char * file_name = make_mram_file_name(dpu_id);
+    char *file_name = make_mram_file_name(dpu_id);
     FILE *f = fopen(file_name, "rb");
     assert(f != NULL);
     free(file_name);

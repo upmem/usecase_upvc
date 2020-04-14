@@ -7,11 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "backends_functions.h"
 #include "dispatch.h"
 #include "getread.h"
 #include "index.h"
-#include "parse_args.h"
 #include "upvc.h"
 
 static dispatch_request_t *requests_buffers[NB_DISPATCH_AND_ACC_BUFFER];

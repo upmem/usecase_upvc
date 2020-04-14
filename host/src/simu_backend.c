@@ -9,10 +9,8 @@
 
 #include "accumulateread.h"
 #include "dispatch.h"
-#include "genome.h"
 #include "index.h"
 #include "mram_dpu.h"
-#include "parse_args.h"
 #include "simu_backend.h"
 #include "upvc.h"
 
@@ -255,8 +253,10 @@ void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attri
     sem_post(dispatch_free_sem);
 }
 
-void init_backend_simulation()
+void init_backend_simulation(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_run)
 {
+    *nb_ranks_per_run = 1;
+    *nb_dpus_per_run = index_get_nb_dpu();
     mrams = (coords_and_nbr_t **)malloc(index_get_nb_dpu() * sizeof(coords_and_nbr_t *));
     assert(mrams != NULL);
 }
@@ -277,6 +277,3 @@ void load_mram_simulation(
         mram_load((uint8_t **)&mrams[each_dpu], each_dpu);
     }
 }
-
-unsigned int get_nb_dpus_per_run_simulation() { return index_get_nb_dpu(); }
-unsigned int get_nb_ranks_per_run_simulation() { return 1; }

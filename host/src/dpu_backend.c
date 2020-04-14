@@ -24,8 +24,6 @@
 DPU_INCBIN(upvc_dpu_program, DPU_BINARY);
 
 typedef struct {
-    unsigned int nb_dpus_per_run;
-    unsigned int nb_ranks_per_run;
     unsigned int nb_dpus_per_rank[NB_RANKS_MAX];
     unsigned int rank_mram_offset[NB_RANKS_MAX];
     struct dpu_set_t all_ranks;
@@ -35,9 +33,6 @@ typedef struct {
 } devices_t;
 
 static devices_t devices;
-
-unsigned int get_nb_dpus_per_run_dpu() { return devices.nb_dpus_per_run; }
-unsigned int get_nb_ranks_per_run_dpu() { return devices.nb_ranks_per_run; }
 
 static void dpu_try_run(unsigned int rank_id)
 {
@@ -246,15 +241,15 @@ void run_on_dpu(
     print(rank_id, "R %.3lf", t5 - t4);
 }
 
-void init_backend_dpu()
+void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_run)
 {
     const char *profile = "cycleAccurate=true";
 
     DPU_ASSERT(dpu_alloc(get_nb_dpu(), profile, &devices.all_ranks));
     DPU_ASSERT(dpu_load_from_incbin(devices.all_ranks, &upvc_dpu_program, NULL));
-    DPU_ASSERT(dpu_get_nr_ranks(devices.all_ranks, &devices.nb_ranks_per_run));
-    DPU_ASSERT(dpu_get_nr_dpus(devices.all_ranks, &devices.nb_dpus_per_run));
-    assert(devices.nb_ranks_per_run <= NB_RANKS_MAX);
+    DPU_ASSERT(dpu_get_nr_ranks(devices.all_ranks, nb_ranks_per_run));
+    DPU_ASSERT(dpu_get_nr_dpus(devices.all_ranks, nb_dpus_per_run));
+    assert(*nb_ranks_per_run <= NB_RANKS_MAX);
 
     unsigned int nb_dpus = 0;
     unsigned int each_rank;
@@ -265,7 +260,7 @@ void init_backend_dpu()
         devices.rank_mram_offset[each_rank] = nb_dpus;
         nb_dpus += devices.nb_dpus_per_rank[each_rank];
     }
-    assert(nb_dpus == devices.nb_dpus_per_run);
+    assert(nb_dpus == *nb_dpus_per_run);
     printf("%u DPUs allocated\n", nb_dpus);
 
     pthread_mutex_init(&devices.log_mutex, NULL);
