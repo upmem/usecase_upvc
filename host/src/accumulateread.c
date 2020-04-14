@@ -134,6 +134,9 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         if (numdpu + dpu_offset >= nb_dpus)
             break;
         total_nb_res += acc_res[numdpu].nb_res;
+        if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
+            ERROR_EXIT(-72, "%s:[P%u, M%u]: end mark is not there in DPU#%u\n", __func__, pass_id, dpu_offset, numdpu);
+        }
     }
 
     // Get data from FILE *
