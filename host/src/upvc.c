@@ -28,8 +28,9 @@ FILE *time_file;
 pthread_mutex_t time_file_mutex;
 backends_functions_t backends_functions;
 
-#define LAST_RUN(dpu_offset) (((dpu_offset) + get_nb_dpus_per_run()) >= get_nb_dpu())
-#define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < get_nb_dpu(); dpu_offset += get_nb_dpus_per_run())
+#define LAST_RUN(dpu_offset) (((dpu_offset) + backends_functions.get_nb_dpus_per_run()) >= index_get_nb_dpu())
+#define FOREACH_RUN(dpu_offset)                                                                                                  \
+    for (unsigned int dpu_offset = 0; dpu_offset < index_get_nb_dpu(); dpu_offset += backends_functions.get_nb_dpus_per_run())
 #define FOREACH_RANK(each_rank)                                                                                                  \
     for (unsigned int each_rank = 0; each_rank < backends_functions.get_nb_ranks_per_run(); each_rank++)
 #define FOREACH_PASS(each_pass) for (unsigned int each_pass = 0; get_reads_in_buffer(each_pass) != 0; each_pass++)
@@ -117,7 +118,7 @@ void *thread_exec_rank(void *arg)
             print(rank_id, "P %u", each_pass);
             PRINT_TIME_MAP_READ(rank_id);
             t1 = my_clock();
-            backends_functions.run_dpu(dpu_offset, rank_id, each_pass, delta_neighbour, dispatch_free_sem, acc_wait_sem);
+            backends_functions.run_dpu(dpu_offset, rank_id, each_pass, dispatch_free_sem, acc_wait_sem);
             t2 = my_clock();
             PRINT_TIME_MAP_READ(rank_id);
             print(rank_id, "T %.2lf", t2 - t1);
@@ -271,10 +272,15 @@ static void exec_round(int round)
     char *input_prefix = get_input_path();
     unsigned int nb_rank = backends_functions.get_nb_ranks_per_run();
 
+#if NB_ROUND > 1
     sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
     fope1 = fopen(filename, "w");
     sprintf(filename, "%s_%d_PE2.fasta", input_prefix, round + 1);
     fope2 = fopen(filename, "w");
+#else
+    fope1 = NULL;
+    fope2 = NULL;
+#endif
 
     if (round == 0) {
         sprintf(filename, "%s_PE1.fastq", input_prefix);
@@ -408,8 +414,10 @@ static void exec_round(int round)
 
     fclose(fipe1);
     fclose(fipe2);
+#if NB_ROUND > 1
     fclose(fope1);
     fclose(fope2);
+#endif
 }
 
 static void init_time_file_and_mutex()
@@ -434,22 +442,20 @@ static void do_mapping()
 {
     init_time_file_and_mutex();
     backends_functions.init_backend();
-    unsigned int nb_dpu = get_nb_dpu();
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-    dispatch_init(nb_dpu);
+    dispatch_init();
 
     for (int round = 0; round < NB_ROUND; round++) {
         printf("#################\n"
                "starting round %u\n"
                "#################\n",
             round);
-        accumulate_init(nb_dpus_per_run);
+        accumulate_init();
         exec_round(round);
-        accumulate_free(nb_dpus_per_run);
+        accumulate_free();
     }
     create_vcf();
 
-    dispatch_free(nb_dpu);
+    dispatch_free();
     backends_functions.free_backend();
     close_time_file_and_mutex();
 }
@@ -484,19 +490,21 @@ int main(int argc, char *argv[])
         backends_functions.run_dpu = run_dpu_simulation;
         backends_functions.load_mram = load_mram_simulation;
         backends_functions.get_nb_ranks_per_run = get_nb_ranks_per_run_simulation;
+        backends_functions.get_nb_dpus_per_run = get_nb_dpus_per_run_simulation;
     } else {
         backends_functions.init_backend = init_backend_dpu;
         backends_functions.free_backend = free_backend_dpu;
         backends_functions.run_dpu = run_on_dpu;
         backends_functions.load_mram = load_mram_dpu;
         backends_functions.get_nb_ranks_per_run = get_nb_ranks_per_run_dpu;
+        backends_functions.get_nb_dpus_per_run = get_nb_dpus_per_run_dpu;
     }
 
     genome_init(get_input_fasta());
 
     switch (get_goal()) {
     case goal_index:
-        index_init(get_nb_dpus_per_run());
+        index_init();
         index_save();
         break;
     case goal_map:

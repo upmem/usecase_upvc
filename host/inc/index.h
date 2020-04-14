@@ -26,11 +26,13 @@ void index_save();
 
 void index_load();
 
-void index_init(int nb_dpu);
+void index_init();
 
 void index_free();
 
 index_seed_t *index_get(int8_t *read);
+
+unsigned int index_get_nb_dpu();
 
 void index_copy_neighbour(int8_t *dst, int8_t *src);
 

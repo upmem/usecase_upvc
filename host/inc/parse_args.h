@@ -41,24 +41,9 @@ goal_t get_goal();
 unsigned int get_nb_dpu();
 
 /**
- * @brief Set the number of DPUs to be use to compute.
- */
-void set_nb_dpu(unsigned int val);
-
-/**
  * @brief Get the execution mode.
  */
 bool get_simulation_mode();
-
-/**
- * @brief Get the number of DPUs to be use simultaneously per run.
- */
-unsigned int get_nb_dpus_per_run();
-
-/**
- * @brief Set the number of DPUs to be use simultaneously per run.
- */
-void set_nb_dpus_per_run(unsigned int val);
 
 /**
  * @brief Parse and validate the argument of the application.

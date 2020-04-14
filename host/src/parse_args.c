@@ -2,6 +2,7 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
 #include <getopt.h>
@@ -23,8 +24,7 @@ static char *input_pe1 = NULL;
 static char *input_pe2 = NULL;
 static bool simulation_mode = false;
 static goal_t goal = goal_unknown;
-static unsigned int nb_dpu = 0;
-static unsigned int nb_dpus_per_run = DPU_ALLOCATE_ALL;
+static unsigned int nb_dpu = DPU_ALLOCATE_ALL;
 
 /**************************************************************************************/
 /**************************************************************************************/
@@ -42,7 +42,7 @@ static void usage()
 
 static void check_args()
 {
-    if (simulation_mode && nb_dpus_per_run != DPU_ALLOCATE_ALL) {
+    if (simulation_mode && nb_dpu != DPU_ALLOCATE_ALL) {
         ERROR("-n is not compatible with simulation mode");
         usage();
     }
@@ -51,9 +51,14 @@ static void check_args()
         ERROR("missing option");
         usage();
     }
-    if (goal == goal_index && nb_dpus_per_run == 0) {
-        ERROR("missing option (number of dpus)");
-        usage();
+    if (goal == goal_index) {
+        if (nb_dpu == DPU_ALLOCATE_ALL) {
+            ERROR("missing option (number of dpus)");
+            usage();
+        } else if (nb_dpu == 0) {
+            ERROR("cannot index for 0 dpus");
+            usage();
+        }
     }
 }
 
@@ -68,19 +73,21 @@ static void verify_that_file_exists(const char *path)
 
 static char *alloc_input_file_name(const char *input_prefix, const char *input_suffix)
 {
-    char *input_file_name = (char *)calloc(strlen(input_prefix) + strlen(input_suffix) + 1, sizeof(char));
-    sprintf(input_file_name, "%s%s", input_prefix, input_suffix);
+    char *input_file_name;
+    asprintf(&input_file_name, "%s%s", input_prefix, input_suffix);
+    assert(input_file_name != NULL);
     verify_that_file_exists(input_file_name);
     return input_file_name;
 }
 
 static void validate_inputs(const char *input_prefix)
 {
-    if (!(input_path == NULL && input_fasta == NULL && input_pe1 == NULL && input_pe2 == NULL)) {
+    if (input_path != NULL) {
         ERROR("input option has been entered more than once");
         usage();
     } else {
         input_path = strdup(input_prefix);
+        assert(input_path != NULL);
         input_fasta = alloc_input_file_name(input_prefix, ".fasta");
         input_pe1 = alloc_input_file_name(input_prefix, "_PE1.fastq");
         input_pe2 = alloc_input_file_name(input_prefix, "_PE2.fastq");
@@ -113,22 +120,16 @@ goal_t get_goal() { return goal; }
 
 /**************************************************************************************/
 /**************************************************************************************/
-static void validate_nb_dpus_per_run(const char *nb_dpus_per_run_str)
+static void validate_nb_dpu(const char *nb_dpu_str)
 {
-    if (nb_dpus_per_run != DPU_ALLOCATE_ALL) {
+    if (nb_dpu != DPU_ALLOCATE_ALL) {
         ERROR("number of DPUs per run option has been entered more than once");
         usage();
     }
-    nb_dpus_per_run = (unsigned int)atoi(nb_dpus_per_run_str);
+    nb_dpu = (unsigned int)atoi(nb_dpu_str);
 }
 
-unsigned int get_nb_dpus_per_run() { return nb_dpus_per_run; }
-void set_nb_dpus_per_run(unsigned int val) { nb_dpus_per_run = val; }
-
-/**************************************************************************************/
-/**************************************************************************************/
 unsigned int get_nb_dpu() { return nb_dpu; }
-void set_nb_dpu(unsigned int val) { nb_dpu = val; }
 
 /**************************************************************************************/
 /**************************************************************************************/
@@ -156,7 +157,7 @@ void validate_args(int argc, char **argv)
             validate_simulation_mode();
             break;
         case 'n':
-            validate_nb_dpus_per_run(optarg);
+            validate_nb_dpu(optarg);
             break;
         default:
             ERROR("unknown option");

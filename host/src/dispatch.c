@@ -17,9 +17,9 @@
 static dispatch_request_t *requests_buffers[NB_DISPATCH_AND_ACC_BUFFER];
 #define REQUESTS_BUFFERS(pass_id) requests_buffers[(pass_id) % NB_DISPATCH_AND_ACC_BUFFER]
 
-void dispatch_init(unsigned int nb_dpu)
+void dispatch_init()
 {
-
+    unsigned int nb_dpu = index_get_nb_dpu();
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         requests_buffers[each_pass] = (dispatch_request_t *)calloc(nb_dpu, sizeof(dispatch_request_t));
         assert(requests_buffers[each_pass] != NULL);
@@ -31,8 +31,9 @@ void dispatch_init(unsigned int nb_dpu)
     }
 }
 
-void dispatch_free(unsigned int nb_dpu)
+void dispatch_free()
 {
+    unsigned int nb_dpu = index_get_nb_dpu();
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
             free(requests_buffers[each_pass][each_dpu].dpu_requests);
@@ -104,7 +105,7 @@ static void *dispatch_read_thread_fct(void *arg)
 void dispatch_read(unsigned int pass_id)
 {
     int ret;
-    int nb_dpu = get_nb_dpu();
+    int nb_dpu = index_get_nb_dpu();
     pthread_mutex_t dispatch_mutex[nb_dpu];
     dispatch_request_t *requests = REQUESTS_BUFFERS(pass_id);
     dispatch_thread_common_arg_t common_arg = {

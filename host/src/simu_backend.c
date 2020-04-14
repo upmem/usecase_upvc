@@ -63,6 +63,7 @@
 #define MAX_SCORE 40
 
 static coords_and_nbr_t **mrams;
+static int delta_neighbour;
 
 /**
  * @brief Arguments needed for the thread that will be offload onto a DPU.
@@ -295,9 +296,9 @@ static void *align_on_dpu(void *arg)
 }
 
 void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
-    unsigned int pass_id, int delta_neighbour, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
+    unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
-    unsigned int nb_dpu = get_nb_dpu();
+    unsigned int nb_dpu = index_get_nb_dpu();
     pthread_t thread_id[nb_dpu];
     align_on_dpu_arg_t thread_args[nb_dpu];
 
@@ -343,26 +344,26 @@ void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attri
 
 void init_backend_simulation()
 {
-    unsigned int nb_dpu = get_nb_dpu();
-    mrams = (coords_and_nbr_t **)malloc(nb_dpu * sizeof(coords_and_nbr_t *));
-    set_nb_dpus_per_run(nb_dpu);
+    mrams = (coords_and_nbr_t **)malloc(index_get_nb_dpu() * sizeof(coords_and_nbr_t *));
+    assert(mrams != NULL);
 }
 
 void free_backend_simulation()
 {
-    unsigned int nb_dpu = get_nb_dpu();
-    for (unsigned int each_dpu = 0; each_dpu < nb_dpu; each_dpu++) {
+    for (unsigned int each_dpu = 0; each_dpu < index_get_nb_dpu(); each_dpu++) {
         free(mrams[each_dpu]);
     }
     free(mrams);
 }
 
-void load_mram_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned int rank_id,
-    __attribute__((unused)) int delta_neighbour)
+void load_mram_simulation(
+    __attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned int rank_id, int _delta_neighbour)
 {
-    for (unsigned int each_dpu = 0; each_dpu < get_nb_dpu(); each_dpu++) {
+    delta_neighbour = _delta_neighbour;
+    for (unsigned int each_dpu = 0; each_dpu < index_get_nb_dpu(); each_dpu++) {
         mram_load((uint8_t **)&mrams[each_dpu], each_dpu);
     }
 }
 
+unsigned int get_nb_dpus_per_run_simulation() { return index_get_nb_dpu(); }
 unsigned int get_nb_ranks_per_run_simulation() { return 1; }

@@ -113,8 +113,8 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
-    unsigned int nb_dpus = get_nb_dpu();
+    unsigned int nb_dpus_per_run = backends_functions.get_nb_dpus_per_run();
+    unsigned int nb_dpus = index_get_nb_dpu();
     acc_results_t *acc_res = RESULTS_BUFFERS(pass_id);
 
     unsigned int nb_dpus_used_current_run = MIN(nb_dpus - dpu_offset, nb_dpus_per_run);
@@ -158,8 +158,9 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     free(merged_result_tab);
 }
 
-void accumulate_free(unsigned int nb_dpu)
+void accumulate_free()
 {
+    unsigned int nb_dpu = backends_functions.get_nb_dpus_per_run();
     for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
         if (result_file[each_pass] != NULL)
             fclose(result_file[each_pass]);
@@ -176,8 +177,9 @@ void accumulate_free(unsigned int nb_dpu)
     free(result_list);
 }
 
-void accumulate_init(unsigned int nb_dpu)
+void accumulate_init()
 {
+    unsigned int nb_dpu = backends_functions.get_nb_dpus_per_run();
     result_file = (FILE **)calloc(MAX_NB_PASS, sizeof(FILE *));
     assert(result_file != NULL);
 

@@ -50,6 +50,9 @@ void index_copy_neighbour(int8_t *dst, int8_t *src) { code_neighbour(&src[SIZE_S
 #define MAX_SIZE_IDX_SEED (1000)
 #define SEED_FILE ("seeds.txt")
 
+static unsigned int nb_indexed_dpu;
+unsigned int index_get_nb_dpu() { return nb_indexed_dpu; }
+
 static index_seed_t **index_seed;
 
 index_seed_t *index_get(int8_t *read) { return index_seed[code_seed(read)]; }
@@ -99,8 +102,8 @@ void index_load()
     }
     free(new_seed);
 
-    set_nb_dpu(max_dpu + 1);
-    printf("\tnb_dpu: %u\n", max_dpu + 1);
+    nb_indexed_dpu = max_dpu + 1;
+    printf("\tnb_dpu: %u\n", nb_indexed_dpu);
 
     fclose(f);
     printf("\ttime: %lf s\n", my_clock() - start_time);
@@ -126,8 +129,9 @@ void index_save()
     printf("\ttime: %lf\n", my_clock() - start_time);
 }
 
-void index_init(int nb_dpu)
+void index_init()
 {
+    unsigned int nb_dpu = get_nb_dpu();
     double start_time = my_clock();
     printf("%s(%i):\n", __func__, nb_dpu);
     seed_counter_t *seed_counter;
@@ -209,7 +213,7 @@ void index_init(int nb_dpu)
                 int dpu_for_current_seed = current_dpu;
                 if (nb_seed_counted != 0) {
                     long max_dpu_workload = LONG_MAX;
-                    for (int j = 0; j < nb_dpu; j++) {
+                    for (unsigned int j = 0; j < nb_dpu; j++) {
                         if (dpu_workload[current_dpu] < max_dpu_workload) {
                             dpu_for_current_seed = current_dpu;
                             max_dpu_workload = dpu_workload[current_dpu];

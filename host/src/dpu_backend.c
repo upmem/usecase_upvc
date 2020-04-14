@@ -24,6 +24,7 @@
 DPU_INCBIN(upvc_dpu_program, DPU_BINARY);
 
 typedef struct {
+    unsigned int nb_dpus_per_run;
     unsigned int nb_ranks_per_run;
     unsigned int nb_dpus_per_rank[NB_RANKS_MAX];
     unsigned int rank_mram_offset[NB_RANKS_MAX];
@@ -35,6 +36,7 @@ typedef struct {
 
 static devices_t devices;
 
+unsigned int get_nb_dpus_per_run_dpu() { return devices.nb_dpus_per_run; }
 unsigned int get_nb_ranks_per_run_dpu() { return devices.nb_ranks_per_run; }
 
 static void dpu_try_run(unsigned int rank_id)
@@ -71,7 +73,7 @@ static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int 
 
     struct dpu_set_t dpu;
     unsigned int each_dpu;
-    unsigned int nb_dpu = get_nb_dpu();
+    unsigned int nb_dpu = index_get_nb_dpu();
     unsigned int max_dispatch_size = 0;
     dpu_offset += devices.rank_mram_offset[rank_id];
     DPU_FOREACH (rank, dpu, each_dpu) {
@@ -121,7 +123,7 @@ static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset)
 
     pthread_mutex_lock(&devices.log_mutex);
     fprintf(devices.log_file, "rank %u offset %u\n", rank_id, dpu_offset);
-    unsigned int nb_dpu = get_nb_dpu();
+    unsigned int nb_dpu = index_get_nb_dpu();
     DPU_FOREACH (rank, dpu, each_dpu) {
         unsigned int this_dpu = each_dpu + dpu_offset;
         if (this_dpu >= nb_dpu)
@@ -181,7 +183,7 @@ static void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_o
 
     struct dpu_set_t dpu;
     unsigned int each_dpu;
-    unsigned int nb_dpu = get_nb_dpu();
+    unsigned int nb_dpu = index_get_nb_dpu();
 
     unsigned int mram_offset = devices.rank_mram_offset[rank_id];
     dpu_offset += mram_offset;
@@ -213,8 +215,8 @@ static void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_o
     dpu_try_log(rank_id, dpu_offset);
 }
 
-void run_on_dpu(unsigned int dpu_offset, unsigned int rank_id, unsigned int pass_id, __attribute__((unused)) int delta_neighbour,
-    sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
+void run_on_dpu(
+    unsigned int dpu_offset, unsigned int rank_id, unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
     double t1, t2, t3, t4, t5;
     PRINT_TIME_WRITE_READS(rank_id);
@@ -246,15 +248,13 @@ void run_on_dpu(unsigned int dpu_offset, unsigned int rank_id, unsigned int pass
 
 void init_backend_dpu()
 {
-    unsigned int nb_dpus_per_run = get_nb_dpus_per_run();
     const char *profile = "cycleAccurate=true";
 
-    DPU_ASSERT(dpu_alloc(nb_dpus_per_run, profile, &devices.all_ranks));
+    DPU_ASSERT(dpu_alloc(get_nb_dpu(), profile, &devices.all_ranks));
     DPU_ASSERT(dpu_load_from_incbin(devices.all_ranks, &upvc_dpu_program, NULL));
     DPU_ASSERT(dpu_get_nr_ranks(devices.all_ranks, &devices.nb_ranks_per_run));
-    DPU_ASSERT(dpu_get_nr_dpus(devices.all_ranks, &nb_dpus_per_run));
+    DPU_ASSERT(dpu_get_nr_dpus(devices.all_ranks, &devices.nb_dpus_per_run));
     assert(devices.nb_ranks_per_run <= NB_RANKS_MAX);
-    set_nb_dpus_per_run(nb_dpus_per_run);
 
     unsigned int nb_dpus = 0;
     unsigned int each_rank;
@@ -265,7 +265,7 @@ void init_backend_dpu()
         devices.rank_mram_offset[each_rank] = nb_dpus;
         nb_dpus += devices.nb_dpus_per_rank[each_rank];
     }
-    assert(nb_dpus == nb_dpus_per_run);
+    assert(nb_dpus == devices.nb_dpus_per_run);
     printf("%u DPUs allocated\n", nb_dpus);
 
     pthread_mutex_init(&devices.log_mutex, NULL);
@@ -281,7 +281,7 @@ void free_backend_dpu()
 
 void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neighbour)
 {
-    unsigned int nb_dpu = get_nb_dpu();
+    unsigned int nb_dpu = index_get_nb_dpu();
     struct dpu_set_t rank = devices.ranks[rank_id];
     unsigned int nb_dpus_per_rank = devices.nb_dpus_per_rank[rank_id];
     uint8_t *mram[nb_dpus_per_rank];

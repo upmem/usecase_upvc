@@ -24,7 +24,7 @@ dispatch_request_t *dispatch_get(unsigned int dpu_id, unsigned int pass_id);
 
 void dispatch_read(unsigned int pass_id);
 
-void dispatch_init(unsigned int nb_dpu);
-void dispatch_free(unsigned int nb_dpu);
+void dispatch_init();
+void dispatch_free();
 
 #endif /* __DISPATCH_H__ */
