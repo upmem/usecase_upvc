@@ -269,7 +269,9 @@ void init_backend_dpu()
     printf("%u DPUs allocated\n", nb_dpus);
 
     pthread_mutex_init(&devices.log_mutex, NULL);
-    devices.log_file = fopen("upvc_log.txt", "w");
+    char filename[1024];
+    sprintf(filename, "%s_log.txt", get_input_path());
+    devices.log_file = fopen(filename, "w");
 }
 
 void free_backend_dpu()

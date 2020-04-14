@@ -158,7 +158,7 @@ void create_vcf()
     char filename[1024];
     genome_t *ref_genome = genome_get();
 
-    sprintf(filename, "%svars_upvc.vcf", get_input_path());
+    sprintf(filename, "%s_upvc.vcf", get_input_path());
     vcf_file = fopen(filename, "w");
 
     /* ####### START OF HEADER ####### */
