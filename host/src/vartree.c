@@ -13,6 +13,8 @@
 #include "upvc.h"
 #include "vartree.h"
 
+#include "common.h"
+
 static variant_t **variant_list[MAX_SEQ_GEN] = { NULL };
 static pthread_mutex_t mutex;
 
@@ -25,7 +27,7 @@ void variant_tree_init()
     }
 }
 
-void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr)
+void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr, int8_t *read)
 {
     pthread_mutex_lock(&mutex);
     variant_t **entry = &variant_list[seq_nr][offset_in_chr];
@@ -35,6 +37,7 @@ void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr
             vars->depth++;
             vars->score += var->score;
             free(var);
+            var = vars;
             goto end;
         }
         vars = vars->next;
@@ -43,6 +46,10 @@ void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr
     *entry = var;
 
 end:
+    var->reads = realloc(var->reads, var->depth * SIZE_READ);
+    assert(var->reads != NULL);
+    memcpy(&var->reads[SIZE_READ * (var->depth - 1)], read, SIZE_READ);
+
     pthread_mutex_unlock(&mutex);
 }
 
@@ -111,6 +118,8 @@ depth_filter_t indel_filter[] = {
     [18] = { 30, 40 },
 };
 
+static const char nucleotide[4] = { 'A', 'C', 'T', 'G' };
+
 static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
 {
     char *chr = ref_genome->seq_name[seq_nr];
@@ -142,8 +151,17 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
         }
     }
 
-    fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos, var->ref, var->alt, var->depth, cov,
+    fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d", chr, seq_pos, var->ref, var->alt, var->depth, cov,
         score);
+
+    for (unsigned int each_read = 0; each_read < depth; each_read++) {
+        int8_t *read = &var->reads[each_read * SIZE_READ];
+        fprintf(vcf_file, ";READ%u=", each_read);
+        for (unsigned int i = 0; i < SIZE_READ; i++) {
+            fprintf(vcf_file, "%c", nucleotide[read[i]]);
+        }
+    }
+    fprintf(vcf_file, "\n");
 
     return true;
 }

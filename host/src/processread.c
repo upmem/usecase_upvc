@@ -326,6 +326,7 @@ static void set_variant(
         newvar->depth = 1;
         newvar->score = result_match.score;
         newvar->next = NULL;
+        newvar->reads = NULL;
         if (code_result == CODE_SUB) {
             /* SNP = 0,1,2,3  (code A,C,T,G) */
             int snp = code_result_tab[code_result_idx + 2];
@@ -393,7 +394,7 @@ static void set_variant(
         newvar->ref[ref_pos] = '\0';
         newvar->alt[alt_pos] = '\0';
         variant_tree_insert(
-            newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
+            newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr], read);
     }
 }
 

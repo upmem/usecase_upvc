@@ -14,10 +14,11 @@ typedef struct variant {
     uint32_t depth;
     char ref[MAX_SIZE_ALLELE];
     char alt[MAX_SIZE_ALLELE];
+    int8_t *reads;
     struct variant *next;
 } variant_t;
 
-void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr);
+void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr, int8_t *read);
 
 void variant_tree_init();
 void variant_tree_free();
