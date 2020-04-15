@@ -43,6 +43,7 @@ size_t mram_load(uint8_t **mram, unsigned int dpu_id)
     size_t size = ftell(f);
     rewind(f);
 
+    assert(mram_size >= size);
     *mram = malloc(mram_size);
     assert(*mram != NULL);
 
