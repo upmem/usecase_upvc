@@ -63,6 +63,13 @@ static void check_args()
     }
 }
 
+static void check_permission()
+{
+    if (access(".", R_OK | W_OK)) {
+        ERROR_EXIT(25, "%s does not have read write permission on the current folder\n", prog_name);
+    }
+}
+
 /**************************************************************************************/
 /**************************************************************************************/
 static void verify_that_file_exists(const char *path)
@@ -146,6 +153,8 @@ void validate_args(int argc, char **argv)
     extern char *optarg;
 
     prog_name = strdup(argv[0]);
+    check_permission();
+
     while ((opt = getopt(argc, argv, "si:g:n:")) != -1) {
         switch (opt) {
         case 'i':
