@@ -103,7 +103,6 @@ void *thread_exec_rank(void *arg)
             sem_wait(&dispatch_to_exec_sem[rank_id]);
         }
 
-        sem_post(&exec_to_dispatch_sem[rank_id]);
         sem_post(&exec_to_acc_sem[rank_id]);
     }
     return NULL;
