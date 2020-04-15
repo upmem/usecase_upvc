@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(upvc)
 
-set(CMAKE_C_FLAGS "--std=gnu99 -O3 -Wall -Wextra -Werror -g3 -fopenmp")
+set(CMAKE_C_FLAGS "--std=gnu99 -O3 -Wall -Wextra -g3 -fopenmp")
 
 file(GLOB_RECURSE SOURCES src/*.c)
 add_executable(upvc ${SOURCES})

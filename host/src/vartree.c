@@ -131,6 +131,7 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
         percentage = depth * 100 / cov;
     }
 
+#if 1
     if (strlen(var->ref) == 1 && strlen(var->alt) == 1) { /* SUBSTITUTION */
         if (depth < 3) {
             return false;
@@ -150,6 +151,7 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
             return false;
         }
     }
+#endif
 
     fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d", chr, seq_pos, var->ref, var->alt, var->depth, cov,
         score);
