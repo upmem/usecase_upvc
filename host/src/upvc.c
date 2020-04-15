@@ -12,7 +12,6 @@
 
 #include "accumulateread.h"
 #include "dispatch.h"
-#include "dpu_backend.h"
 #include "genome.h"
 #include "getread.h"
 #include "index.h"
@@ -390,17 +389,10 @@ int main(int argc, char *argv[])
     printf("Information:\n");
     printf("\tread size: %d\n", SIZE_READ);
 
-    if (get_simulation_mode()) {
-        backends_functions.init_backend = init_backend_simulation;
-        backends_functions.free_backend = free_backend_simulation;
-        backends_functions.run_dpu = run_dpu_simulation;
-        backends_functions.load_mram = load_mram_simulation;
-    } else {
-        backends_functions.init_backend = init_backend_dpu;
-        backends_functions.free_backend = free_backend_dpu;
-        backends_functions.run_dpu = run_on_dpu;
-        backends_functions.load_mram = load_mram_dpu;
-    }
+    backends_functions.init_backend = init_backend_simulation;
+    backends_functions.free_backend = free_backend_simulation;
+    backends_functions.run_dpu = run_dpu_simulation;
+    backends_functions.load_mram = load_mram_simulation;
 
     genome_init(get_input_fasta());
 

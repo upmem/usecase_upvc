@@ -41,11 +41,6 @@ goal_t get_goal();
 unsigned int get_nb_dpu();
 
 /**
- * @brief Get the execution mode.
- */
-bool get_simulation_mode();
-
-/**
  * @brief Parse and validate the argument of the application.
  */
 void validate_args(int argc, char **argv);

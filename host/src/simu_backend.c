@@ -14,8 +14,6 @@
 #include "simu_backend.h"
 #include "upvc.h"
 
-#include <dpu.h>
-
 #include "common.h"
 
 #define MAX_SCORE 40
