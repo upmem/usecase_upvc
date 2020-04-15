@@ -234,27 +234,29 @@ def print_stat(tp_stats, fp_stats, nb_tp, nb_fp, nb_cm):
 # COMPUTE VCF #################################################################
 ###############################################################################
 
-
-def compute_for_pos(v1_infos, v2_infos, tp, fp, tp_stat, fp_stat):
+def compute_for_pos(v1_infos, v2_infos, tp, fp, tp_stat, fp_stat, chr, pos, fp_file):
     for (ref, alt), v1_info in v1_infos.items():
         if (ref, alt) in v2_infos:
             tp += 1
             update_stat(tp_stat, v1_info)
         else:
             fp += 1
+            fp_file.write("chr" + str(chr) + "\t" + str(pos) + "\t" + str(ref) + "\t" + str(alt) + "\t" + str(v1_info))
             update_stat(fp_stat, v1_info)
     return tp, fp
 
 
-def compute(V1, V2, tp_stat, fp_stat):
+def compute(V1, V2, tp_stat, fp_stat, fp_file):
     tp = 0
     fp = 0
     for (chr, pos), v1_infos in V1.items():
         if (chr, pos) in V2:
             tp, fp = compute_for_pos(
-                v1_infos, V2[(chr, pos)], tp, fp, tp_stat, fp_stat)
+                v1_infos, V2[(chr, pos)], tp, fp, tp_stat, fp_stat, chr, pos, fp_file)
         else:
             fp += len(v1_infos)
+            for (ref, alt), v1_info in v1_infos.items():
+                fp_file.write("chr" + str(chr) + "\t" + str(pos) + "\t" + str(ref) + "\t" + str(alt) + "\t" + str(v1_info))
             update_stat_for_pos(fp_stat, v1_infos)
     return tp, fp
 
@@ -271,8 +273,12 @@ def compute_data(V_ref, V_upvc, len_ref, len_upvc):
     tp_stat = stats["tp"] if args.enable_stat else None
     fp_stat = stats["fp"] if args.enable_stat else None
 
-    tp, fp = compute(V_upvc, V_ref, tp_stat, fp_stat)
-    cm, fn = compute(V_ref, V_upvc, None, None)
+    fp_file = open(args.upvc_file + ".fp", "w")
+    tp, fp = compute(V_upvc, V_ref, tp_stat, fp_stat, fp_file)
+    fp_file.close()
+    fp_file = open(args.upvc_file + ".fn", "w")
+    cm, fn = compute(V_ref, V_upvc, None, None, fp_file)
+    fp_file.close()
 
     # print_stat(tp_stat, fp_stat, tp, fp, cm)
 
@@ -351,7 +357,7 @@ chr_str_to_val = {"1": 1,
 }
 
 
-extract_info_re = re.compile("DEPTH=(.*);COV=(.*);SCORE=(.*)")
+extract_info_re = re.compile("DEPTH=(.*);COV=(.*);SCORE=([^;]*)")
 
 
 def extract_info(info):
@@ -378,8 +384,6 @@ def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del, extract):
     alt_len = len(alt)
     if args.enable_stat and extract:
         info = extract_info(info)
-    else:
-        info = 0
     if ref_len == 1 and alt_len == 1:
         SUB.setdefault((chr, pos), {})[(ref, alt)] = info
         len_sub += 1
