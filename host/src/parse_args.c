@@ -83,7 +83,7 @@ static void verify_that_file_exists(const char *path)
 static char *alloc_input_file_name(const char *input_prefix, const char *input_suffix)
 {
     char *input_file_name;
-    asprintf(&input_file_name, "%s%s", input_prefix, input_suffix);
+    assert(asprintf(&input_file_name, "%s%s", input_prefix, input_suffix) > 0);
     assert(input_file_name != NULL);
     verify_that_file_exists(input_file_name);
     return input_file_name;
