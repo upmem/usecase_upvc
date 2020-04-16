@@ -19,15 +19,16 @@
 #include "mram_dpu.h"
 #include "upvc.h"
 
+#define MRAM_FORMAT "mram_%04u.bin"
 #define MRAM_SIZE_AVAILABLE (MRAM_SIZE - MAX_DPU_REQUEST * sizeof(dpu_request_t) - MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
-static const int mram_size = MRAM_SIZE_AVAILABLE;
+static const size_t mram_size = MRAM_SIZE_AVAILABLE;
 static vmi_t *vmis = NULL;
 _Static_assert(MRAM_SIZE_AVAILABLE > 0, "Too many request and/or result compare to MRAM_SIZE");
 
 static char *make_mram_file_name(unsigned int dpu_id)
 {
     char *file_name;
-    asprintf(&file_name, "mram_%04u.bin", dpu_id);
+    assert(asprintf(&file_name, MRAM_FORMAT, dpu_id) == strlen(MRAM_FORMAT));
     assert(file_name != NULL);
     return file_name;
 }
