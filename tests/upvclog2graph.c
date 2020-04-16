@@ -42,7 +42,6 @@ static bool read_dpu(FILE *fp, char *str, struct dpu_head *rank, bool *end_of_fi
     unsigned int dpu_id, req, nodp, odpd, results, data_in, result_out, load, store;
     unsigned long long cycle;
     unsigned long long odpd_time, nodp_time;
-    float time;
     dpu_t *new_dpu;
 
     if (*end_of_file) {
@@ -55,7 +54,7 @@ static bool read_dpu(FILE *fp, char *str, struct dpu_head *rank, bool *end_of_fi
     new_dpu = (dpu_t *)calloc(1, sizeof(dpu_t));
     SLIST_INSERT_HEAD(rank, new_dpu, next);
     do {
-        if (sscanf(str, GET_DPU_ID_FORMAT " TIME=%llu SEC=%f", &dpu_id, &cycle, &time) == 3) {
+        if (sscanf(str, GET_DPU_ID_FORMAT " TIME=%llu", &dpu_id, &cycle) == 2) {
             new_dpu->cycle = cycle;
         } else if (sscanf(str, GET_DPU_ID_FORMAT " REQ=%u", &dpu_id, &req) == 2) {
             new_dpu->req += req;
