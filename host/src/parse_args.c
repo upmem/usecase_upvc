@@ -24,6 +24,7 @@ static char *input_fasta = NULL;
 static char *input_pe1 = NULL;
 static char *input_pe2 = NULL;
 static bool simulation_mode = false;
+static bool no_filter = false;
 static goal_t goal = goal_unknown;
 static unsigned int nb_dpu = DPU_ALLOCATE_ALL;
 
@@ -147,6 +148,12 @@ bool get_simulation_mode() { return simulation_mode; }
 
 /**************************************************************************************/
 /**************************************************************************************/
+static void validate_no_filter() { no_filter = true; }
+
+bool get_no_filter() { return no_filter; }
+
+/**************************************************************************************/
+/**************************************************************************************/
 void validate_args(int argc, char **argv)
 {
     int opt;
@@ -155,7 +162,7 @@ void validate_args(int argc, char **argv)
     prog_name = strdup(argv[0]);
     check_permission();
 
-    while ((opt = getopt(argc, argv, "si:g:n:")) != -1) {
+    while ((opt = getopt(argc, argv, "fsi:g:n:")) != -1) {
         switch (opt) {
         case 'i':
             validate_inputs(optarg);
@@ -168,6 +175,9 @@ void validate_args(int argc, char **argv)
             break;
         case 'n':
             validate_nb_dpu(optarg);
+            break;
+        case 'f':
+            validate_no_filter();
             break;
         default:
             ERROR("unknown option");

@@ -45,6 +45,8 @@ unsigned int get_nb_dpu();
  */
 bool get_simulation_mode();
 
+bool get_no_filter();
+
 /**
  * @brief Parse and validate the argument of the application.
  */
