@@ -349,6 +349,7 @@ static void do_mapping()
     init_time_file_and_mutex();
     backends_functions.init_backend(&nb_dpus_per_run, &nb_ranks_per_run);
     dispatch_init();
+    process_read_init();
 
     for (round = 0; round < NB_ROUND; round++) {
         printf("#################\n"
@@ -361,6 +362,7 @@ static void do_mapping()
     }
     create_vcf();
 
+    process_read_free();
     dispatch_free();
     backends_functions.free_backend();
     close_time_file_and_mutex();

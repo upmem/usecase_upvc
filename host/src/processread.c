@@ -422,9 +422,10 @@ void release_curr_match(unsigned int new_curr_match)
     return;
 }
 
-#define PROCESS_READ_THREAD (8)
+static pthread_barrier_t barrier;
+
 typedef struct {
-    const unsigned int nb_match;
+    unsigned int nb_match;
     dpu_result_out_t *result_tab;
     int round;
     int8_t *reads_buffer;
@@ -433,15 +434,15 @@ typedef struct {
     FILE *fpe2;
 } process_read_arg_t;
 
-void *process_read_thread_fct(void *arg)
+static void do_process_read(process_read_arg_t *arg)
 {
-    const unsigned int nb_match = ((process_read_arg_t *)arg)->nb_match;
-    dpu_result_out_t *result_tab = ((process_read_arg_t *)arg)->result_tab;
-    int round = ((process_read_arg_t *)arg)->round;
-    int8_t *reads_buffer = ((process_read_arg_t *)arg)->reads_buffer;
-    genome_t *ref_genome = ((process_read_arg_t *)arg)->ref_genome;
-    FILE *fpe1 = ((process_read_arg_t *)arg)->fpe1;
-    FILE *fpe2 = ((process_read_arg_t *)arg)->fpe2;
+    const unsigned int nb_match = arg->nb_match;
+    dpu_result_out_t *result_tab = arg->result_tab;
+    int round = arg->round;
+    int8_t *reads_buffer = arg->reads_buffer;
+    genome_t *ref_genome = arg->ref_genome;
+    FILE *fpe1 = arg->fpe1;
+    FILE *fpe2 = arg->fpe2;
     unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
 
     /*
@@ -462,7 +463,7 @@ void *process_read_thread_fct(void *arg)
         unsigned int i;
         if ((i = acquire_curr_match()) >= nb_match) {
             release_curr_match(i);
-            return NULL;
+            return;
         }
         int numpair = result_tab[i].num / 4;
         unsigned int j = i;
@@ -533,37 +534,68 @@ void *process_read_thread_fct(void *arg)
     }
 }
 
+#define PROCESS_READ_THREAD (8)
+#define PROCESS_READ_THREAD_SLAVE (PROCESS_READ_THREAD - 1)
+static process_read_arg_t args;
+static pthread_t thread_id[PROCESS_READ_THREAD_SLAVE];
+static bool stop_threads = false;
+
 void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 {
     int8_t *reads_buffer = get_reads_buffer(pass_id);
     acc_results_t acc_res = accumulate_get_result(pass_id);
-    genome_t *ref_genome = genome_get();
 
-    pthread_mutex_init(&curr_match_mutex, NULL);
-    pthread_mutex_init(&non_mapped_mutex, NULL);
     curr_match = 0;
 
-    process_read_arg_t args = {
-        .nb_match = acc_res.nb_res,
-        .result_tab = acc_res.results,
-        .round = round,
-        .reads_buffer = reads_buffer,
-        .ref_genome = ref_genome,
-        .fpe1 = fpe1,
-        .fpe2 = fpe2,
-    };
-    int ret;
-    pthread_t thread_id[PROCESS_READ_THREAD];
-    for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD; each_thread++) {
-        ret = pthread_create(&thread_id[each_thread], NULL, process_read_thread_fct, &args);
-        assert(ret == 0);
+    args.nb_match = acc_res.nb_res;
+    args.result_tab = acc_res.results;
+    args.round = round;
+    args.reads_buffer = reads_buffer;
+    args.fpe1 = fpe1;
+    args.fpe2 = fpe2;
+
+    pthread_barrier_wait(&barrier);
+    do_process_read(&args);
+    pthread_barrier_wait(&barrier);
+
+    free(acc_res.results);
+}
+
+static void *process_read_thread_fct(void *arg)
+{
+    pthread_barrier_wait(&barrier);
+    while (!stop_threads) {
+        do_process_read(arg);
+        pthread_barrier_wait(&barrier);
+        pthread_barrier_wait(&barrier);
     }
-    for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD; each_thread++) {
-        ret = pthread_join(thread_id[each_thread], NULL);
-        assert(ret == 0);
+    return NULL;
+}
+
+void process_read_init()
+{
+    genome_t *ref_genome = genome_get();
+    args.ref_genome = ref_genome;
+
+    assert(pthread_mutex_init(&curr_match_mutex, NULL) == 0);
+    assert(pthread_mutex_init(&non_mapped_mutex, NULL) == 0);
+    assert(pthread_barrier_init(&barrier, NULL, PROCESS_READ_THREAD) == 0);
+
+    for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD_SLAVE; each_thread++) {
+        assert(pthread_create(&thread_id[each_thread], NULL, process_read_thread_fct, &args) == 0);
+    }
+}
+
+void process_read_free()
+{
+    stop_threads = true;
+    pthread_barrier_wait(&barrier);
+
+    for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD_SLAVE; each_thread++) {
+        assert(pthread_join(thread_id[each_thread], NULL) == 0);
     }
 
-    pthread_mutex_destroy(&curr_match_mutex);
-    pthread_mutex_destroy(&non_mapped_mutex);
-    free(acc_res.results);
+    assert(pthread_barrier_destroy(&barrier) == 0);
+    assert(pthread_mutex_destroy(&curr_match_mutex) == 0);
+    assert(pthread_mutex_destroy(&non_mapped_mutex) == 0);
 }
