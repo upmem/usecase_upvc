@@ -29,25 +29,6 @@
 #define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
-static int check_pair(dpu_result_out_t A1, dpu_result_out_t A2)
-{
-    int pos1, pos2;
-    int size_insert_min = SIZE_INSERT_MEAN - SIZE_INSERT_STD;
-    int size_insert_max = SIZE_INSERT_MEAN + SIZE_INSERT_STD;
-    int size_read = SIZE_READ;
-
-    if (A1.coord.seq_nr == A2.coord.seq_nr) {
-        pos1 = A1.coord.seed_nr;
-        pos2 = A2.coord.seed_nr;
-
-        /* Check the distance between the 2 reads */
-        if ((abs(pos2 - pos1 + size_read) > size_insert_min) && (abs(pos2 - pos1 + size_read) < size_insert_max)) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 #define PQD_INIT_VAL (99)
 
 #define PATH_SUBSTITUTION (0)
@@ -426,22 +407,6 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     pthread_mutex_unlock(&non_mapped_mutex);
 }
 
-static bool compute_read_pair(
-    int type1, int type2, int *offset, int *nbread, dpu_result_out_t *result_tab, int *pa_found, int *pb_found, bool *found)
-{
-    for (int pa = offset[type1]; pa < offset[type1] + nbread[type1]; pa++) {
-        for (int pb = offset[type2]; pb < offset[type2] + nbread[type2]; pb++) {
-            if (check_pair(result_tab[pa], result_tab[pb])) {
-                if (*found)
-                    return false;
-                *found = true;
-                *pa_found = pa;
-                *pb_found = pb;
-            }
-        }
-    }
-    return true;
-}
 
 static volatile unsigned int curr_match;
 static pthread_mutex_t curr_match_mutex;
@@ -487,13 +452,13 @@ void *process_read_thread_fct(void *arg)
      *                      2 ==> read 2
      *                      3 ==> read 2 complement
      * The read pair to consider are [0, 3] and [1, 2].
+     *
+     * NEW (04/2020):
+     *  - more paired reads are considered
+     *  - when different position mapping are possible, choose the less covered zone
      */
 
     while (true) {
-        int offset[4] = { -1, -1, -1, -1 }; /* offset in result_tab of the first read  */
-        int nbread[4] = { 0, 0, 0, 0 }; /* number of reads                        */
-        unsigned int score[4] = { 1000, 1000, 1000, 1000 };
-
         unsigned int i;
         if ((i = acquire_curr_match()) >= nb_match) {
             release_curr_match(i);
@@ -506,37 +471,65 @@ void *process_read_thread_fct(void *arg)
         }
         release_curr_match(j);
 
-        for (; i < j; i++) {
-            int type = result_tab[i].num % 4;
-            if (result_tab[i].score < score[type]) {
-                score[type] = result_tab[i].score;
-                offset[type] = i;
-                nbread[type] = 1;
-            } else if (result_tab[i].score == score[type]) {
-                nbread[type]++;
+        // i = start index in result_tab
+        // j = stop index in result_tab
+        // select best couples of paired reads
+        unsigned int P1[1000];
+        unsigned int P2[1000];
+        unsigned int np = 0;
+        unsigned int pos1, pos2, t1, t2;
+        unsigned int best_score = 1000;
+        // test all significant pairs of reads (0,3) & (1,2)
+        for (unsigned int x1 = i; x1 < j; x1++) {
+            t1 = result_tab[x1].num % 4;
+            pos1 = result_tab[x1].coord.seed_nr;
+            for (unsigned int x2 = i + 1; x2 < j; x2++) {
+                pos2 = result_tab[x2].coord.seed_nr;
+                t2 = result_tab[x2].num % 4;
+                if (t1 + t2 == 3) // select significant pair
+                {
+                    if ((abs(pos2 - pos1) > 130 && (abs(pos2 - pos1) < 430))) {
+                        if (result_tab[x1].score + result_tab[x2].score < best_score) {
+                            np = 0;
+                            best_score = result_tab[x1].score + result_tab[x2].score;
+                            P1[np] = x1;
+                            P2[np] = x2;
+                            np++;
+                        } else {
+                            if (result_tab[x1].score + result_tab[x2].score == best_score) {
+                                P1[np] = x1;
+                                P2[np] = x2;
+                                if (np < 999)
+                                    np++;
+                            }
+                        }
+                    }
+                }
             }
         }
+        if (np > 0) {
+            // choose the less covered zone on the genome
+            int x = 0;
+            uint64_t genome_pos;
+            int cov1, cov2;
+            int min_cov = 1000;
+            ;
+            for (unsigned int kk = 0; kk < np; kk++) {
+                genome_pos = ref_genome->pt_seq[result_tab[P1[kk]].coord.seq_nr] + result_tab[P1[kk]].coord.seed_nr;
+                cov1 = ref_genome->mapping_coverage[genome_pos];
+                genome_pos = ref_genome->pt_seq[result_tab[P2[kk]].coord.seq_nr] + result_tab[P2[kk]].coord.seed_nr;
+                cov2 = ref_genome->mapping_coverage[genome_pos];
+                if (cov1 + cov2 < min_cov) {
+                    x = kk;
+                    min_cov = cov1 + cov2;
+                }
+            }
 
-        bool found = false;
-        int pa;
-        int pb;
-        /* Compute a [0, 3] read pair */
-        if (!compute_read_pair(0, 3, offset, nbread, result_tab, &pa, &pb, &found)) {
-            goto add_to_non_mapped_read_label;
+            set_variant(result_tab[P1[x]], ref_genome, reads_buffer, size_neighbour_in_symbols);
+            set_variant(result_tab[P2[x]], ref_genome, reads_buffer, size_neighbour_in_symbols);
+        } else {
+            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
         }
-        /* Compute a [1, 2] read pair */
-        if (!compute_read_pair(2, 1, offset, nbread, result_tab, &pa, &pb, &found)) {
-            goto add_to_non_mapped_read_label;
-        }
-
-        if (found) {
-            set_variant(result_tab[pa], ref_genome, reads_buffer, size_neighbour_in_symbols);
-            set_variant(result_tab[pb], ref_genome, reads_buffer, size_neighbour_in_symbols);
-            continue;
-        }
-
-    add_to_non_mapped_read_label:
-        add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
     }
 }
 

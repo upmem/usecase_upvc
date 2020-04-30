@@ -111,10 +111,21 @@ depth_filter_t indel_filter[] = {
     [18] = { 30, 40 },
 };
 
+static bool homopolymer(int8_t *seq, int offset)
+{
+    for (int i = 0; i < offset - 1; i++) {
+        if (seq[i] != seq[i + 1]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
 {
     char *chr = ref_genome->seq_name[seq_nr];
-    uint32_t cov = ref_genome->mapping_coverage[seq_pos + ref_genome->pt_seq[seq_nr]];
+    uint64_t genome_pos = ref_genome->pt_seq[seq_nr] + seq_pos;
+    uint32_t cov = ref_genome->mapping_coverage[genome_pos];
     uint32_t depth = var->depth;
     uint32_t score = var->score / depth;
     uint32_t percentage = 100;
@@ -122,10 +133,16 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
         percentage = depth * 100 / cov;
     }
 
+    uint32_t ref_len = strlen(var->ref);
+    uint32_t alt_len = strlen(var->alt);
+    if (ref_len > alt_len && percentage <= 25 && homopolymer(&ref_genome->data[genome_pos - 12], 12)) {
+        return false;
+    }
+
     if (get_no_filter())
         goto print;
 
-    if (strlen(var->ref) == 1 && strlen(var->alt) == 1) { /* SUBSTITUTION */
+    if (ref_len == alt_len) { /* SUBSTITUTION */
         if (depth < 3) {
             return false;
         } else if (depth > 22) {
