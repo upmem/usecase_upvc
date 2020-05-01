@@ -21,6 +21,10 @@
 
 #define MRAM_FORMAT "mram_%04u.bin"
 #define MRAM_SIZE_AVAILABLE (MRAM_SIZE - MAX_DPU_REQUEST * sizeof(dpu_request_t) - MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
+typedef struct {
+    uint32_t size;
+    uint8_t *buffer;
+} vmi_t;
 static const size_t mram_size = MRAM_SIZE_AVAILABLE;
 static vmi_t *vmis = NULL;
 _Static_assert(MRAM_SIZE_AVAILABLE > 0, "Too many request and/or result compare to MRAM_SIZE");
@@ -55,40 +59,37 @@ size_t mram_load(uint8_t **mram, unsigned int dpu_id)
     return read_size;
 }
 
-void init_vmis(unsigned int nb_dpu)
+void init_vmis(unsigned int nb_dpu, distribute_index_t *table)
 {
     vmis = (vmi_t *)calloc(nb_dpu, sizeof(vmi_t));
     assert(vmis != NULL);
-    for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-        char *file_name = make_mram_file_name(dpuno);
-        vmis[dpuno] = open(file_name, O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
-        if (vmis[dpuno] == -1) {
-            ERROR_EXIT(-1, "%s: open failed (%s)", file_name, strerror(errno));
-        }
-        free(file_name);
+
+    for (unsigned int i = 0; i < nb_dpu; i++) {
+        vmis[i].size = table[i].size * sizeof(coords_and_nbr_t);
+        assert(vmis[i].size < MRAM_SIZE);
+        vmis[i].buffer = (uint8_t *)malloc(vmis[i].size);
+        assert(vmis[i].buffer != NULL);
     }
 }
 
 void free_vmis(unsigned int nb_dpu)
 {
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
-        close(vmis[dpuno]);
+        char *file_name = make_mram_file_name(dpuno);
+        FILE *f = fopen(file_name, "w");
+        xfer_file(vmis[dpuno].buffer, vmis[dpuno].size, f, xfer_write);
+        fclose(f);
+        free(vmis[dpuno].buffer);
     }
+
     free(vmis);
 }
 
 void write_vmi(unsigned int num_dpu, unsigned int num_ref, int8_t *nbr, dpu_result_coord_t coord)
 {
-    coords_and_nbr_t buffer;
-    ssize_t buffer_size = sizeof(buffer);
-    buffer.coord = coord;
-    memcpy(&buffer.nbr, nbr, sizeof(buffer.nbr));
-
-    vmi_t vmi = vmis[num_dpu];
-    lseek(vmi, num_ref * sizeof(buffer), SEEK_SET);
-    ssize_t write_size = write(vmi, &buffer, buffer_size);
-    if (write_size != buffer_size) {
-        ERROR_EXIT(-1, "%s: did not write the expected number of bytes (expected %li got %li, errno: %s)",
-            make_mram_file_name(num_dpu), buffer_size, write_size, strerror(errno));
-    }
+    uint32_t offset = sizeof(coords_and_nbr_t) * num_ref;
+    assert(offset < vmis[num_dpu].size);
+    coords_and_nbr_t *buffer = (coords_and_nbr_t *)&vmis[num_dpu].buffer[offset];
+    buffer->coord = coord;
+    memcpy(&buffer->nbr, nbr, sizeof(buffer->nbr));
 }

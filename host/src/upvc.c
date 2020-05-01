@@ -346,6 +346,7 @@ static void close_time_file_and_mutex()
 
 static void do_mapping()
 {
+    variant_tree_init();
     init_time_file_and_mutex();
     backends_functions.init_backend(&nb_dpus_per_run, &nb_ranks_per_run);
     dispatch_init();
@@ -366,6 +367,7 @@ static void do_mapping()
     dispatch_free();
     backends_functions.free_backend();
     close_time_file_and_mutex();
+    variant_tree_free();
 }
 
 static void print_time()
@@ -391,6 +393,7 @@ int main(int argc, char *argv[])
     assert(get_read_size(get_input_pe1()) == SIZE_READ);
     printf("Information:\n");
     printf("\tread size: %d\n", SIZE_READ);
+    printf("\tseed size: %u\n", SIZE_SEED);
 
     if (get_simulation_mode()) {
         backends_functions.init_backend = init_backend_simulation;
@@ -408,11 +411,9 @@ int main(int argc, char *argv[])
 
     switch (get_goal()) {
     case goal_index:
-        index_init();
-        index_save();
+        index_create();
         break;
     case goal_map:
-        variant_tree_init();
         index_load();
         do_mapping();
         break;

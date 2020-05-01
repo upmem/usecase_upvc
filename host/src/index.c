@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "common.h"
 
@@ -48,14 +49,41 @@ void index_copy_neighbour(int8_t *dst, int8_t *src) { code_neighbour(&src[SIZE_S
 #define NB_SEED (1 << (SIZE_SEED << 1)) /* NB_SEED = 4 ^ (SIZE_SEED) */
 
 #define MAX_SIZE_IDX_SEED (1000)
-#define SEED_FILE ("seeds.txt")
+
+typedef struct hashtable_header {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t size_read;
+    uint32_t size_seed;
+    uint32_t nb_dpus;
+    uint32_t unused;
+    uint64_t nb_seed_total;
+} hashtable_header_t;
+
+#define INDEX_VERSION 1
+static hashtable_header_t hashtable_header
+    = { .magic = 0x1dec, .version = INDEX_VERSION, .size_read = SIZE_READ, .size_seed = SIZE_SEED };
+
+static char *get_index_filename()
+{
+    static char filename[FILENAME_MAX];
+    sprintf(filename, "%s_hashtable.bin", get_input_path());
+    return filename;
+}
 
 static unsigned int nb_indexed_dpu;
 unsigned int index_get_nb_dpu() { return nb_indexed_dpu; }
 
-static index_seed_t **index_seed;
+static index_seed_t *index_seed;
 
-index_seed_t *index_get(int8_t *read) { return index_seed[code_seed(read)]; }
+index_seed_t *index_get(int8_t *read)
+{
+    index_seed_t *seed = &index_seed[code_seed(read)];
+    if (seed->nb_nbr == 0 && seed->next == NULL)
+        return NULL;
+    else
+        return seed;
+}
 
 typedef struct seed_counter {
     int nb_seed;
@@ -77,191 +105,160 @@ void index_load()
 {
     double start_time = my_clock();
     printf("%s:\n", __func__);
-    FILE *f = fopen(SEED_FILE, "r");
-    assert(f != NULL);
+    FILE *f = fopen(get_index_filename(), "r");
+    assert(f != NULL
+        && "Could not find index file, make sure you have generated your MRAMs with the same version of UPVC that you are "
+           "using.");
 
-    unsigned int max_dpu = 0;
-    uint32_t seed_id = 0;
+    hashtable_header_t header;
+    fread(&header, sizeof(header), 1, f);
+    assert(header.magic == hashtable_header.magic
+        && "Wrong header, make sure you have generated your MRAMs with the same version of UPVC that you are "
+           "using.");
+    assert(header.version == hashtable_header.version && "Could not load an index generated with a different version of UPVC.");
+    assert(header.size_read == hashtable_header.size_read && "Could not load an index generated with a different size of read.");
+    assert(header.size_seed == hashtable_header.size_seed && "Could not load an index generated with a different size of seed.");
 
-    index_seed = (index_seed_t **)calloc(NB_SEED, sizeof(index_seed_t *));
+    index_seed = (index_seed_t *)malloc(header.nb_seed_total * sizeof(index_seed_t));
     assert(index_seed != NULL);
 
-    index_seed_t *new_seed = (index_seed_t *)malloc(sizeof(index_seed_t));
-    assert(new_seed != NULL);
-    while (fread(&seed_id, sizeof(uint32_t), 1, f) == 1) {
-        size_t read_nmemb = fread(new_seed, sizeof(uint32_t), 3, f);
-        assert(read_nmemb == 3);
-        new_seed->next = index_seed[seed_id];
-        index_seed[seed_id] = new_seed;
+    xfer_file((uint8_t *)index_seed, sizeof(index_seed_t) * header.nb_seed_total, f, xfer_read);
 
-        if (new_seed->num_dpu > max_dpu) {
-            max_dpu = new_seed->num_dpu;
+    for (unsigned int each_seed = 0; each_seed < header.nb_seed_total; each_seed++) {
+        if ((uintptr_t)index_seed[each_seed].next == UINTPTR_MAX) {
+            index_seed[each_seed].next = NULL;
+        } else {
+            index_seed[each_seed].next = (struct index_seed *)((uintptr_t)index_seed[each_seed].next + (uintptr_t)index_seed);
         }
-        new_seed = (index_seed_t *)malloc(sizeof(index_seed_t));
-        assert(new_seed != NULL);
     }
-    free(new_seed);
 
-    nb_indexed_dpu = max_dpu + 1;
-    printf("\tnb_dpu: %u\n", nb_indexed_dpu);
+    nb_indexed_dpu = header.nb_dpus;
+    printf("\tnb_dpu: %u\n"
+           "\tsize_read: %u\n"
+           "\tsize_seed: %u\n",
+        nb_indexed_dpu, header.size_read, header.size_seed);
 
     fclose(f);
     printf("\ttime: %lf s\n", my_clock() - start_time);
 }
 
-void index_save()
-{
-    double start_time = my_clock();
-    printf("%s:\n", __func__);
-    FILE *f = fopen(SEED_FILE, "w");
-    assert(f != NULL);
+static int compute_nb_index_needed(int nb_seed) { return (nb_seed + MAX_SIZE_IDX_SEED - 1) / MAX_SIZE_IDX_SEED; }
 
-    for (unsigned int i = 0; i < NB_SEED; i++) {
-        index_seed_t *seed = index_seed[i];
-        while (seed != NULL) {
-            fwrite(&i, sizeof(uint32_t), 1, f);
-            fwrite(seed, sizeof(uint32_t), 3, f);
-            seed = seed->next;
-        }
+#define INDEX_THREAD (16)
+#define INDEX_THREAD_SLAVE (INDEX_THREAD - 1)
+static seed_counter_t *seed_counter;
+static pthread_barrier_t barrier;
+static uint64_t nb_seed_total;
+
+static void set_seed_counter(int thread_id)
+{
+    pthread_barrier_wait(&barrier);
+    for (int i = thread_id; i < NB_SEED; i += INDEX_THREAD) {
+        seed_counter[i].nb_seed = 0;
+        seed_counter[i].seed_code = i;
     }
 
-    fclose(f);
-    printf("\ttime: %lf\n", my_clock() - start_time);
+    static genome_t *ref_genome;
+    if (thread_id == 0)
+        ref_genome = genome_get();
+    pthread_barrier_wait(&barrier);
+
+    for (uint32_t i = 0; i < ref_genome->nb_seq; i++) {
+        uint64_t sequence_start_idx = ref_genome->pt_seq[i];
+        for (uint64_t sequence_idx = thread_id; sequence_idx < ref_genome->len_seq[i] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1;
+             sequence_idx += INDEX_THREAD) {
+            int seed_code = code_seed(&ref_genome->data[sequence_start_idx + sequence_idx]);
+            if (seed_code >= 0) {
+                __sync_fetch_and_add(&seed_counter[seed_code].nb_seed, 1);
+            }
+        }
+    }
+    pthread_barrier_wait(&barrier);
 }
 
-void index_init()
+static void init_index_seed(int thread_id)
 {
-    unsigned int nb_dpu = get_nb_dpu();
-    double start_time = my_clock();
-    printf("%s(%i):\n", __func__, nb_dpu);
-    seed_counter_t *seed_counter;
+    static uint64_t seed_offset = NB_SEED;
+
+    pthread_barrier_wait(&barrier);
+    for (int i = thread_id; i < NB_SEED; i += INDEX_THREAD) {
+        if (seed_counter[i].nb_seed == 0) {
+            index_seed[i].nb_nbr = 0;
+            index_seed[i].next = NULL;
+            continue;
+        }
+
+        int nb_index_needed = compute_nb_index_needed(seed_counter[i].nb_seed);
+        int nb_neighbour_per_index = (seed_counter[i].nb_seed + nb_index_needed - 1) / nb_index_needed;
+        index_seed[i].nb_nbr = seed_counter[i].nb_seed - ((nb_index_needed - 1) * nb_neighbour_per_index);
+        index_seed[i].next = NULL;
+        for (int j = 1; j < nb_index_needed; j++) {
+            index_seed_t *seed = &index_seed[__sync_fetch_and_add(&seed_offset, 1)];
+            seed->nb_nbr = nb_neighbour_per_index;
+            seed->next = index_seed[i].next;
+            index_seed[i].next = seed;
+        }
+    }
+    pthread_barrier_wait(&barrier);
+}
+
+static void adjust_index_seed_next(int thread_id) {
+    pthread_barrier_wait(&barrier);
+    for (unsigned int i = thread_id; i < nb_seed_total; i += INDEX_THREAD) {
+        if (index_seed[i].next == NULL) {
+            index_seed[i].next = (index_seed_t *)(UINTPTR_MAX);
+        } else {
+            index_seed[i].next = (index_seed_t *)((uintptr_t)index_seed[i].next - (uintptr_t)index_seed);
+        }
+    }
+    pthread_barrier_wait(&barrier);
+}
+static void write_data(int thread_id)
+{
+    static genome_t *ref_genome;
+    static volatile uint32_t seq_number_shared[INDEX_THREAD_SLAVE] = {0};
+    static volatile uint64_t sequence_idx_shared[INDEX_THREAD_SLAVE] = {0};
     int8_t buf_code_neighbour[SIZE_NEIGHBOUR_IN_BYTES];
-
-    index_seed = (index_seed_t **)malloc(sizeof(index_seed_t *) * NB_SEED);
-    assert(index_seed != NULL);
-
-    init_vmis(nb_dpu);
-
-    /* Initialize the seed_counter table */
-    {
-        double init_seed_counter_time = my_clock();
-        printf("\tInitialize the seed_counter table\n");
-        seed_counter = (seed_counter_t *)malloc(NB_SEED * sizeof(seed_counter_t));
-        for (int i = 0; i < NB_SEED; i++) {
-            seed_counter[i].nb_seed = 0;
-            seed_counter[i].seed_code = i;
-        }
-
-        genome_t *ref_genome = genome_get();
-        for (uint32_t i = 0; i < ref_genome->nb_seq; i++) {
-            uint64_t sequence_start_idx = ref_genome->pt_seq[i];
-            for (uint64_t sequence_idx = 0; sequence_idx < ref_genome->len_seq[i] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1;
-                 sequence_idx++) {
-                int seed_code = code_seed(&ref_genome->data[sequence_start_idx + sequence_idx]);
-                if (seed_code >= 0) {
-                    seed_counter[seed_code].nb_seed++;
-                }
+    if (thread_id == 0)
+        ref_genome = genome_get();
+    pthread_barrier_wait(&barrier);
+    if (thread_id == INDEX_THREAD_SLAVE) {
+        bool write_data_completed = false;
+        double start_time = my_clock();
+        while (!write_data_completed) {
+            write_data_completed = true;
+            for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread++) {
+                if (seq_number_shared[each_thread] != ref_genome->nb_seq
+                    || sequence_idx_shared[each_thread]
+                        < (ref_genome->len_seq[ref_genome->nb_seq - 1] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1))
+                    write_data_completed = false;
             }
-        }
-        printf("\t\ttime: %lf s\n", my_clock() - init_seed_counter_time);
-    }
-
-    /* Create and initialize and link together all the seed */
-    {
-        double create_init_link_all_seed_time = my_clock();
-        printf("\tCreate, initialize and link together all the seed\n");
-
-        for (int i = 0; i < NB_SEED; i++) {
-            int nb_index_needed = (seed_counter[i].nb_seed / MAX_SIZE_IDX_SEED) + 1;
-            int nb_neighbour_per_index = (seed_counter[i].nb_seed / nb_index_needed) + 1;
-
-            index_seed[i] = (index_seed_t *)malloc(sizeof(index_seed_t));
-            assert(index_seed[i] != NULL);
-            index_seed[i]->nb_nbr = nb_neighbour_per_index;
-            index_seed[i]->next = NULL;
-            for (int j = 1; j < nb_index_needed; j++) {
-                index_seed_t *seed = (index_seed_t *)malloc(sizeof(index_seed_t));
-                assert(seed != NULL);
-                seed->nb_nbr = nb_neighbour_per_index;
-                seed->next = index_seed[i];
-                index_seed[i] = seed;
-            }
-            index_seed[i]->nb_nbr = seed_counter[i].nb_seed - ((nb_index_needed - 1) * nb_neighbour_per_index);
-        }
-        printf("\t\ttime: %lf s\n", my_clock() - create_init_link_all_seed_time);
-    }
-
-    /* Distribute indexs between DPUs */
-    /* Sort the seeds from the most to the least used. */
-    {
-        double distribute_index_time = my_clock();
-        printf("\tDistribute indexs between DPUs\n");
-
-        qsort(seed_counter, NB_SEED, sizeof(seed_counter_t), cmp_seed_counter);
-
-        long *dpu_workload = (long *)calloc(nb_dpu, sizeof(long));
-        int *dpu_index_size = (int *)calloc(nb_dpu, sizeof(int));
-        assert(dpu_workload != NULL && dpu_index_size != NULL);
-
-        int current_dpu = 0;
-        for (int i = 0; i < NB_SEED; i++) {
-            int seed_code = seed_counter[i].seed_code;
-            int nb_seed_counted = seed_counter[i].nb_seed;
-            index_seed_t *seed = index_seed[seed_code];
-
-            while (seed != NULL) {
-                int dpu_for_current_seed = current_dpu;
-                if (nb_seed_counted != 0) {
-                    long max_dpu_workload = LONG_MAX;
-                    for (unsigned int j = 0; j < nb_dpu; j++) {
-                        if (dpu_workload[current_dpu] < max_dpu_workload) {
-                            dpu_for_current_seed = current_dpu;
-                            max_dpu_workload = dpu_workload[current_dpu];
-                        }
-                        current_dpu = (current_dpu + 1) % nb_dpu;
+            printf("\r\t\t");
+            for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread++) {
+                    uint32_t curr_seq = seq_number_shared[each_thread];
+                    if (curr_seq >= ref_genome->nb_seq) {
+                        printf("100.00%%#%u ", ref_genome->nb_seq);
+                    } else {
+                        printf("%.2f%%#%u ",
+                            ((float)sequence_idx_shared[each_thread])*100.0 / ref_genome->len_seq[seq_number_shared[each_thread]],
+                            seq_number_shared[each_thread]);
                     }
-                }
-                dpu_index_size[dpu_for_current_seed] += seed->nb_nbr;
-                dpu_workload[dpu_for_current_seed] += (long)(seed->nb_nbr * nb_seed_counted);
-                seed->num_dpu = dpu_for_current_seed;
-                seed = seed->next;
-                current_dpu = (current_dpu + 1) % nb_dpu;
             }
-        }
-        free(dpu_workload);
-        free(dpu_index_size);
-        printf("\t\ttime: %lf s\n", my_clock() - distribute_index_time);
-    }
-
-    /* Compute offset in the DPUs memories */
-    {
-        double offset_dpu_memories_time = my_clock();
-        printf("\tCompute offset in the DPUs memories\n");
-        int *dpu_offset_in_memory;
-        dpu_offset_in_memory = (int *)calloc(nb_dpu, sizeof(int));
-        for (int i = 0; i < NB_SEED; i++) {
-            index_seed_t *seed = index_seed[i];
-            while (seed != NULL) {
-                seed->offset = dpu_offset_in_memory[seed->num_dpu];
-                dpu_offset_in_memory[seed->num_dpu] += seed->nb_nbr;
-                seed = seed->next;
+            double time = my_clock() - start_time;
+            if (time < 60.0) {
+                printf("- %us           ", (unsigned int)time);
+            } else {
+                printf("- %umin%us           ", (unsigned int)time / 60, (unsigned int)time % 60);
             }
+            fflush(stdout);
+            usleep(1000000);
         }
-        free(dpu_offset_in_memory);
-        printf("\t\ttime: %lf s\n", my_clock() - offset_dpu_memories_time);
-    }
-
-    /* Writing data in DPUs memories */
-    {
-        double write_in_memories_time = my_clock();
-        printf("\tWriting data in DPUs memories\n");
-
-        memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
-        genome_t *ref_genome = genome_get();
-        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+    } else {
+        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++, seq_number_shared[thread_id] = seq_number) {
             uint64_t sequence_start_idx = ref_genome->pt_seq[seq_number];
-            for (uint64_t sequence_idx = 0;
-                 sequence_idx < ref_genome->len_seq[seq_number] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1; sequence_idx++) {
+            for (uint64_t sequence_idx = thread_id;
+                 sequence_idx < ref_genome->len_seq[seq_number] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1;
+                 sequence_idx += INDEX_THREAD_SLAVE, sequence_idx_shared[thread_id] = sequence_idx) {
                 index_seed_t *seed;
                 int total_nb_neighbour = 0;
                 int align_idx;
@@ -275,43 +272,170 @@ void index_init()
                     continue;
                 }
 
-                seed = index_seed[seed_code];
+                seed = &index_seed[seed_code];
+
+                int32_t nb_seed = __sync_fetch_and_add(&seed_counter[seed_code].nb_seed, 1);
                 while (seed != NULL) {
-                    if (seed_counter[seed_code].nb_seed < (int)seed->nb_nbr + total_nb_neighbour)
+                    if (nb_seed < (int)seed->nb_nbr + total_nb_neighbour)
                         break;
                     total_nb_neighbour += seed->nb_nbr;
                     seed = seed->next;
                 }
-                align_idx = seed->offset + seed_counter[seed_code].nb_seed - total_nb_neighbour;
+                align_idx = seed->offset + nb_seed - total_nb_neighbour;
 
                 code_neighbour(&ref_genome->data[sequence_start_idx + sequence_idx + SIZE_SEED], buf_code_neighbour);
-                if (sequence_idx % 1000 == 0)
-                    printf("\r\t%lli/%lli %i/%i         ", (unsigned long long)sequence_idx,
-                        (unsigned long long)ref_genome->len_seq[seq_number] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1, seq_number,
-                        ref_genome->nb_seq);
                 write_vmi(seed->num_dpu, align_idx, buf_code_neighbour, coord_var);
-
-                seed_counter[seed_code].nb_seed++;
             }
-            printf("\n");
         }
-        free_vmis(nb_dpu);
-        free(seed_counter);
-        printf("\t\ttime: %lf s\n", my_clock() - write_in_memories_time);
     }
+    pthread_barrier_wait(&barrier);
+}
+
+static void *index_create_slave_fct(void *args) {
+    uint32_t thread_id = (uint32_t)(uintptr_t)args;
+
+    set_seed_counter(thread_id);
+    init_index_seed(thread_id);
+    write_data(thread_id);
+    adjust_index_seed_next(thread_id);
+
+    return NULL;
+}
+
+void index_create()
+{
+    unsigned int nb_dpu = get_nb_dpu();
+    double start_time = my_clock();
+    printf("%s(%i):\n", __func__, nb_dpu);
+    pthread_t thread_id[INDEX_THREAD_SLAVE];
+    distribute_index_t *distribute_index_table;
+
+    assert(pthread_barrier_init(&barrier, NULL, INDEX_THREAD) == 0);
+    for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread ++) {
+        assert(pthread_create(&thread_id[each_thread], NULL, index_create_slave_fct, (void *)(uintptr_t)each_thread) == 0);
+    }
+
+    {
+        double init_seed_counter_time = my_clock();
+        printf("\tInitialize the seed_counter table\n");
+        seed_counter = (seed_counter_t *)malloc(NB_SEED * sizeof(seed_counter_t));
+        set_seed_counter(INDEX_THREAD_SLAVE);
+
+        printf("\t\ttime: %lf s\n", my_clock() - init_seed_counter_time);
+    }
+
+    {
+        double alloc_index_seed_time = my_clock();
+        printf("\tAllocating the index table\n");
+        nb_seed_total = NB_SEED;
+        for (int i = 0; i < NB_SEED; i++) {
+            nb_seed_total += compute_nb_index_needed(seed_counter[i].nb_seed);
+        }
+        index_seed = (index_seed_t *)malloc(sizeof(index_seed_t) * nb_seed_total);
+        assert(index_seed != NULL);
+        printf("\t\tnb_seed_total=%lu\n"
+               "\t\ttime: %lf s\n",
+            nb_seed_total, my_clock() - alloc_index_seed_time);
+    }
+
+    {
+        double create_init_link_all_seed_time = my_clock();
+        printf("\tCreate, initialize and link together all the seed\n");
+        init_index_seed(INDEX_THREAD_SLAVE);
+        printf("\t\ttime: %lf s\n", my_clock() - create_init_link_all_seed_time);
+    }
+
+    {
+        double sort_time = my_clock();
+        printf("\tSort seed counter\n");
+        qsort(seed_counter, NB_SEED, sizeof(seed_counter_t), cmp_seed_counter);
+        printf("\t\ttime: %lf s\n", my_clock() - sort_time);
+    }
+
+    {
+        double distribute_index_time = my_clock();
+        printf("\tDistribute indexs between DPUs\n");
+
+        distribute_index_table = (distribute_index_t *)calloc(nb_dpu, sizeof(distribute_index_t));
+        assert(distribute_index_table != NULL);
+        struct distribute_index_list head = TAILQ_HEAD_INITIALIZER(head);
+
+        for (unsigned int i = 0; i < nb_dpu; i++) {
+            distribute_index_table[i].dpu_id = i;
+            TAILQ_INSERT_TAIL(&head, &distribute_index_table[i], entries);
+        }
+
+        for (int i = 0; i < NB_SEED; i++) {
+            int seed_code = seed_counter[i].seed_code;
+            int nb_seed_counted = seed_counter[i].nb_seed;
+            index_seed_t *seed = &index_seed[seed_code];
+            if (seed->nb_nbr == 0 && seed->next == NULL) {
+                continue;
+            }
+
+            while (seed != NULL) {
+                distribute_index_t *dpu = TAILQ_LAST(&head, distribute_index_list);
+                TAILQ_REMOVE(&head, dpu, entries);
+                seed->offset = dpu->size;
+                seed->num_dpu = dpu->dpu_id;
+                dpu->size += seed->nb_nbr;
+                dpu->workload += (uint64_t)seed->nb_nbr * (uint64_t)nb_seed_counted;
+                seed = seed->next;
+
+                distribute_index_t *dpu_cmp;
+                TAILQ_FOREACH(dpu_cmp, &head, entries)
+                {
+                    if (dpu->workload >= dpu_cmp->workload) {
+                        TAILQ_INSERT_BEFORE(dpu_cmp, dpu, entries);
+                        break;
+                    }
+                }
+            }
+        }
+
+        printf("\t\ttime: %lf s\n", my_clock() - distribute_index_time);
+    }
+
+    /* Writing data in DPUs memories */
+    {
+        double write_in_memories_time = my_clock();
+        printf("\tWriting data in DPUs memories\n");
+
+        memset(seed_counter, 0, sizeof(seed_counter_t) * NB_SEED);
+
+        init_vmis(nb_dpu, distribute_index_table);
+        write_data(INDEX_THREAD_SLAVE);
+        free_vmis(nb_dpu);
+
+        free(seed_counter);
+        free(distribute_index_table);
+        printf("\n\t\ttime: %lf s\n", my_clock() - write_in_memories_time);
+    }
+
+    {
+        double start_time = my_clock();
+        printf("\tSaving index on disk\n");
+        FILE *f = fopen(get_index_filename(), "w");
+        assert(f != NULL);
+
+        hashtable_header.nb_seed_total = nb_seed_total;
+        hashtable_header.nb_dpus = nb_dpu;
+        fwrite(&hashtable_header, sizeof(hashtable_header_t), 1, f);
+
+        adjust_index_seed_next(INDEX_THREAD_SLAVE);
+
+        xfer_file((uint8_t *)index_seed, sizeof(index_seed_t) * nb_seed_total, f, xfer_write);
+
+        fclose(f);
+        printf("\t\ttime: %lf s\n", my_clock() - start_time);
+    }
+
+    for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread++) {
+        assert(pthread_join(thread_id[each_thread], NULL) == 0);
+    }
+    assert(pthread_barrier_destroy(&barrier) == 0);
 
     printf("\ttime: %lf s\n", my_clock() - start_time);
 }
 
-void index_free()
-{
-    for (int i = 0; i < NB_SEED; i++) {
-        index_seed_t *seed = index_seed[i];
-        while (seed != NULL) {
-            index_seed_t *next_seed = seed->next;
-            free(seed);
-            seed = next_seed;
-        }
-    }
-    free(index_seed);
-}
+void index_free() { free(index_seed); }

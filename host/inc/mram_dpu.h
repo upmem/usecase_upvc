@@ -13,13 +13,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "index.h"
 #include "common.h"
-
-typedef int vmi_t;
 
 size_t mram_load(uint8_t **mram, unsigned int dpu_id);
 
-void init_vmis(unsigned int nb_dpu);
+void init_vmis(unsigned int nb_dpu, distribute_index_t *table);
 void free_vmis(unsigned int nb_dpu);
 void write_vmi(unsigned int num_dpu, unsigned int num_ref, int8_t *nbr, dpu_result_coord_t coord);
 
