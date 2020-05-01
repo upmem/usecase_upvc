@@ -53,8 +53,13 @@ typedef struct {
  * @var coord Coordinate of the read that matched in the reference genome.
  */
 typedef struct {
-    int32_t num;
-    uint32_t score;
+    union {
+        struct {
+            uint32_t score;
+            int32_t num;
+        };
+        uint64_t key;
+    };
     dpu_result_coord_t coord;
 } dpu_result_out_t;
 #define DPU_RESULT_VAR m_dpu_result

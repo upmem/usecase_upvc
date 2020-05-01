@@ -8,91 +8,153 @@
 #include "upvc.h"
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/queue.h>
+#include <unistd.h>
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
 #define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
 
 static FILE **result_file;
-static dpu_result_out_t **result_list;
 static acc_results_t *results_buffers[NB_DISPATCH_AND_ACC_BUFFER];
 #define RESULTS_BUFFERS(pass_id) results_buffers[(pass_id) % NB_DISPATCH_AND_ACC_BUFFER]
 
-SLIST_HEAD(min_heap_head, min_heap);
-struct min_heap {
-    dpu_result_out_t *list;
-    SLIST_ENTRY(min_heap) entries;
-};
+#define BUCKET_SIZE (16)
+#define NB_BUCKET (1 << BUCKET_SIZE)
+#define BUCKET_MASK (NB_BUCKET - 1)
+typedef struct bucket_elem {
+    dpu_result_out_t *elem;
+    struct bucket_elem *next;
+} bucket_elem_t;
 
-static int cmpresult(const void *a, const void *b)
+static bucket_elem_t **bucket_table_read, **bucket_table_write, **bucket_table_last;
+static bucket_elem_t *bucket_elems;
+
+#define ACCUMULATE_THREADS (8)
+#define ACCUMULATE_THREADS_SLAVE (ACCUMULATE_THREADS - 1)
+static pthread_barrier_t barrier;
+static pthread_t thread_id[ACCUMULATE_THREADS_SLAVE];
+static bool stop_threads = false;
+static acc_results_t *acc_res;
+static unsigned int nb_dpus_used_current_run;
+static unsigned int *dpu_offset_res;
+
+static void merge_dpu_list_into_buckets(const unsigned int thread_id)
 {
-    dpu_result_out_t *A = (dpu_result_out_t *)a;
-    dpu_result_out_t *B = (dpu_result_out_t *)b;
-    if (A->num == B->num) {
-        if (A->score > B->score) {
-            return 1;
-        } else {
-            return -1;
+    for (unsigned int numdpu = thread_id; numdpu < nb_dpus_used_current_run; numdpu += ACCUMULATE_THREADS) {
+        acc_results_t *curr_res = &acc_res[numdpu];
+        for (unsigned int each_res = 0; each_res < curr_res->nb_res; each_res++) {
+            bucket_elem_t *elem = &bucket_elems[each_res + dpu_offset_res[numdpu]];
+            dpu_result_out_t *res = &(curr_res->results[each_res]);
+            elem->elem = res;
+            elem->next = __atomic_exchange_n(&bucket_table_read[res->key & BUCKET_MASK], elem, __ATOMIC_RELAXED);
         }
     }
-    if (A->num > B->num) {
-        return 1;
+}
+
+static void *accumulate_read_thread_fct(void *arg)
+{
+    const unsigned int thread_id = (int)(uintptr_t)arg;
+
+    pthread_barrier_wait(&barrier);
+    while (!stop_threads) {
+        merge_dpu_list_into_buckets(thread_id);
+        pthread_barrier_wait(&barrier);
+        pthread_barrier_wait(&barrier);
+    }
+
+    return NULL;
+}
+
+typedef void (*insert_bucket_fct_t)(bucket_elem_t *, unsigned int);
+
+static void insert_bucket_first(bucket_elem_t *bucket, const unsigned int bucket_id)
+{
+    bucket->next = bucket_table_write[bucket_id];
+    bucket_table_write[bucket_id] = bucket;
+}
+
+static void insert_bucket_last(bucket_elem_t *bucket, const unsigned int bucket_id)
+{
+    if (bucket_table_last[bucket_id] == NULL) {
+        bucket_table_write[bucket_id] = bucket;
+        bucket_table_last[bucket_id] = bucket;
     } else {
-        return -1;
+        bucket_table_last[bucket_id]->next = bucket;
+        bucket_table_last[bucket_id] = bucket;
     }
+    bucket->next = NULL;
 }
 
-static void insert_in_order(struct min_heap_head *head, struct min_heap *elem)
+static void do_bucket_sort(const unsigned int bucket_pass, insert_bucket_fct_t insert)
 {
-    if (elem->list[0].num == -1)
-        return;
-    if (SLIST_EMPTY(head)) {
-        SLIST_INSERT_HEAD(head, elem, entries);
-        return;
-    }
-    struct min_heap *curr, *prev = NULL;
-    SLIST_FOREACH (curr, head, entries) {
-        if (cmpresult(&elem->list[0], &curr->list[0]) == -1) {
-            if (prev == NULL)
-                SLIST_INSERT_HEAD(head, elem, entries);
-            else
-                SLIST_INSERT_AFTER(prev, elem, entries);
-            return;
+    for (int each_bucket = NB_BUCKET - 1; each_bucket >= 0; each_bucket--) {
+        bucket_elem_t *bucket = bucket_table_read[each_bucket];
+        while (bucket != NULL) {
+            bucket_elem_t *next_bucket = bucket->next;
+            insert(bucket, (bucket->elem->key >> (BUCKET_SIZE * bucket_pass)) & BUCKET_MASK);
+            bucket = next_bucket;
         }
-        prev = curr;
-    }
-    SLIST_INSERT_AFTER(prev, elem, entries);
-}
-
-static void init_min_heap_lists(
-    struct min_heap_head *head, struct min_heap *min_inputs, unsigned int nb_input, dpu_result_out_t **inputs)
-{
-    SLIST_INIT(head);
-    for (unsigned int each_input = 0; each_input < nb_input; each_input++) {
-        min_inputs[each_input].list = inputs[each_input];
-        insert_in_order(head, &min_inputs[each_input]);
     }
 }
 
-static void merge_result_list(
-    dpu_result_out_t *output, dpu_result_out_t **inputs, unsigned int nb_input, unsigned int output_size)
+static bucket_elem_t *get_next_read_in_bucket(bucket_elem_t *curr_elem, unsigned int *curr_bucket_id)
 {
-    struct min_heap_head head;
-    struct min_heap min_inputs[nb_input];
-    init_min_heap_lists(&head, min_inputs, nb_input, inputs);
-    for (unsigned int output_id = 0; output_id < output_size; output_id++) {
-        assert(!SLIST_EMPTY(&head));
-        struct min_heap *min_input = SLIST_FIRST(&head);
-        SLIST_REMOVE_HEAD(&head, entries);
+    unsigned int bucket_id = *curr_bucket_id;
+    curr_elem = curr_elem->next;
+    while (curr_elem == NULL) {
+        curr_elem = bucket_table_read[bucket_id++];
+        if (bucket_id > NB_BUCKET) {
+            return NULL;
+        }
+    }
+    *curr_bucket_id = bucket_id;
+    return curr_elem;
+}
 
-        output[output_id] = min_input->list[0];
-        min_input->list = &min_input->list[1];
+static void copy_bucket_to_dest(dpu_result_out_t *dest, unsigned int nb_elem, bucket_elem_t *curr_elem, unsigned int *bucket_id)
+{
+    for (unsigned int each_res = 0; each_res < nb_elem; each_res++) {
+        dest[each_res] = *(curr_elem->elem);
+        curr_elem = get_next_read_in_bucket(curr_elem, bucket_id);
+    }
+}
 
-        insert_in_order(&head, min_input);
+static void merge_bucket_and_acc_list(
+    dpu_result_out_t *dest, acc_results_t *acc_res, const unsigned nb_read, const unsigned int nb_read_in_bucket)
+{
+    unsigned int acc_res_idx = 0;
+    unsigned int bucket_read_idx = 0;
+    unsigned int bucket_id = 0;
+    bucket_elem_t fake_first_elem = { .elem = NULL, .next = NULL };
+    bucket_elem_t *bucket_elem = get_next_read_in_bucket(&fake_first_elem, &bucket_id);
+    if (acc_res->nb_res == 0) {
+        copy_bucket_to_dest(&dest[0], nb_read_in_bucket, bucket_elem, &bucket_id);
+        return;
+    }
+    for (unsigned int each_read = 0; each_read < nb_read; each_read++) {
+        dpu_result_out_t *src;
+        if (acc_res->results[acc_res_idx].key > bucket_elem->elem->key) {
+            src = bucket_elem->elem;
+            if (++bucket_read_idx >= nb_read_in_bucket) {
+                dest[each_read++] = *src;
+                memcpy(
+                    &dest[each_read], &acc_res->results[acc_res_idx], sizeof(dpu_result_out_t) * (acc_res->nb_res - acc_res_idx));
+                return;
+            }
+            bucket_elem = get_next_read_in_bucket(bucket_elem, &bucket_id);
+        } else {
+            src = &acc_res->results[acc_res_idx];
+            if (++acc_res_idx > acc_res->nb_res) {
+                dest[each_read++] = *src;
+                copy_bucket_to_dest(&dest[each_read], nb_read_in_bucket - bucket_read_idx, bucket_elem, &bucket_id);
+                return;
+            }
+        }
+        dest[each_read] = *src;
     }
 }
 
@@ -122,29 +184,46 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
-    unsigned int nb_dpus = index_get_nb_dpu();
-    acc_results_t *acc_res = RESULTS_BUFFERS(pass_id);
-
-    unsigned int nb_dpus_used_current_run = MIN(nb_dpus - dpu_offset, nb_dpus_per_run);
-
-    // sort the lists comming from each dpu independantly
-#pragma omp parallel for
-    for (unsigned int numdpu = 0; numdpu < nb_dpus_per_run; numdpu++) {
-        if (numdpu + dpu_offset >= nb_dpus)
-            continue;
-        result_list[numdpu] = acc_res[numdpu].results;
-        qsort(result_list[numdpu], acc_res[numdpu].nb_res, sizeof(dpu_result_out_t), cmpresult);
-    }
+    nb_dpus_used_current_run = MIN(index_get_nb_dpu() - dpu_offset, nb_dpus_per_run);
+    acc_res = RESULTS_BUFFERS(pass_id);
 
     // compute the total number of resultat for all DPUs
     nb_result_t total_nb_res = 0;
-    for (unsigned int numdpu = 0; numdpu < nb_dpus_per_run; numdpu++) {
-        if (numdpu + dpu_offset >= nb_dpus)
-            break;
+    for (unsigned int numdpu = 0; numdpu < nb_dpus_used_current_run; numdpu++) {
+        dpu_offset_res[numdpu] = total_nb_res;
         total_nb_res += acc_res[numdpu].nb_res;
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
             ERROR_EXIT(-72, "%s:[P%u, M%u]: end mark is not there in DPU#%u\n", __func__, pass_id, dpu_offset, numdpu);
         }
+    }
+
+    if (total_nb_res == 0) {
+        return;
+    }
+
+    bucket_elems = (bucket_elem_t *)malloc(sizeof(bucket_elem_t) * total_nb_res);
+    assert(bucket_elems != NULL);
+
+    // merge the list comming from the DPUs in parallel in the bucket_table_read
+    memset(bucket_table_read, 0, sizeof(bucket_elem_t *) * NB_BUCKET);
+    pthread_barrier_wait(&barrier);
+    merge_dpu_list_into_buckets(ACCUMULATE_THREADS_SLAVE);
+    pthread_barrier_wait(&barrier);
+
+    /* We need to make 4 passes as the key is 64bits and the bucket is (1 << 16) (64/16=4).
+     * But the first pass has been done in parallel when mergind the list from all DPUs.
+     * 3 passes left to do.
+     */
+    const insert_bucket_fct_t insert_fcts[4] = { NULL, insert_bucket_last, insert_bucket_last, insert_bucket_first };
+    for (unsigned int bucket_pass = 1; bucket_pass < 4; bucket_pass++) {
+        memset(bucket_table_write, 0, sizeof(bucket_elem_t *) * NB_BUCKET);
+        memset(bucket_table_last, 0, sizeof(bucket_elem_t *) * NB_BUCKET);
+
+        do_bucket_sort(bucket_pass, insert_fcts[bucket_pass]);
+
+        bucket_elem_t **tmp = bucket_table_write;
+        bucket_table_write = bucket_table_read;
+        bucket_table_read = tmp;
     }
 
     // Get data from FILE *
@@ -157,8 +236,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     assert(merged_result_tab != NULL);
 
     // Merge and sort all the result for this pass
-    result_list[nb_dpus_used_current_run] = acc_res_from_file.results;
-    merge_result_list(merged_result_tab, result_list, nb_dpus_used_current_run + 1, nb_read);
+    merge_bucket_and_acc_list(merged_result_tab, &acc_res_from_file, nb_read, total_nb_res);
 
     // update FILE *
     free(acc_res_from_file.results);
@@ -167,6 +245,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     size_t written_size = fwrite(merged_result_tab, size, 1, result_file[pass_id]);
     assert(written_size == 1);
     free(merged_result_tab);
+    free(bucket_elems);
 }
 
 void accumulate_free()
@@ -184,7 +263,18 @@ void accumulate_free()
         free(results_buffers[each_pass]);
     }
 
-    free(result_list);
+    stop_threads = true;
+    pthread_barrier_wait(&barrier);
+    assert(pthread_barrier_destroy(&barrier) == 0);
+    for (unsigned int each_thread = 0; each_thread < ACCUMULATE_THREADS_SLAVE; each_thread++) {
+        assert(pthread_join(thread_id[each_thread], NULL) == 0);
+    }
+
+    free(dpu_offset_res);
+
+    free(bucket_table_read);
+    free(bucket_table_write);
+    free(bucket_table_last);
 }
 
 void accumulate_init()
@@ -201,8 +291,20 @@ void accumulate_init()
         }
     }
 
-    result_list = (dpu_result_out_t **)malloc(sizeof(dpu_result_out_t *) * (nb_dpus_per_run + 1));
-    assert(result_list != NULL);
+    dpu_offset_res = (unsigned int *)malloc(sizeof(unsigned int) * nb_dpus_per_run);
+    assert(dpu_offset_res != NULL);
+
+    bucket_table_read = (bucket_elem_t **)malloc(sizeof(bucket_elem_t *) * NB_BUCKET);
+    assert(bucket_table_read != NULL);
+    bucket_table_write = (bucket_elem_t **)malloc(sizeof(bucket_elem_t *) * NB_BUCKET);
+    assert(bucket_table_write != NULL);
+    bucket_table_last = (bucket_elem_t **)malloc(sizeof(bucket_elem_t *) * NB_BUCKET);
+    assert(bucket_table_last != NULL);
+
+    assert(pthread_barrier_init(&barrier, NULL, ACCUMULATE_THREADS) == 0);
+    for (unsigned int each_thread = 0; each_thread < ACCUMULATE_THREADS_SLAVE; each_thread++) {
+        assert(pthread_create(&thread_id[each_thread], NULL, accumulate_read_thread_fct, (void *)(uintptr_t)each_thread) == 0);
+    }
 }
 
 acc_results_t *accumulate_get_buffer(unsigned int dpu_id, unsigned int pass_id) { return &(RESULTS_BUFFERS(pass_id)[dpu_id]); }
