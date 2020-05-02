@@ -20,9 +20,6 @@
 
 static char *prog_name = NULL;
 static char *input_path = NULL;
-static char *input_fasta = NULL;
-static char *input_pe1 = NULL;
-static char *input_pe2 = NULL;
 static bool simulation_mode = false;
 static bool no_filter = false;
 static goal_t goal = goal_unknown;
@@ -32,7 +29,7 @@ static unsigned int nb_dpu = DPU_ALLOCATE_ALL;
 /**************************************************************************************/
 static void usage()
 {
-    ERROR_EXIT(24,
+    ERROR_EXIT(ERR_USAGE,
         "\nusage: %s -i <input_prefix> -g <goal> [-s | -n <number_of_dpus>] \n"
         "options:\n"
         "\t-i\tInput prefix that will be used to find the inputs files\n"
@@ -48,8 +45,7 @@ static void check_args()
         ERROR("-n is not compatible with simulation mode");
         usage();
     }
-    if (prog_name == NULL || input_path == NULL || input_fasta == NULL || input_pe1 == NULL || input_pe2 == NULL
-        || goal == goal_unknown) {
+    if (prog_name == NULL || input_path == NULL || goal == goal_unknown) {
         ERROR("missing option");
         usage();
     }
@@ -67,27 +63,12 @@ static void check_args()
 static void check_permission()
 {
     if (access(".", R_OK | W_OK)) {
-        ERROR_EXIT(25, "%s does not have read write permission on the current folder\n", prog_name);
+        ERROR_EXIT(ERR_CURRENT_FOLDER_PERMISSIONS, "'%s' does not have read write permission on the current folder\n", prog_name);
     }
 }
 
 /**************************************************************************************/
 /**************************************************************************************/
-static void verify_that_file_exists(const char *path)
-{
-    if (access(path, R_OK)) {
-        ERROR_EXIT(25, "input file %s does not exist or is not readable (errno : %i)\n", path, errno);
-    }
-}
-
-static char *alloc_input_file_name(const char *input_prefix, const char *input_suffix)
-{
-    char *input_file_name;
-    assert(asprintf(&input_file_name, "%s%s", input_prefix, input_suffix) > 0);
-    assert(input_file_name != NULL);
-    verify_that_file_exists(input_file_name);
-    return input_file_name;
-}
 
 static void validate_inputs(const char *input_prefix)
 {
@@ -97,16 +78,10 @@ static void validate_inputs(const char *input_prefix)
     } else {
         input_path = strdup(input_prefix);
         assert(input_path != NULL);
-        input_fasta = alloc_input_file_name(input_prefix, ".fasta");
-        input_pe1 = alloc_input_file_name(input_prefix, "_PE1.fastq");
-        input_pe2 = alloc_input_file_name(input_prefix, "_PE2.fastq");
     }
 }
 
 char *get_input_path() { return input_path; }
-char *get_input_fasta() { return input_fasta; }
-char *get_input_pe1() { return input_pe1; }
-char *get_input_pe2() { return input_pe2; }
 
 /**************************************************************************************/
 /**************************************************************************************/
@@ -191,7 +166,4 @@ void free_args()
 {
     free(prog_name);
     free(input_path);
-    free(input_fasta);
-    free(input_pe1);
-    free(input_pe2);
 }

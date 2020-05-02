@@ -32,8 +32,10 @@ _Static_assert(MRAM_SIZE_AVAILABLE > 0, "Too many request and/or result compare 
 static char *make_mram_file_name(unsigned int dpu_id)
 {
     char *file_name;
-    assert(asprintf(&file_name, MRAM_FORMAT, dpu_id) == strlen(MRAM_FORMAT));
+    char *index_folder = get_index_folder();
+    assert(asprintf(&file_name, "%s" MRAM_FORMAT, index_folder, dpu_id) > 0);
     assert(file_name != NULL);
+    free(index_folder);
     return file_name;
 }
 
@@ -41,7 +43,7 @@ size_t mram_load(uint8_t **mram, unsigned int dpu_id)
 {
     char *file_name = make_mram_file_name(dpu_id);
     FILE *f = fopen(file_name, "rb");
-    assert(f != NULL);
+    CHECK_FILE(f, file_name);
     free(file_name);
 
     fseek(f, 0, SEEK_END);
@@ -77,6 +79,8 @@ void free_vmis(unsigned int nb_dpu)
     for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
         char *file_name = make_mram_file_name(dpuno);
         FILE *f = fopen(file_name, "w");
+        CHECK_FILE(f, file_name);
+        free(file_name);
         xfer_file(vmis[dpuno].buffer, vmis[dpuno].size, f, xfer_write);
         fclose(f);
         free(vmis[dpuno].buffer);

@@ -181,6 +181,7 @@ void create_vcf()
 
     sprintf(filename, "%s_upvc.vcf", get_input_path());
     vcf_file = fopen(filename, "w");
+    CHECK_FILE(vcf_file, filename);
 
     /* ####### START OF HEADER ####### */
 
@@ -197,7 +198,7 @@ void create_vcf()
     fprintf(vcf_file, "##fileDate=%s\n", filedate);
 
     /* print reference genome file name */
-    fprintf(vcf_file, "##reference=%s\n", get_input_fasta());
+    fprintf(vcf_file, "##reference=%s.fasta\n", get_input_path());
 
     /* print the column names (fields are tab-delimited in VCF) */
     fprintf(vcf_file, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n");

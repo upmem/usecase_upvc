@@ -213,7 +213,7 @@ static void *align_on_dpu(void *arg)
             }
 
             if (nb_map >= MAX_DPU_RESULTS - 1) {
-                ERROR_EXIT(-42, "%s:[P%u, DPU#%u]: MAX_DPU_RESULTS reached!", __func__, pass_id, numdpu);
+                ERROR_EXIT(ERR_SIMU_MAX_RESULTS_REACHED, "%s:[P%u, DPU#%u]: MAX_DPU_RESULTS reached!", __func__, pass_id, numdpu);
             }
 
             dpu_result_out_t *result = &acc_res->results[nb_map++];

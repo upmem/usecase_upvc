@@ -178,7 +178,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
                     backtrack[align_distance].jx = j;
                     align_distance++;
                 } else {
-                    ERROR_EXIT(2, "Error during DPD compute");
+                    ERROR_EXIT(ERR_PROCESSREAD_DPD_FAILED, "Error during DPD compute");
                 }
             }
         }
@@ -406,7 +406,6 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     fprintf(fpe2, "\n");
     pthread_mutex_unlock(&non_mapped_mutex);
 }
-
 
 static volatile unsigned int curr_match;
 static pthread_mutex_t curr_match_mutex;

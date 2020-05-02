@@ -2,6 +2,7 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#define _GNU_SOURCE
 #include "index.h"
 #include "genome.h"
 #include "mram_dpu.h"
@@ -15,6 +16,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -67,7 +70,9 @@ static hashtable_header_t hashtable_header
 static char *get_index_filename()
 {
     static char filename[FILENAME_MAX];
-    sprintf(filename, "%s_hashtable.bin", get_input_path());
+    char *index_folder = get_index_folder();
+    sprintf(filename, "%sindex.bin", index_folder);
+    free(index_folder);
     return filename;
 }
 
@@ -106,9 +111,7 @@ void index_load()
     double start_time = my_clock();
     printf("%s:\n", __func__);
     FILE *f = fopen(get_index_filename(), "r");
-    assert(f != NULL
-        && "Could not find index file, make sure you have generated your MRAMs with the same version of UPVC that you are "
-           "using.");
+    CHECK_FILE(f, get_index_filename());
 
     hashtable_header_t header;
     fread(&header, sizeof(header), 1, f);
@@ -202,7 +205,8 @@ static void init_index_seed(int thread_id)
     pthread_barrier_wait(&barrier);
 }
 
-static void adjust_index_seed_next(int thread_id) {
+static void adjust_index_seed_next(int thread_id)
+{
     pthread_barrier_wait(&barrier);
     for (unsigned int i = thread_id; i < nb_seed_total; i += INDEX_THREAD) {
         if (index_seed[i].next == NULL) {
@@ -216,40 +220,40 @@ static void adjust_index_seed_next(int thread_id) {
 static void write_data(int thread_id)
 {
     static genome_t *ref_genome;
-    static volatile uint32_t seq_number_shared[INDEX_THREAD_SLAVE] = {0};
-    static volatile uint64_t sequence_idx_shared[INDEX_THREAD_SLAVE] = {0};
+    static volatile uint32_t seq_number_shared[INDEX_THREAD_SLAVE] = { 0 };
+    static volatile uint64_t sequence_idx_shared[INDEX_THREAD_SLAVE] = { 0 };
     int8_t buf_code_neighbour[SIZE_NEIGHBOUR_IN_BYTES];
     if (thread_id == 0)
         ref_genome = genome_get();
     pthread_barrier_wait(&barrier);
     if (thread_id == INDEX_THREAD_SLAVE) {
-        bool write_data_completed = false;
         double start_time = my_clock();
-        while (!write_data_completed) {
-            write_data_completed = true;
+        while (true) {
+            uint32_t slowest_thread_seq = UINT_MAX;
+            uint64_t slowest_thread_sequence = ULONG_MAX;
             for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread++) {
-                if (seq_number_shared[each_thread] != ref_genome->nb_seq
-                    || sequence_idx_shared[each_thread]
-                        < (ref_genome->len_seq[ref_genome->nb_seq - 1] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1))
-                    write_data_completed = false;
-            }
-            printf("\r\t\t");
-            for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread++) {
-                    uint32_t curr_seq = seq_number_shared[each_thread];
-                    if (curr_seq >= ref_genome->nb_seq) {
-                        printf("100.00%%#%u ", ref_genome->nb_seq);
-                    } else {
-                        printf("%.2f%%#%u ",
-                            ((float)sequence_idx_shared[each_thread])*100.0 / ref_genome->len_seq[seq_number_shared[each_thread]],
-                            seq_number_shared[each_thread]);
-                    }
+                uint32_t curr_seq = seq_number_shared[each_thread];
+                uint32_t sequence_curr = sequence_idx_shared[each_thread];
+                if (curr_seq < slowest_thread_seq) {
+                    slowest_thread_seq = curr_seq;
+                    slowest_thread_sequence = sequence_curr;
+                } else if (curr_seq == slowest_thread_seq && sequence_curr < slowest_thread_sequence) {
+                    slowest_thread_sequence = sequence_curr;
+                }
             }
             double time = my_clock() - start_time;
+            char time_str[FILENAME_MAX];
             if (time < 60.0) {
-                printf("- %us           ", (unsigned int)time);
+                sprintf(time_str, " - %us ", (unsigned int)time);
             } else {
-                printf("- %umin%us           ", (unsigned int)time / 60, (unsigned int)time % 60);
+                sprintf(time_str, " - %umin%us ", (unsigned int)time / 60, (unsigned int)time % 60);
             }
+            if (slowest_thread_seq == ref_genome->nb_seq) {
+                printf("\r\t\t100.00%%#%u%s\n", ref_genome->nb_seq, time_str);
+                break;
+            }
+            printf("\r\t\t%2.2f%%#%u%s", ((float)slowest_thread_sequence) * 100.0 / ref_genome->len_seq[slowest_thread_seq],
+                slowest_thread_seq, time_str);
             fflush(stdout);
             usleep(1000000);
         }
@@ -291,7 +295,8 @@ static void write_data(int thread_id)
     pthread_barrier_wait(&barrier);
 }
 
-static void *index_create_slave_fct(void *args) {
+static void *index_create_slave_fct(void *args)
+{
     uint32_t thread_id = (uint32_t)(uintptr_t)args;
 
     set_seed_counter(thread_id);
@@ -300,6 +305,19 @@ static void *index_create_slave_fct(void *args) {
     adjust_index_seed_next(thread_id);
 
     return NULL;
+}
+
+void index_create_folder()
+{
+    char *index_folder = get_index_folder();
+    if (access(index_folder, F_OK) == 0) {
+        ERROR_EXIT(ERR_INDEX_FOLDER_ALREAD_EXIST, "'%s' already exits, please save it elsewhere or erase it", index_folder);
+    }
+    if (mkdir(index_folder, 0755) != 0) {
+        ERROR_EXIT(ERR_INDEX_FOLDER_MKDIR_FAILED,
+            "Could not create '%s', make sure you have the permission to create folder and file here", index_folder);
+    }
+    free(index_folder);
 }
 
 void index_create()
@@ -311,7 +329,7 @@ void index_create()
     distribute_index_t *distribute_index_table;
 
     assert(pthread_barrier_init(&barrier, NULL, INDEX_THREAD) == 0);
-    for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread ++) {
+    for (unsigned int each_thread = 0; each_thread < INDEX_THREAD_SLAVE; each_thread++) {
         assert(pthread_create(&thread_id[each_thread], NULL, index_create_slave_fct, (void *)(uintptr_t)each_thread) == 0);
     }
 
@@ -409,14 +427,14 @@ void index_create()
 
         free(seed_counter);
         free(distribute_index_table);
-        printf("\n\t\ttime: %lf s\n", my_clock() - write_in_memories_time);
+        printf("\t\ttime: %lf s\n", my_clock() - write_in_memories_time);
     }
 
     {
         double start_time = my_clock();
         printf("\tSaving index on disk\n");
         FILE *f = fopen(get_index_filename(), "w");
-        assert(f != NULL);
+        CHECK_FILE(f, get_index_filename());
 
         hashtable_header.nb_seed_total = nb_seed_total;
         hashtable_header.nb_dpus = nb_dpu;
@@ -439,3 +457,11 @@ void index_create()
 }
 
 void index_free() { free(index_seed); }
+
+char *get_index_folder()
+{
+    char *filename;
+    assert(asprintf(&filename, "%s_index/", get_input_path()) > 0);
+    assert(filename != NULL);
+    return filename;
+}

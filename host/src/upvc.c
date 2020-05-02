@@ -200,14 +200,19 @@ void *thread_process(__attribute__((unused)) void *arg)
 
 static void exec_round()
 {
-    char filename[1024];
+    char filename[FILENAME_MAX];
     char *input_prefix = get_input_path();
 
     if (round == 0) {
         sprintf(filename, "%s_PE1.fastq", input_prefix);
+        assert(get_read_size(filename) == SIZE_READ);
         fipe1 = fopen(filename, "r");
+        CHECK_FILE(fipe1, filename);
+
         sprintf(filename, "%s_PE2.fastq", input_prefix);
+        assert(get_read_size(filename) == SIZE_READ);
         fipe2 = fopen(filename, "r");
+        CHECK_FILE(fipe2, filename);
     } else {
         fipe1 = fope1;
         fipe2 = fope2;
@@ -219,9 +224,11 @@ static void exec_round()
     } else {
         sprintf(filename, "%s_%d_PE1.fasta", input_prefix, round + 1);
         fope1 = fopen(filename, "w+");
+        assert(fope1 != NULL);
         assert(unlink(filename) == 0);
         sprintf(filename, "%s_%d_PE2.fasta", input_prefix, round + 1);
         fope2 = fopen(filename, "w+");
+        assert(fope2 != NULL);
         assert(unlink(filename) == 0);
     }
 
@@ -331,6 +338,7 @@ static void init_time_file_and_mutex()
     char filename[1024];
     sprintf(filename, "%s_time.csv", get_input_path());
     time_file = fopen(filename, "w");
+    CHECK_FILE(time_file, filename);
     fprintf(time_file,
         "time, get_reads, dispatch, accumulate_read, process_read, "
         "write_mram, write_reads, compute, read_result, map_read\n");
@@ -390,7 +398,6 @@ int main(int argc, char *argv[])
     printf("%s\n", VERSION);
     print_time();
 
-    assert(get_read_size(get_input_pe1()) == SIZE_READ);
     printf("Information:\n");
     printf("\tread size: %d\n", SIZE_READ);
     printf("\tseed size: %u\n", SIZE_SEED);
@@ -407,19 +414,20 @@ int main(int argc, char *argv[])
         backends_functions.load_mram = load_mram_dpu;
     }
 
-    genome_init(get_input_fasta());
-
     switch (get_goal()) {
     case goal_index:
+        index_create_folder();
+        genome_create();
         index_create();
         break;
     case goal_map:
+        genome_load();
         index_load();
         do_mapping();
         break;
     case goal_unknown:
     default:
-        ERROR_EXIT(23, "goal has not been specified!");
+        ERROR_EXIT(ERR_NO_GOAL_DEFINED, "goal has not been specified!");
     }
 
     index_free();

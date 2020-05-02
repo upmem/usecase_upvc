@@ -96,13 +96,14 @@ int get_reads_in_buffer(unsigned int pass_id) { return nb_reads[PASS(pass_id)]; 
 
 int8_t *get_reads_buffer(unsigned int pass_id) { return reads_buffers[PASS(pass_id)]; }
 
-int get_read_size(char *input_pe1_file)
+int get_read_size(char *input_pe_file)
 {
     FILE *f;
     size_t size;
     char sequence_buffer[MAX_SEQ_SIZE];
 
-    f = fopen(input_pe1_file, "r");
+    f = fopen(input_pe_file, "r");
+    CHECK_FILE(f, input_pe_file);
     if (fgets(sequence_buffer, MAX_SEQ_SIZE, f) == NULL) { /* Commentary */
         return -1;
     }

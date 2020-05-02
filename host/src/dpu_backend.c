@@ -267,6 +267,7 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_
     char filename[1024];
     sprintf(filename, "%s_log.txt", get_input_path());
     devices.log_file = fopen(filename, "w");
+    CHECK_FILE(devices.log_file, filename);
 }
 
 void free_backend_dpu()

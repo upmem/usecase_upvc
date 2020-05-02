@@ -16,21 +16,6 @@ typedef enum { goal_unknown, goal_index, goal_map } goal_t;
 char *get_input_path();
 
 /**
- * @brief Get the path to the fasta file.
- */
-char *get_input_fasta();
-
-/**
- * @brief Get the path to the first PE file.
- */
-char *get_input_pe1();
-
-/**
- * @brief Get the path to the second PE file.
- */
-char *get_input_pe2();
-
-/**
  * @brief Get the goal of the run of the application.
  */
 goal_t get_goal();

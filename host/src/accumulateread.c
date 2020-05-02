@@ -166,6 +166,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
         sprintf(result_filename, "result_%u.bin", pass_id);
 
         result_file[pass_id] = fopen(result_filename, "w+");
+        assert(result_file[pass_id] != NULL);
         assert(unlink(result_filename) == 0);
         fwrite(&dummy_res, sizeof(dummy_res), 1, result_file[pass_id]);
     }
@@ -193,7 +194,8 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         dpu_offset_res[numdpu] = total_nb_res;
         total_nb_res += acc_res[numdpu].nb_res;
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
-            ERROR_EXIT(-72, "%s:[P%u, M%u]: end mark is not there in DPU#%u\n", __func__, pass_id, dpu_offset, numdpu);
+            ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u\n", __func__, pass_id,
+                dpu_offset, numdpu);
         }
     }
 

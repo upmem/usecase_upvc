@@ -39,7 +39,7 @@ static void write_mem_DPU(index_seed_t *seed, int8_t *read, int num_read)
 
         index_copy_neighbour((int8_t *)new_read->nbr, read);
         if (nb_reads > MAX_DPU_REQUEST) {
-            ERROR_EXIT(28, "%s:[P%u]: Buffer full (DPU#%u)", __func__, dispatch_pass_id, num_dpu);
+            ERROR_EXIT(ERR_DISPATCH_BUFFER_FULL, "%s:[P%u]: Buffer full (DPU#%u)", __func__, dispatch_pass_id, num_dpu);
         }
 
         seed = seed->next;

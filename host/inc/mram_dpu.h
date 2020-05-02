@@ -13,8 +13,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "index.h"
 #include "common.h"
+#include "index.h"
 
 size_t mram_load(uint8_t **mram, unsigned int dpu_id);
 

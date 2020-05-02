@@ -5,10 +5,10 @@
 #ifndef __INDEX_H__
 #define __INDEX_H__
 
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/queue.h>
-#include <assert.h>
 
 /**
  * @brief Structure of a list of index of neighbour that shared the same seed.
@@ -27,15 +27,19 @@ typedef struct index_seed {
 
 TAILQ_HEAD(distribute_index_list, distribute_index);
 typedef struct distribute_index {
-        uint64_t workload;
-        uint32_t size;
-        uint32_t dpu_id;
-        TAILQ_ENTRY(distribute_index) entries;
+    uint64_t workload;
+    uint32_t size;
+    uint32_t dpu_id;
+    TAILQ_ENTRY(distribute_index) entries;
 } distribute_index_t;
+
+char *get_index_folder();
 
 void index_load();
 
 void index_create();
+
+void index_create_folder();
 
 void index_free();
 

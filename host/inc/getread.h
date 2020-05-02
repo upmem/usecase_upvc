@@ -14,6 +14,6 @@ int8_t *get_reads_buffer(unsigned int pass_id);
 
 void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id);
 
-int get_read_size(char *input_pe1_file);
+int get_read_size(char *input_pe_file);
 
 #endif /* __GETREAD_H__ */

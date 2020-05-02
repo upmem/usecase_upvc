@@ -16,6 +16,7 @@
 #define COST_GAPE 1
 #define NB_DIAG 15
 
+#include <errno.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -53,6 +54,19 @@ extern pthread_mutex_t time_file_mutex;
 
 #include <stdlib.h>
 
+enum error_code {
+    ERR_USAGE = -1,
+    ERR_ACC_END_MARK_MISSING = -2,
+    ERR_DISPATCH_BUFFER_FULL = -3,
+    ERR_INDEX_FOLDER_ALREAD_EXIST = -4,
+    ERR_INDEX_FOLDER_MKDIR_FAILED = -5,
+    ERR_PROCESSREAD_DPD_FAILED = -6,
+    ERR_SIMU_MAX_RESULTS_REACHED = -7,
+    ERR_NO_GOAL_DEFINED = -8,
+    ERR_CURRENT_FOLDER_PERMISSIONS = -8,
+    ERR_FOPEN_FAILED = -9,
+};
+
 #define ERROR(fmt, ...)                                                                                                          \
     do {                                                                                                                         \
         fprintf(stderr, "ERROR: " fmt "\n", ##__VA_ARGS__);                                                                      \
@@ -61,6 +75,12 @@ extern pthread_mutex_t time_file_mutex;
     do {                                                                                                                         \
         ERROR(fmt, ##__VA_ARGS__);                                                                                               \
         exit((err_code));                                                                                                        \
+    } while (0)
+
+#define CHECK_FILE(f, name)                                                                                                      \
+    do {                                                                                                                         \
+        if (f == NULL)                                                                                                           \
+            ERROR_EXIT(ERR_FOPEN_FAILED, "Could not open file '%s' (%s)", name, strerror(errno));                                \
     } while (0)
 
 #define XSTR(s) STR(s)
