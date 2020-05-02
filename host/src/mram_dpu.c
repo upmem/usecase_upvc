@@ -19,6 +19,8 @@
 #include "mram_dpu.h"
 #include "upvc.h"
 
+#include <dpu.h>
+
 #define MRAM_FORMAT "mram_%04u.bin"
 #define MRAM_SIZE_AVAILABLE (MRAM_SIZE - MAX_DPU_REQUEST * sizeof(dpu_request_t) - MAX_DPU_RESULTS * sizeof(dpu_result_out_t))
 typedef struct {
@@ -61,22 +63,62 @@ size_t mram_load(uint8_t **mram, unsigned int dpu_id)
     return read_size;
 }
 
+static struct dpu_set_t dpu_set;
+static struct dpu_set_t *dpus;
+static uint32_t nb_dpu_set;
+static struct dpu_symbol_t mram_symbol = { .address = 0x08000000, .size = MRAM_SIZE };
+
 void init_vmis(unsigned int nb_dpu, distribute_index_t *table)
 {
     vmis = (vmi_t *)calloc(nb_dpu, sizeof(vmi_t));
     assert(vmis != NULL);
 
+    dpu_error_t err = dpu_alloc(DPU_ALLOCATE_ALL, "backend=hw", &dpu_set);
+    if (err == DPU_OK) {
+        struct dpu_set_t dpu;
+        uint32_t each_dpu;
+        DPU_ASSERT(dpu_get_nr_dpus(dpu_set, &nb_dpu_set));
+        printf("\t\tUsing %u DPUs to help indexing\n", nb_dpu_set);
+        if (nb_dpu_set > nb_dpu) {
+            nb_dpu_set = nb_dpu;
+        }
+        dpus = (struct dpu_set_t *)malloc(sizeof(struct dpu_set_t) * nb_dpu_set);
+        assert(dpus != NULL);
+        DPU_FOREACH(dpu_set, dpu, each_dpu) {
+            if (each_dpu >= nb_dpu_set) {
+                break;
+            }
+            dpus[each_dpu] = dpu;
+        }
+    } else {
+        nb_dpu_set = 0;
+    }
+
     for (unsigned int i = 0; i < nb_dpu; i++) {
         vmis[i].size = table[i].size * sizeof(coords_and_nbr_t);
         assert(vmis[i].size < MRAM_SIZE);
-        vmis[i].buffer = (uint8_t *)malloc(vmis[i].size);
-        assert(vmis[i].buffer != NULL);
+        if (i >= nb_dpu_set) {
+            vmis[i].buffer = (uint8_t *)malloc(vmis[i].size);
+            assert(vmis[i].buffer != NULL);
+        }
     }
 }
 
 void free_vmis(unsigned int nb_dpu)
 {
-    for (unsigned int dpuno = 0; dpuno < nb_dpu; dpuno++) {
+    uint8_t *tmp_mram = (uint8_t *)malloc(MRAM_SIZE);
+    assert(tmp_mram != NULL);
+    for (unsigned int dpuno = 0; dpuno < nb_dpu_set; dpuno++) {
+        char *file_name = make_mram_file_name(dpuno);
+        FILE *f = fopen(file_name, "w");
+        CHECK_FILE(f, file_name);
+        free(file_name);
+        DPU_ASSERT(
+            dpu_copy_from_symbol(dpus[dpuno], mram_symbol, 0, tmp_mram, vmis[dpuno].size));
+        xfer_file(tmp_mram, vmis[dpuno].size, f, xfer_write);
+        fclose(f);
+    }
+    for (unsigned int dpuno = nb_dpu_set; dpuno < nb_dpu; dpuno++) {
         char *file_name = make_mram_file_name(dpuno);
         FILE *f = fopen(file_name, "w");
         CHECK_FILE(f, file_name);
@@ -86,6 +128,7 @@ void free_vmis(unsigned int nb_dpu)
         free(vmis[dpuno].buffer);
     }
 
+    free(tmp_mram);
     free(vmis);
 }
 
@@ -93,6 +136,10 @@ void write_vmi(unsigned int num_dpu, unsigned int num_ref, coords_and_nbr_t *coo
 {
     uint32_t offset = sizeof(coords_and_nbr_t) * num_ref;
     assert(offset < vmis[num_dpu].size);
+    if (num_dpu < nb_dpu_set) {
+        DPU_ASSERT(dpu_copy_to_symbol(dpus[num_dpu], mram_symbol, offset, coords_and_nbr, sizeof(*coords_and_nbr)));
+        return;
+    }
     coords_and_nbr_t *buffer = (coords_and_nbr_t *)&vmis[num_dpu].buffer[offset];
     memcpy(buffer, coords_and_nbr, sizeof(*coords_and_nbr));
 }
