@@ -89,11 +89,10 @@ void free_vmis(unsigned int nb_dpu)
     free(vmis);
 }
 
-void write_vmi(unsigned int num_dpu, unsigned int num_ref, int8_t *nbr, dpu_result_coord_t coord)
+void write_vmi(unsigned int num_dpu, unsigned int num_ref, coords_and_nbr_t *coords_and_nbr)
 {
     uint32_t offset = sizeof(coords_and_nbr_t) * num_ref;
     assert(offset < vmis[num_dpu].size);
     coords_and_nbr_t *buffer = (coords_and_nbr_t *)&vmis[num_dpu].buffer[offset];
-    buffer->coord = coord;
-    memcpy(&buffer->nbr, nbr, sizeof(buffer->nbr));
+    memcpy(buffer, coords_and_nbr, sizeof(*coords_and_nbr));
 }

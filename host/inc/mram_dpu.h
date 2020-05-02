@@ -20,6 +20,6 @@ size_t mram_load(uint8_t **mram, unsigned int dpu_id);
 
 void init_vmis(unsigned int nb_dpu, distribute_index_t *table);
 void free_vmis(unsigned int nb_dpu);
-void write_vmi(unsigned int num_dpu, unsigned int num_ref, int8_t *nbr, dpu_result_coord_t coord);
+void write_vmi(unsigned int num_dpu, unsigned int num_ref, coords_and_nbr_t *coords_and_nbr);
 
 #endif /* __INTEGRATION_MDPU_H__ */

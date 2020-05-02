@@ -222,7 +222,7 @@ static void write_data(int thread_id)
     static genome_t *ref_genome;
     static volatile uint32_t seq_number_shared[INDEX_THREAD_SLAVE] = { 0 };
     static volatile uint64_t sequence_idx_shared[INDEX_THREAD_SLAVE] = { 0 };
-    int8_t buf_code_neighbour[SIZE_NEIGHBOUR_IN_BYTES];
+    coords_and_nbr_t buffer;
     if (thread_id == 0)
         ref_genome = genome_get();
     pthread_barrier_wait(&barrier);
@@ -264,13 +264,8 @@ static void write_data(int thread_id)
                  sequence_idx < ref_genome->len_seq[seq_number] - SIZE_NEIGHBOUR_IN_BYTES - SIZE_SEED + 1;
                  sequence_idx += INDEX_THREAD_SLAVE, sequence_idx_shared[thread_id] = sequence_idx) {
                 index_seed_t *seed;
-                int total_nb_neighbour = 0;
                 int align_idx;
                 int seed_code = code_seed(&ref_genome->data[sequence_start_idx + sequence_idx]);
-                dpu_result_coord_t coord_var = {
-                    .seq_nr = seq_number,
-                    .seed_nr = sequence_idx,
-                };
 
                 if (seed_code < 0) {
                     continue;
@@ -278,6 +273,7 @@ static void write_data(int thread_id)
 
                 seed = &index_seed[seed_code];
 
+                int total_nb_neighbour = 0;
                 int32_t nb_seed = __sync_fetch_and_add(&seed_counter[seed_code].nb_seed, 1);
                 while (seed != NULL) {
                     if (nb_seed < (int)seed->nb_nbr + total_nb_neighbour)
@@ -287,8 +283,10 @@ static void write_data(int thread_id)
                 }
                 align_idx = seed->offset + nb_seed - total_nb_neighbour;
 
-                code_neighbour(&ref_genome->data[sequence_start_idx + sequence_idx + SIZE_SEED], buf_code_neighbour);
-                write_vmi(seed->num_dpu, align_idx, buf_code_neighbour, coord_var);
+                buffer.coord.seq_nr = seq_number;
+                buffer.coord.seed_nr = sequence_idx;
+                code_neighbour(&ref_genome->data[sequence_start_idx + sequence_idx + SIZE_SEED], (int8_t *)&buffer.nbr);
+                write_vmi(seed->num_dpu, align_idx, &buffer);
             }
         }
     }
