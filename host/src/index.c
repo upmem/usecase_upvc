@@ -245,8 +245,11 @@ static void write_data(int thread_id)
             char time_str[FILENAME_MAX];
             if (time < 60.0) {
                 sprintf(time_str, " - %us ", (unsigned int)time);
-            } else {
+            } else if (time < 3600.0){
                 sprintf(time_str, " - %umin%us ", (unsigned int)time / 60, (unsigned int)time % 60);
+            } else {
+                sprintf(time_str, " - %uh%umin%us ", (unsigned int)time / 3600, (unsigned int)(time / 60) % 60,
+                    (unsigned int)time % 60);
             }
             if (slowest_thread_seq == ref_genome->nb_seq) {
                 printf("\r\t\t100.00%%#%u%s\n", ref_genome->nb_seq, time_str);
