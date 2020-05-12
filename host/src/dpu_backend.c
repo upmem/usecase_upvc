@@ -243,7 +243,7 @@ void run_on_dpu(
 
 void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_run)
 {
-    const char *profile = "cycleAccurate=true";
+    const char *profile = "cycleAccurate=true,nrThreadsPerRank=0";
 
     DPU_ASSERT(dpu_alloc(get_nb_dpu(), profile, &devices.all_ranks));
     DPU_ASSERT(dpu_load_from_incbin(devices.all_ranks, &upvc_dpu_program, NULL));
