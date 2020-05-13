@@ -104,22 +104,22 @@ static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcou
     *last_time = current_time;
 }
 
-static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t *cached_coords_and_nbr,
+static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_nbr_t *cached_coords_and_nbr,
     uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats)
 {
-    int score, score_nodp, score_odpd = -1;
+    uint32_t score, score_nodp, score_odpd = UINT_MAX;
     uint8_t *ref_nbr = &cached_coords_and_nbr->nbr[0];
     STATS_TIME_VAR(start, end, acc);
 
     STATS_GET_START_TIME(start, acc, end);
 
-    score = score_nodp = noDP(current_read_nbr, ref_nbr, DPU_MRAM_INFO_VAR, *mini);
+    score = score_nodp = nodp(current_read_nbr, ref_nbr, DPU_MRAM_INFO_VAR, *mini);
 
     STATS_GET_END_TIME(end, acc);
     STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));
     STATS_INCR_NB_NODP_CALLS(*tasklet_stats);
 
-    if (score_nodp == -1) {
+    if (score_nodp == UINT_MAX) {
         STATS_GET_START_TIME(start, acc, end);
 
         score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR));
@@ -152,7 +152,7 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t
 static void compute_request(sysname_t tasklet_id, coords_and_nbr_t *cached_coords_and_nbr, uint8_t *current_read_nbr,
     dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats)
 {
-    int mini = MAX_SCORE;
+    uint32_t mini = MAX_SCORE;
     for (unsigned int idx = 0; idx < request->count; idx += NB_REF_PER_READ) {
         load_reference_multiple_nbr_and_coords_at(request->offset, idx, (uint8_t *)cached_coords_and_nbr, tasklet_stats);
         for (unsigned int ref_id = 0; ref_id < NB_REF_PER_READ && ((idx + ref_id) < request->count); ref_id++) {

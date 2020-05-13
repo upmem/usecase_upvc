@@ -20,6 +20,6 @@
  *
  * @return -1 if INDELs are detected, otherwise a score specifying the distance between s1 and s2 with substitutions
  */
-int noDP(uint8_t *s1, uint8_t *s2, unsigned int delta, int max_score);
+uint32_t nodp(uint8_t *s1, uint8_t *s2, uint32_t delta, uint32_t max_score);
 
 #endif /* __INTEGRATION_NODP_H__ */
