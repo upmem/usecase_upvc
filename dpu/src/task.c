@@ -39,7 +39,7 @@ __mram_noinit dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NR_TASKLETS];
 #ifdef STATS_ON
 #define DPU_TASKLET_STATS_WRITE(res, addr)                                                                                       \
     do {                                                                                                                         \
-        mram_write(res, addr, sizeof(dpu_tasklet_stats_t))                                                                       \
+        mram_write(res, addr, sizeof(dpu_tasklet_stats_t));                                                                      \
     } while (0)
 #else
 #define DPU_TASKLET_STATS_WRITE(res, addr)
@@ -205,7 +205,7 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
         result_pool_write(dout, &tasklet_stats);
     }
 
-    DPU_TASKLET_STATS_WRITE(&tasklet_stats, (mram_addr_t)(&DPU_TASKLET_STATS_VAR[tasklet_id]));
+    DPU_TASKLET_STATS_WRITE(&tasklet_stats, (__mram_ptr void *)(&DPU_TASKLET_STATS_VAR[tasklet_id]));
 
     result_pool_finish(&tasklet_stats);
 }
