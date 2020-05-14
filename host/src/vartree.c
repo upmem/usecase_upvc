@@ -69,46 +69,37 @@ typedef struct {
 } depth_filter_t;
 
 depth_filter_t sub_filter[] = {
-    [3] = { 16, 19 },
-    [4] = { 17, 19 },
-    [5] = { 18, 19 },
-    [6] = { 19, 19 },
-    [7] = { 20, 19 },
-    [8] = { 20, 19 },
-    [9] = { 20, 20 },
-    [10] = { 20, 21 },
-    [11] = { 20, 21 },
-    [12] = { 20, 21 },
-    [13] = { 20, 22 },
-    [14] = { 20, 22 },
-    [15] = { 20, 22 },
-    [16] = { 20, 22 },
-    [17] = { 20, 22 },
-    [18] = { 20, 22 },
-    [19] = { 20, 23 },
-    [20] = { 20, 23 },
-    [21] = { 20, 23 },
-    [22] = { 20, 24 },
+    [3] = { 15, 16 },
+    [4] = { 17, 17 },
+    [5] = { 18, 18 },
+    [6] = { 20, 18 },
+    [7] = { 21, 20 },
+    [8] = { 22, 21 },
+    [9] = { 22, 21 },
+    [10] = { 24, 21 },
+    [11] = { 24, 21 },
+    [12] = { 28, 21 },
+    [13] = { 29, 22 },
+    [14] = { 29, 23 },
+    [15] = { 32, 24 },
+    [16] = { 32, 25 },
+    [17] = { 35, 25 },
+    [18] = { 35, 25 },
+    [19] = { 35, 25 },
+    [20] = { 40, 25 },
 };
 
 depth_filter_t indel_filter[] = {
-    [2] = { 11, 15 },
-    [3] = { 12, 16 },
-    [4] = { 13, 20 },
-    [5] = { 13, 20 },
-    [6] = { 15, 22 },
-    [7] = { 16, 23 },
-    [8] = { 17, 23 },
-    [9] = { 20, 23 },
-    [10] = { 20, 23 },
-    [11] = { 20, 23 },
-    [12] = { 20, 25 },
-    [13] = { 20, 25 },
-    [14] = { 20, 25 },
-    [15] = { 20, 25 },
-    [16] = { 30, 25 },
-    [17] = { 30, 30 },
-    [18] = { 30, 40 },
+    [2] = { 10, 16 },
+    [3] = { 12, 21 },
+    [4] = { 13, 21 },
+    [5] = { 14, 22 },
+    [6] = { 14, 22 },
+    [7] = { 1, 23 },
+    [8] = { 1, 25 },
+    [9] = { 1, 25 },
+    [10] = { 1, 30 },
+    [11] = { 1, 40 },
 };
 
 static bool homopolymer(int8_t *seq, int offset)
@@ -145,8 +136,8 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
     if (ref_len == alt_len) { /* SUBSTITUTION */
         if (depth < 3) {
             return false;
-        } else if (depth > 22) {
-            depth = 22;
+        } else if (depth > 20) {
+            depth = 20;
         }
         if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
             return false;
@@ -154,8 +145,8 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
     } else { /* INSERTION OR DELETION */
         if (depth < 2) {
             return false;
-        } else if (depth > 18) {
-            depth = 18;
+        } else if (depth > 11) {
+            depth = 11;
         }
         if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
             return false;
