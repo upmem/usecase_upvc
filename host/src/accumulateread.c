@@ -148,7 +148,7 @@ static void merge_bucket_and_acc_list(
             bucket_elem = get_next_read_in_bucket(bucket_elem, &bucket_id);
         } else {
             src = &acc_res->results[acc_res_idx];
-            if (++acc_res_idx > acc_res->nb_res) {
+            if (++acc_res_idx >= acc_res->nb_res) {
                 dest[each_read++] = *src;
                 copy_bucket_to_dest(&dest[each_read], nb_read_in_bucket - bucket_read_idx, bucket_elem, &bucket_id);
                 return;
