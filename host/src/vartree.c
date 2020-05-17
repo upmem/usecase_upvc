@@ -12,6 +12,7 @@
 #include "parse_args.h"
 #include "upvc.h"
 #include "vartree.h"
+#include "common.h"
 
 static variant_t **variant_list[MAX_SEQ_GEN] = { NULL };
 static pthread_mutex_t mutex;
@@ -68,6 +69,7 @@ typedef struct {
     uint32_t score;
 } depth_filter_t;
 
+#if (SIZE_READ == 120)
 depth_filter_t sub_filter[] = {
     [3] = { 15, 16 },
     [4] = { 17, 17 },
@@ -101,6 +103,43 @@ depth_filter_t indel_filter[] = {
     [10] = { 1, 30 },
     [11] = { 1, 40 },
 };
+#elif (SIZE_READ == 150)
+depth_filter_t sub_filter[] = {
+    [3] = { 15, 16 },
+    [4] = { 17, 20 },
+    [5] = { 18, 20 },
+    [6] = { 20, 21 },
+    [7] = { 21, 21 },
+    [8] = { 22, 21 },
+    [9] = { 24, 22 },
+    [10] = { 25, 23 },
+    [11] = { 27, 23 },
+    [12] = { 27, 25 },
+    [13] = { 29, 25 },
+    [14] = { 30, 27 },
+    [15] = { 31, 27 },
+    [16] = { 34, 27 },
+    [17] = { 34, 27 },
+    [18] = { 34, 29 },
+    [19] = { 35, 29 },
+    [20] = { 40, 29 },
+};
+
+depth_filter_t indel_filter[] = {
+    [2] = { 9, 21 },
+    [3] = { 12, 22 },
+    [4] = { 12, 22 },
+    [5] = { 13, 24 },
+    [6] = { 15, 25 },
+    [7] = { 17, 25 },
+    [8] = { 18, 25 },
+    [9] = { 2, 26 },
+    [10] = { 1, 27 },
+    [11] = { 1, 40 },
+};
+#else
+#error "Filter not defined for this size of read"
+#endif
 
 static bool homopolymer(int8_t *seq, int offset)
 {

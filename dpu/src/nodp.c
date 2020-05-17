@@ -33,21 +33,21 @@ const uint8_t translation_table[256] = { 0, 10, 10, 10, 10, 20, 20, 20, 10, 20, 
         CMP(V2, V1, shift);                                                                                                      \
     } while (0)
 
-uint32_t nodp(uint8_t *s1, uint8_t *s2, __attribute__((unused)) uint32_t delta, uint32_t max_score)
+uint32_t nodp(uint8_t *s1, uint8_t *s2, uint32_t max_score, uint32_t size_neighbour_in_bytes)
 {
     uint32_t score = 0;
     uint32_t s1_acc_h = *(uint32_t *)s1;
     uint32_t s2_acc_h = *(uint32_t *)s2;
     uint32_t i = 0;
-    while (i < SIZE_NEIGHBOUR_IN_BYTES) {
+    while (i < size_neighbour_in_bytes) {
         uint32_t s1_acc_l = s1_acc_h;
         uint32_t s2_acc_l = s2_acc_h;
         s1_acc_h = *(uint32_t *)(&s1[i + sizeof(uint32_t)]);
         s2_acc_h = *(uint32_t *)(&s2[i + sizeof(uint32_t)]);
         uint32_t s_xor = s1_acc_l ^ s2_acc_l;
-        for (uint32_t k = 0; (k < sizeof(uint32_t)) && (i < SIZE_NEIGHBOUR_IN_BYTES); k++, i++) {
+        for (uint32_t k = 0; (k < sizeof(uint32_t)) && (i < size_neighbour_in_bytes); k++, i++) {
             uint32_t s_translated = translation_table[s_xor & 0xFF];
-            if ((s_translated > COST_SUB) && ((i + sizeof(uint32_t)) < SIZE_NEIGHBOUR_IN_BYTES)) {
+            if ((s_translated > COST_SUB) && ((i + sizeof(uint32_t)) < size_neighbour_in_bytes)) {
                 uint32_t V1, V2;
                 if (k != (sizeof(uint32_t) - 1)) {
                     uint32_t jr = (k + 1) * CHAR_BIT;
