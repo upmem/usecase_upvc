@@ -111,7 +111,6 @@ int get_read_size(char *input_pe_file)
         return -1;
     }
     size = strlen(sequence_buffer) - 1;
-    size &= ~((int)0x3);
 
     fclose(f);
     return (int)size;

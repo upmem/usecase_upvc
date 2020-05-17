@@ -24,6 +24,8 @@
 
 BARRIER_INIT(init_barrier, NR_TASKLETS);
 
+STDOUT_BUFFER_INIT(128*1024);
+
 /**
  * @brief The MRAM information, shared between the tasklets.
  *
@@ -58,7 +60,7 @@ __host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
 /**
  * @brief Number of reference read to be fetch per mram read
  */
-#define NB_REF_PER_READ (8)
+#define NB_REF_PER_READ (4)
 
 /**
  * @brief Global table of dout_t structure.
@@ -113,7 +115,7 @@ static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_
 
     STATS_GET_START_TIME(start, acc, end);
 
-    score = score_nodp = nodp(current_read_nbr, ref_nbr, DPU_MRAM_INFO_VAR, *mini);
+    score = score_nodp = nodp(current_read_nbr, ref_nbr, *mini, SIZE_NEIGHBOUR_IN_BYTES - DPU_MRAM_INFO_VAR);
 
     STATS_GET_END_TIME(end, acc);
     STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));

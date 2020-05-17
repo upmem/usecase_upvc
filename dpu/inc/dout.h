@@ -23,7 +23,8 @@
  * The "data out" (dout) module manages both the local caching of results and the swapping.
  */
 
-#define MAX_LOCAL_RESULTS_PER_READ 32
+#define MAX_LOCAL_RESULTS_PER_READ 16
+
 #define LOCAL_RESULTS_PAGE_SIZE (MAX_LOCAL_RESULTS_PER_READ * sizeof(dpu_result_out_t))
 
 /**

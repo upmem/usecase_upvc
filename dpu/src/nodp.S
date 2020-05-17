@@ -3,27 +3,27 @@
 //
 
 #define COST_SUB    10
-#define SIZE_NEIGHBOUR_IN_BYTES 26
 
 #define S1_ARG r0
 #define S2_ARG r1
-#define DELTA r2
-#define MAX_SCORE r3
+#define MAX_SCORE r2
+#define SIZE_NEIGHBOUR_IN_BYTES r3
 
 #define SCORE r0
 #define S2 r1
-#define S1 r2
-#define S1_ACC_H r4
-#define S1_ACC_L r5
-#define S2_ACC_H r6
-#define S2_ACC_L r7
-#define I r8
-#define S_XOR r9
-#define TMP1 r10
-#define S_TRANSLATED r10
-#define TMP2 r11
-#define V1 r12
-#define V2 r13
+#define S1 r4
+#define S1_ACC_H r5
+#define S1_ACC_L r6
+#define S2_ACC_H r7
+#define S2_ACC_L r8
+#define I r9
+#define SIZE_NEIGHBOUR_IN_BYTES_MINUS_4 r10
+#define S_XOR r11
+#define TMP1 r12
+#define S_TRANSLATED r12
+#define TMP2 r13
+#define V1 r14
+#define V2 r15
 
     .macro CMP V1:req V2:req shift:req
     lsr TMP1, \V1, \shift
@@ -45,9 +45,11 @@
 
 
 nodp:
+    sd r22, 0, d14
     move S1, S1_ARG
     move SCORE, 0
     move I, 0
+    add SIZE_NEIGHBOUR_IN_BYTES_MINUS_4, SIZE_NEIGHBOUR_IN_BYTES, -4
     lw S1_ACC_H, S1, 0
     lw S2_ACC_H, S2, 0
 .Lfor_i:
@@ -64,7 +66,7 @@ nodp:
     add SCORE, SCORE, S_TRANSLATED
     jleu S_TRANSLATED, COST_SUB, .Lupdate_score
 
-    jgeu I, (SIZE_NEIGHBOUR_IN_BYTES - 4), .Lupdate_score
+    jgeu I, SIZE_NEIGHBOUR_IN_BYTES_MINUS_4, .Lupdate_score
 
     and TMP2, I, 0x3
     add TMP2, TMP2, 1
@@ -100,6 +102,7 @@ nodp:
 .Lreturn_UINT_MAX:
     move SCORE, 0xffffffff
 .Lend:
+    ld d14, r22, 0
     jump r23
 
     .size nodp, .Lend-nodp
