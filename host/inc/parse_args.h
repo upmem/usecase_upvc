@@ -32,6 +32,10 @@ bool get_simulation_mode();
 
 bool get_no_filter();
 
+unsigned int get_nb_thread_for_simu();
+
+bool get_index_with_dpus();
+
 /**
  * @brief Parse and validate the argument of the application.
  */

@@ -18,6 +18,7 @@
 #include "common.h"
 #include "mram_dpu.h"
 #include "upvc.h"
+#include "parse_args.h"
 
 #include <dpu.h>
 
@@ -73,7 +74,10 @@ void init_vmis(unsigned int nb_dpu, distribute_index_t *table)
     vmis = (vmi_t *)calloc(nb_dpu, sizeof(vmi_t));
     assert(vmis != NULL);
 
-    dpu_error_t err = dpu_alloc(DPU_ALLOCATE_ALL, "backend=hw", &dpu_set);
+    dpu_error_t err = !DPU_OK;
+    if (get_index_with_dpus()) {
+        err = dpu_alloc(DPU_ALLOCATE_ALL, "backend=hw", &dpu_set);
+    }
     if (err == DPU_OK) {
         struct dpu_set_t dpu;
         uint32_t each_dpu;
