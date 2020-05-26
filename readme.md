@@ -25,7 +25,7 @@ Data-set must consist of 3 files:
   - ``<dataset_prefix>.fasta`` the reference genomee (or part of genomee)
   - ``<dataset_prefix>_PE1.fastq`` the PE1 of the input to compare to the reference
   - ``<dataset_prefix>_PE2.fastq`` the PE2 of the input to compare to the reference
-  - ``<dataset_prefix>.vcf the reference vcf output to check the quality of the computation
+  - ``<reference_vcf> the reference vcf output to check the quality of the computation
 
 Run once to create the MRAM for the reference genomee to compare to:
 
@@ -46,7 +46,7 @@ Result are in ``<dataset_prefix>_upvc.vcf``
 To check the quality of the results use:
 
 ```
-python <path_to_build>/../tests/compareVCF.py <dataset_prefix>.vcf <dataset_prefix>_upvc.vcf
+python3 <path_to_build>/../tests/compareVCF.py <reference_vcf> <dataset_prefix>_upvc.vcf
 ```
 
 Paper link
