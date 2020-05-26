@@ -13,6 +13,7 @@
 #include "mram_dpu.h"
 #include "simu_backend.h"
 #include "upvc.h"
+#include "parse_args.h"
 
 #include <dpu.h>
 
@@ -21,8 +22,7 @@
 #define MAX_SCORE 40
 
 static coords_and_nbr_t **mrams;
-static int delta_neighbour;
-static int pass_id;
+static const int delta_neighbour = 0;
 
 static int min(int a, int b) { return a < b ? a : b; }
 
@@ -183,10 +183,9 @@ static int noDP(int8_t *s1, int8_t *s2, int max_score)
     return score;
 }
 
-static void *align_on_dpu(void *arg)
+static void align_on_dpu(int numdpu, int pass_id)
 {
     int nb_map = 0;
-    int numdpu = *(int *)arg;
     int size_neighbour_in_symbols = SIZE_IN_SYMBOLS(delta_neighbour);
     dispatch_request_t *requests = dispatch_get(numdpu, pass_id);
     acc_results_t *acc_res = accumulate_get_buffer(numdpu, pass_id);
@@ -225,55 +224,36 @@ static void *align_on_dpu(void *arg)
 
     acc_res->results[nb_map].num = -1;
     acc_res->nb_res = nb_map;
-
-    return NULL;
 }
 
-void run_dpu_simulation(__attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned rank_id,
-    unsigned int _pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
+void run_dpu_simulation(unsigned int dpu_offset, unsigned rank_id,
+    unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
-    unsigned int nb_dpu = index_get_nb_dpu();
-    pthread_t thread_id[nb_dpu];
-    int thread_args[nb_dpu];
-    pass_id = _pass_id;
-
     sem_wait(acc_wait_sem);
-
-    for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
-        thread_args[numdpu] = numdpu;
-    }
-
-    for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
-        pthread_create(&thread_id[numdpu], NULL, align_on_dpu, &thread_args[numdpu]);
-    }
-    for (unsigned int numdpu = 0; numdpu < nb_dpu; numdpu++) {
-        pthread_join(thread_id[numdpu], NULL);
-    }
-
+    align_on_dpu(dpu_offset + rank_id, pass_id);
     sem_post(dispatch_free_sem);
 }
 
 void init_backend_simulation(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_run)
 {
-    *nb_ranks_per_run = 1;
-    *nb_dpus_per_run = index_get_nb_dpu();
-    mrams = (coords_and_nbr_t **)malloc(index_get_nb_dpu() * sizeof(coords_and_nbr_t *));
+    unsigned int nb_thread_for_simu = get_nb_thread_for_simu();
+    *nb_ranks_per_run = nb_thread_for_simu;
+    *nb_dpus_per_run = nb_thread_for_simu;
+    mrams = (coords_and_nbr_t **)calloc(nb_thread_for_simu, sizeof(coords_and_nbr_t *));
     assert(mrams != NULL);
 }
 
 void free_backend_simulation()
 {
-    for (unsigned int each_dpu = 0; each_dpu < index_get_nb_dpu(); each_dpu++) {
+    for (unsigned int each_dpu = 0; each_dpu < get_nb_thread_for_simu(); each_dpu++) {
         free(mrams[each_dpu]);
     }
     free(mrams);
 }
 
-void load_mram_simulation(
-    __attribute__((unused)) unsigned int dpu_offset, __attribute__((unused)) unsigned int rank_id, int _delta_neighbour)
+void load_mram_simulation(unsigned int dpu_offset, unsigned int rank_id, __attribute__((unused)) int _delta_neighbour)
 {
-    delta_neighbour = _delta_neighbour;
-    for (unsigned int each_dpu = 0; each_dpu < index_get_nb_dpu(); each_dpu++) {
-        mram_load((uint8_t **)&mrams[each_dpu], each_dpu);
-    }
+    unsigned int dpu_id = dpu_offset + rank_id;
+    free(mrams[dpu_id]);
+    mram_load((uint8_t **)&mrams[dpu_id], dpu_id);
 }

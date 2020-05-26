@@ -67,6 +67,10 @@ enum error_code {
     ERR_FOPEN_FAILED = -9,
 };
 
+#define WARNING(fmt, ...)                                                                                                        \
+    do {                                                                                                                         \
+        fprintf(stderr, "WARNING: " fmt "\n", ##__VA_ARGS__);                                                                    \
+    } while (0)
 #define ERROR(fmt, ...)                                                                                                          \
     do {                                                                                                                         \
         fprintf(stderr, "ERROR: " fmt "\n", ##__VA_ARGS__);                                                                      \

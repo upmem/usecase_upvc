@@ -2,6 +2,7 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#include <limits.h>
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
@@ -11,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/sysinfo.h>
 #include <unistd.h>
 
 #include <dpu.h>
@@ -22,20 +24,25 @@ static char *prog_name = NULL;
 static char *input_path = NULL;
 static bool simulation_mode = false;
 static bool no_filter = false;
+static bool index_with_dpus = false;
 static goal_t goal = goal_unknown;
 static unsigned int nb_dpu = DPU_ALLOCATE_ALL;
+static unsigned int nb_thread_for_simu = UINT_MAX;
 
 /**************************************************************************************/
 /**************************************************************************************/
 static void usage()
 {
     ERROR_EXIT(ERR_USAGE,
-        "\nusage: %s -i <input_prefix> -g <goal> [-s | -n <number_of_dpus>] \n"
+        "\nusage: %s -i <input_prefix> -g <goal> [ -s [ -t <number_of_thread_for_dpu_simulation> ] | -n <number_of_dpus>] [ -d "
+        "]\n"
         "options:\n"
         "\t-i\tInput prefix that will be used to find the inputs files\n"
         "\t-g\tGoal of the run - values=index|map\n"
+        "\t-d\tTry to use Hardware DPU to help indexing\n"
         "\t-s\tSimulation mode (not compatible with -n)\n"
-        "\t-n\tNumber of DPUs to use when not in simulation mode\n",
+        "\t-t\tNumber of thread to use to simulate DPUs (only in simulation mode) (default: 1/2 of the threads of the system)\n"
+        "\t-n\tNumber of DPUs to use when not in simulation mode (default: use all available DPUs)\n",
         prog_name);
 }
 
@@ -57,6 +64,12 @@ static void check_args()
             ERROR("cannot index for 0 dpus");
             usage();
         }
+    } else if (index_with_dpus) {
+        ERROR("-d is not compatible with mapping");
+        usage();
+    }
+    if (simulation_mode && nb_thread_for_simu == UINT_MAX) {
+            nb_thread_for_simu = get_nprocs() / 2;
     }
 }
 
@@ -129,6 +142,28 @@ bool get_no_filter() { return no_filter; }
 
 /**************************************************************************************/
 /**************************************************************************************/
+static void validate_index_with_dpus_mode() { index_with_dpus = true; }
+
+bool get_index_with_dpus() { return index_with_dpus; }
+
+/**************************************************************************************/
+/**************************************************************************************/
+static void validate_nb_thread_for_simu(const char *nb_thread_for_simu_str)
+{
+    if (nb_thread_for_simu != UINT_MAX) {
+        ERROR("number of threads for simu has been entered more than once");
+        usage();
+    }
+    nb_thread_for_simu = (unsigned int)atoi(nb_thread_for_simu_str);
+    if (nb_thread_for_simu > (unsigned int)get_nprocs()) {
+        WARNING("number of threads for simu is greater than the actual number of threads of the system");
+    }
+}
+
+unsigned int get_nb_thread_for_simu() { return nb_thread_for_simu; }
+
+/**************************************************************************************/
+/**************************************************************************************/
 void validate_args(int argc, char **argv)
 {
     int opt;
@@ -137,8 +172,14 @@ void validate_args(int argc, char **argv)
     prog_name = strdup(argv[0]);
     check_permission();
 
-    while ((opt = getopt(argc, argv, "fsi:g:n:")) != -1) {
+    while ((opt = getopt(argc, argv, "dfsi:g:n:t:")) != -1) {
         switch (opt) {
+        case 'd':
+            validate_index_with_dpus_mode();
+            break;
+        case 't':
+            validate_nb_thread_for_simu(optarg);
+            break;
         case 'i':
             validate_inputs(optarg);
             break;
