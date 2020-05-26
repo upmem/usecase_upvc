@@ -148,6 +148,7 @@ static void generate_svg(FILE *fp, char *str, struct line_head *line_list, unsig
     printf("dispatch: %lfs\n", acc[type_dispatch] / nb_it[type_dispatch]);
     printf("accumulate_read: %lfs\n", acc[type_accumulate_read] / nb_it[type_accumulate_read]);
     printf("process_read: %lfs\n", acc[type_process_read] / nb_it[type_process_read]);
+    printf("map read: %lfs\n", acc[type_map_read] / nb_it[type_map_read]);
 
     sprintf(str, "</svg>");
     fwrite(str, sizeof(char), strlen(str), fp);
