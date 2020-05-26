@@ -60,13 +60,7 @@ __host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
 /**
  * @brief Number of reference read to be fetch per mram read
  */
-#if SIZE_READ == 120
-#define NB_REF_PER_READ (8)
-#elif SIZE_READ == 150
 #define NB_REF_PER_READ (4)
-#else
-#error "NB_REF_PER_READ not defined for this size of read"
-#endif
 
 /**
  * @brief Global table of dout_t structure.
