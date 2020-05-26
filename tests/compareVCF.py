@@ -346,6 +346,8 @@ chr_str_to_val = {"1": 1,
                   "chr22": 22,
                   "chr23": 23,
                   "chr24": 24,
+                  "chrX": 23,
+                  "chrY": 24,
                   "X": 23,
                   "Y": 24,
 }
@@ -369,7 +371,12 @@ def process_line(line, SUB, INS, DEL, len_sub, len_ins, len_del, extract):
     if len(line) < 1 or line[0] == "#":
         return len_sub, len_ins, len_del
 
-    chr_str, pos_str, _, ref, alt, _, _, info = line.split("\t")
+    line_infos = line.split("\t")
+    chr_str = line_infos[0]
+    pos_str = line_infos[1]
+    ref = line_infos[3]
+    alt = line_infos[4]
+    info = line_infos[7]
 
     chr = chr_str_to_val[chr_str]
     pos = int(pos_str)
