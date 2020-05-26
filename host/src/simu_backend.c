@@ -183,12 +183,13 @@ static int noDP(int8_t *s1, int8_t *s2, int max_score)
     return score;
 }
 
-static void align_on_dpu(int numdpu, int pass_id)
+static void align_on_dpu(unsigned int dpu_offset, unsigned rank_id, int pass_id)
 {
     int nb_map = 0;
+    int numdpu = dpu_offset + rank_id;
     int size_neighbour_in_symbols = SIZE_IN_SYMBOLS(delta_neighbour);
     dispatch_request_t *requests = dispatch_get(numdpu, pass_id);
-    acc_results_t *acc_res = accumulate_get_buffer(numdpu, pass_id);
+    acc_results_t *acc_res = accumulate_get_buffer(rank_id, pass_id);
 
     for (unsigned int each_request_read = 0; each_request_read < requests->nb_reads; each_request_read++) {
         dpu_request_t *curr_request = &(requests->dpu_requests[each_request_read]);
@@ -196,7 +197,7 @@ static void align_on_dpu(int numdpu, int pass_id)
         int nb_map_start = nb_map;
         int8_t *curr_read = (int8_t *)&curr_request->nbr[0];
         for (unsigned int nb_neighbour = 0; nb_neighbour < curr_request->count; nb_neighbour++) {
-            coords_and_nbr_t *coord_and_nbr = &(mrams[numdpu][curr_request->offset + nb_neighbour]);
+            coords_and_nbr_t *coord_and_nbr = &(mrams[rank_id][curr_request->offset + nb_neighbour]);
             int8_t *curr_nbr = (int8_t *)&coord_and_nbr->nbr[0];
 
             int score = noDP(curr_read, curr_nbr, min);
@@ -230,7 +231,7 @@ void run_dpu_simulation(unsigned int dpu_offset, unsigned rank_id,
     unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
     sem_wait(acc_wait_sem);
-    align_on_dpu(dpu_offset + rank_id, pass_id);
+    align_on_dpu(dpu_offset, rank_id, pass_id);
     sem_post(dispatch_free_sem);
 }
 
@@ -254,6 +255,6 @@ void free_backend_simulation()
 void load_mram_simulation(unsigned int dpu_offset, unsigned int rank_id, __attribute__((unused)) int _delta_neighbour)
 {
     unsigned int dpu_id = dpu_offset + rank_id;
-    free(mrams[dpu_id]);
-    mram_load((uint8_t **)&mrams[dpu_id], dpu_id);
+    free(mrams[rank_id]);
+    mram_load((uint8_t **)&mrams[rank_id], dpu_id);
 }
