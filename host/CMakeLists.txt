@@ -28,7 +28,11 @@ if (NB_DPU)
         set(NB_DPU_MARK "-n")
 endif()
 
-add_custom_target(mrams ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g index -n 128 -d
+if (NOT DEFINED INDEX_WITH_DPUS)
+        set(INDEX_WITH_DPUS "")
+endif()
+
+add_custom_target(mrams ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g index -n 128 ${INDEX_WITH_DPUS}
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU} -f
