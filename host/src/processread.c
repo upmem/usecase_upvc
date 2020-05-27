@@ -488,7 +488,7 @@ static void do_process_read(process_read_arg_t *arg)
                 t2 = result_tab[x2].num % 4;
                 if (t1 + t2 == 3) // select significant pair
                 {
-                    if ((abs(pos2 - pos1) > 130 && (abs(pos2 - pos1) < 430))) {
+                    if ((abs((int)pos2 - (int)pos1) > 130 && (abs((int)pos2 - (int)pos1) < 430))) {
                         if (result_tab[x1].score + result_tab[x2].score < best_score) {
                             np = 0;
                             best_score = result_tab[x1].score + result_tab[x2].score;
