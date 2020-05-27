@@ -359,7 +359,7 @@ void index_create()
 
     {
         double create_init_link_all_seed_time = my_clock();
-        printf("\tCreate, initialize and link together all the seed\n");
+        printf("\tCreate, initialize and link together all the seeds\n");
         init_index_seed(INDEX_THREAD_SLAVE);
         printf("\t\ttime: %lf s\n", my_clock() - create_init_link_all_seed_time);
     }
@@ -373,7 +373,7 @@ void index_create()
 
     {
         double distribute_index_time = my_clock();
-        printf("\tDistribute indexs between DPUs\n");
+        printf("\tDistribute index between DPUs\n");
 
         distribute_index_table = (distribute_index_t *)calloc(nb_dpu, sizeof(distribute_index_t));
         assert(distribute_index_table != NULL);
