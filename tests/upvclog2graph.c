@@ -122,8 +122,7 @@ static void export_rank(FILE *fp, char *str, struct dpu_head *rank)
     unsigned int nb_dpu = 0;
 #endif
 #endif
-    SLIST_FOREACH(dpu, rank, next)
-    {
+    SLIST_FOREACH (dpu, rank, next) {
 #ifdef EXPORT_ALL
         sprintf(str, "%llu, %u, %u, %u, %llu, %llu, %u, %u, %u, %u, %u\n", dpu->cycle, dpu->req, dpu->nodp, dpu->odpd,
             dpu->nodp_time, dpu->odpd_time, dpu->results, dpu->data_in, dpu->result_out, dpu->load, dpu->store);

@@ -8,11 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common.h"
 #include "genome.h"
 #include "parse_args.h"
 #include "upvc.h"
 #include "vartree.h"
-#include "common.h"
 
 static variant_t **variant_list[MAX_SEQ_GEN] = { NULL };
 static pthread_mutex_t mutex;

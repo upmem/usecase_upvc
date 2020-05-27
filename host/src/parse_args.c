@@ -69,7 +69,7 @@ static void check_args()
         usage();
     }
     if (simulation_mode && nb_thread_for_simu == UINT_MAX) {
-            nb_thread_for_simu = get_nprocs() / 2;
+        nb_thread_for_simu = get_nprocs() / 2;
     }
 }
 

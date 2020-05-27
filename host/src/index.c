@@ -245,7 +245,7 @@ static void write_data(int thread_id)
             char time_str[FILENAME_MAX];
             if (time < 60.0) {
                 sprintf(time_str, " - %us ", (unsigned int)time);
-            } else if (time < 3600.0){
+            } else if (time < 3600.0) {
                 sprintf(time_str, " - %umin%us ", (unsigned int)time / 60, (unsigned int)time % 60);
             } else {
                 sprintf(time_str, " - %uh%umin%us ", (unsigned int)time / 3600, (unsigned int)(time / 60) % 60,

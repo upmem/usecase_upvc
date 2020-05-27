@@ -59,8 +59,7 @@ static void add_point(struct line_head *line_list, struct line_head *first_point
     unsigned int *height, double *width_offset)
 {
     line_t *first_point;
-    SLIST_FOREACH(first_point, &first_point_head[type], next)
-    {
+    SLIST_FOREACH (first_point, &first_point_head[type], next) {
         if (value != first_point->y1) {
             continue;
         }
@@ -134,8 +133,7 @@ static void generate_svg(FILE *fp, char *str, struct line_head *line_list, unsig
         width * ZOOM, height * ZOOM);
     fwrite(str, sizeof(char), strlen(str), fp);
 
-    SLIST_FOREACH(current_line, line_list, next)
-    {
+    SLIST_FOREACH (current_line, line_list, next) {
         acc[current_line->type] += (current_line->x2 - current_line->x1);
         nb_it[current_line->type]++;
         sprintf(str, "\t<line x1=\"%lf\" y1=\"%lf\" x2=\"%lf\" y2=\"%lf\" stroke=\"%s\" stroke-width=\"%lf\"/>\n",

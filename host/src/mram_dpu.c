@@ -17,8 +17,8 @@
 
 #include "common.h"
 #include "mram_dpu.h"
-#include "upvc.h"
 #include "parse_args.h"
+#include "upvc.h"
 
 #include <dpu.h>
 
@@ -88,7 +88,7 @@ void init_vmis(unsigned int nb_dpu, distribute_index_t *table)
         }
         dpus = (struct dpu_set_t *)malloc(sizeof(struct dpu_set_t) * nb_dpu_set);
         assert(dpus != NULL);
-        DPU_FOREACH(dpu_set, dpu, each_dpu) {
+        DPU_FOREACH (dpu_set, dpu, each_dpu) {
             if (each_dpu >= nb_dpu_set) {
                 break;
             }
@@ -117,8 +117,7 @@ void free_vmis(unsigned int nb_dpu)
         FILE *f = fopen(file_name, "w");
         CHECK_FILE(f, file_name);
         free(file_name);
-        DPU_ASSERT(
-            dpu_copy_from_symbol(dpus[dpuno], mram_symbol, 0, tmp_mram, vmis[dpuno].size));
+        DPU_ASSERT(dpu_copy_from_symbol(dpus[dpuno], mram_symbol, 0, tmp_mram, vmis[dpuno].size));
         xfer_file(tmp_mram, vmis[dpuno].size, f, xfer_write);
         fclose(f);
     }

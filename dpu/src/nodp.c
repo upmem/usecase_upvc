@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <defs.h>
 #include "common.h"
+#include <defs.h>
 
 #define COST_SUB 10
 

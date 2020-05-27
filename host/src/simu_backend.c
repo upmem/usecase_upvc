@@ -11,9 +11,9 @@
 #include "dispatch.h"
 #include "index.h"
 #include "mram_dpu.h"
+#include "parse_args.h"
 #include "simu_backend.h"
 #include "upvc.h"
-#include "parse_args.h"
 
 #include <dpu.h>
 
@@ -227,8 +227,8 @@ static void align_on_dpu(unsigned int dpu_offset, unsigned rank_id, int pass_id)
     acc_res->nb_res = nb_map;
 }
 
-void run_dpu_simulation(unsigned int dpu_offset, unsigned rank_id,
-    unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
+void run_dpu_simulation(
+    unsigned int dpu_offset, unsigned rank_id, unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
 {
     sem_wait(acc_wait_sem);
     align_on_dpu(dpu_offset, rank_id, pass_id);

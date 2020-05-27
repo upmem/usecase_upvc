@@ -24,7 +24,7 @@
 
 BARRIER_INIT(init_barrier, NR_TASKLETS);
 
-STDOUT_BUFFER_INIT(128*1024);
+STDOUT_BUFFER_INIT(128 * 1024);
 
 /**
  * @brief The MRAM information, shared between the tasklets.
