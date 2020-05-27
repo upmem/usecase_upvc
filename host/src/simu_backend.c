@@ -187,7 +187,7 @@ static void align_on_dpu(unsigned int dpu_offset, unsigned rank_id, int pass_id)
 {
     int nb_map = 0;
     int numdpu = dpu_offset + rank_id;
-    if (numdpu > (int)index_get_nb_dpu())
+    if (numdpu >= (int)index_get_nb_dpu())
         return;
     int size_neighbour_in_symbols = SIZE_IN_SYMBOLS(delta_neighbour);
     dispatch_request_t *requests = dispatch_get(numdpu, pass_id);
@@ -257,7 +257,7 @@ void free_backend_simulation()
 void load_mram_simulation(unsigned int dpu_offset, unsigned int rank_id, __attribute__((unused)) int _delta_neighbour)
 {
     unsigned int dpu_id = dpu_offset + rank_id;
-    if (dpu_id > index_get_nb_dpu())
+    if (dpu_id >= index_get_nb_dpu())
         return;
     free(mrams[rank_id]);
     mram_load((uint8_t **)&mrams[rank_id], dpu_id);
