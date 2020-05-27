@@ -114,7 +114,7 @@ void index_load()
     CHECK_FILE(f, get_index_filename());
 
     hashtable_header_t header;
-    fread(&header, sizeof(header), 1, f);
+    xfer_file((uint8_t *)&header, sizeof(header), f, xfer_read);
     assert(header.magic == hashtable_header.magic
         && "Wrong header, make sure you have generated your MRAMs with the same version of UPVC that you are "
            "using.");
