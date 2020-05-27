@@ -32,6 +32,12 @@ parser.add_argument(
     dest="enable_stat",
     help="Enable auto compute of UPVC filter",
     action="store_true")
+parser.add_argument(
+    "-c",
+    dest="check_results",
+    help="Check that TP and CM are above 99%",
+    action="store_true")
+
 args = parser.parse_args()
 
 
@@ -296,6 +302,10 @@ def compute_data(V_ref, V_upvc, len_ref, len_upvc):
             print_VCF_quality(tp, fp, new_fn, new_cm, len_upvc, len_ref)
     else:
         print_VCF_quality(tp, fp, fn, cm, len_upvc, len_ref)
+
+    if args.check_results:
+        if per(tp, len_upvc) < 99.0 or per(cm, len_ref) < 99:
+            sys.exit(-1)
 
 
 chr_str_to_val = {"1": 1,

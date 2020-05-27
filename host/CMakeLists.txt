@@ -42,7 +42,7 @@ add_custom_target(run_simu ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map -f -
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
-add_custom_target(check cat ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_upvc.vcf | grep -E "^chr22" | diff -y --suppress-common-lines ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_upvc_ref.vcf -
+add_custom_target(check ${CMAKE_CURRENT_SOURCE_DIR}/../tests/compareVCF.py ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_upvc_ref.vcf ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration/chr22_upvc.vcf -c
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
 include(ExternalProject)
