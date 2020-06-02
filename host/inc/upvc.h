@@ -16,12 +16,15 @@
 #define COST_GAPE 1
 #define NB_DIAG 15
 
+#include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include <stddef.h>
 #include <time.h>
@@ -86,6 +89,19 @@ enum error_code {
         if (f == NULL)                                                                                                           \
             ERROR_EXIT(ERR_FOPEN_FAILED, "Could not open file '%s' (%s)", name, strerror(errno));                                \
     } while (0)
+
+static inline void check_ulimit_n(unsigned int expected_limit)
+{
+    struct rlimit nofile_limit;
+    assert(getrlimit(RLIMIT_NOFILE, &nofile_limit) == 0);
+    if ((unsigned int)nofile_limit.rlim_cur < expected_limit) {
+        WARNING("Number of file descriptor that can be opened by this process looks too small (current: %u - expected: %u), use "
+                "'ulimit -n' to set to appropriate value",
+            (unsigned int)nofile_limit.rlim_cur, expected_limit);
+        printf("Press any key to continue\n");
+        getchar();
+    }
+}
 
 #define XSTR(s) STR(s)
 #define STR(s) #s

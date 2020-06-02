@@ -71,6 +71,8 @@ static struct dpu_symbol_t mram_symbol = { .address = 0x08000000, .size = MRAM_S
 
 void init_vmis(unsigned int nb_dpu, distribute_index_t *table)
 {
+    check_ulimit_n(nb_dpu * 2);
+
     vmis = (vmi_t *)calloc(nb_dpu, sizeof(vmi_t));
     assert(vmis != NULL);
 

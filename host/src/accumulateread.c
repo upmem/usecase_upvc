@@ -281,6 +281,8 @@ void accumulate_free()
 
 void accumulate_init()
 {
+    check_ulimit_n(MAX_NB_PASS * 2);
+
     result_file = (FILE **)calloc(MAX_NB_PASS, sizeof(FILE *));
     assert(result_file != NULL);
 
