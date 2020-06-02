@@ -28,13 +28,13 @@ if (NB_DPU)
         set(NB_DPU_MARK "-n")
 endif()
 
-add_custom_target(mrams ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g index -n 128
+add_custom_target(mrams yes | ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g index -n 128
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
-add_custom_target(run ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU} -f
+add_custom_target(run yes | ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map ${NB_DPU_MARK} ${NB_DPU} -f
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
-add_custom_target(run_simu ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map -f -s
+add_custom_target(run_simu yes | ${CMAKE_CURRENT_BINARY_DIR}/upvc -i chr22 -g map -f -s
         DEPENDS upvc
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../tests/chr22_integration)
 
