@@ -202,17 +202,25 @@ static void exec_round()
 {
     char filename[FILENAME_MAX];
     char *input_prefix = get_input_path();
+    static unsigned int max_nb_pass;
 
     if (round == 0) {
+        size_t read_size1, read_size2, nb_read1, nb_read2;
+
         sprintf(filename, "%s_PE1.fastq", input_prefix);
-        assert(get_read_size(filename) == SIZE_READ);
         fipe1 = fopen(filename, "r");
         CHECK_FILE(fipe1, filename);
+        assert(get_input_info(fipe1, &read_size1, &nb_read1) == 0);
+        assert(read_size1 == SIZE_READ);
 
         sprintf(filename, "%s_PE2.fastq", input_prefix);
-        assert(get_read_size(filename) == SIZE_READ);
         fipe2 = fopen(filename, "r");
         CHECK_FILE(fipe2, filename);
+        assert(get_input_info(fipe2, &read_size2, &nb_read2) == 0);
+        assert(read_size2 == SIZE_READ);
+
+        assert(nb_read1 == nb_read2);
+        max_nb_pass = (unsigned int)(nb_read1 * 2 + nb_read2 * 2 + MAX_READS_BUFFER - 1) / MAX_READS_BUFFER;
     } else {
         fipe1 = fope1;
         fipe2 = fope2;
@@ -231,6 +239,8 @@ static void exec_round()
         assert(fope2 != NULL);
         assert(unlink(filename) == 0);
     }
+
+    accumulate_init(max_nb_pass);
 
     pthread_t tid_get_reads;
     pthread_t tid_exec_rank[nb_ranks_per_run];
@@ -329,6 +339,8 @@ static void exec_round()
     free(accprocess_to_getreads_sem);
     assert(ret == 0);
 
+    accumulate_free();
+
     fclose(fipe1);
     fclose(fipe2);
 }
@@ -365,9 +377,7 @@ static void do_mapping()
                "starting round %u\n"
                "#################\n",
             round);
-        accumulate_init();
         exec_round();
-        accumulate_free();
     }
     create_vcf();
 

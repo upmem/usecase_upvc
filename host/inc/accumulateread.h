@@ -17,7 +17,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id);
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset);
 
-void accumulate_init();
+void accumulate_init(unsigned int max_nb_pass);
 void accumulate_free();
 
 #endif /* __ACCUMULATEREAD_H__ */

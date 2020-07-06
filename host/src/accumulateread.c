@@ -16,8 +16,6 @@
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
-#define MAX_NB_PASS (1600 * (1024 * 1024ULL) / MAX_READS_BUFFER) /* Whole genomee is less than 1600 pass of 1Mreq. */
-
 static FILE **result_file;
 static acc_results_t *results_buffers[NB_DISPATCH_AND_ACC_BUFFER];
 #define RESULTS_BUFFERS(pass_id) results_buffers[(pass_id) % NB_DISPATCH_AND_ACC_BUFFER]
@@ -41,6 +39,7 @@ static bool stop_threads = false;
 static acc_results_t *acc_res;
 static unsigned int nb_dpus_used_current_run;
 static unsigned int *dpu_offset_res;
+static unsigned int nb_pass;
 
 static void merge_dpu_list_into_buckets(const unsigned int thread_id)
 {
@@ -252,7 +251,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 
 void accumulate_free()
 {
-    for (unsigned int each_pass = 0; each_pass < MAX_NB_PASS; each_pass++) {
+    for (unsigned int each_pass = 0; each_pass < nb_pass; each_pass++) {
         if (result_file[each_pass] != NULL)
             fclose(result_file[each_pass]);
     }
@@ -279,11 +278,12 @@ void accumulate_free()
     free(bucket_table_last);
 }
 
-void accumulate_init()
+void accumulate_init(unsigned int max_nb_pass)
 {
-    check_ulimit_n(MAX_NB_PASS * 2);
+    nb_pass = max_nb_pass;
+    check_ulimit_n(nb_pass + 16);
 
-    result_file = (FILE **)calloc(MAX_NB_PASS, sizeof(FILE *));
+    result_file = (FILE **)calloc(nb_pass, sizeof(FILE *));
     assert(result_file != NULL);
 
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
