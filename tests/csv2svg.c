@@ -147,6 +147,9 @@ static void generate_svg(FILE *fp, char *str, struct line_head *line_list, unsig
     printf("accumulate_read: %lfs\n", acc[type_accumulate_read] / nb_it[type_accumulate_read]);
     printf("process_read: %lfs\n", acc[type_process_read] / nb_it[type_process_read]);
     printf("map read: %lfs\n", acc[type_map_read] / nb_it[type_map_read]);
+    printf("write_reads: %lfs\n", acc[type_write_reads] / nb_it[type_write_reads]);
+    printf("read_result: %lfs\n", acc[type_read_result] / nb_it[type_read_result]);
+    printf("write ref genome: %lfs\n", acc[type_write_mram] / nb_it[type_write_mram]);
 
     sprintf(str, "</svg>");
     fwrite(str, sizeof(char), strlen(str), fp);

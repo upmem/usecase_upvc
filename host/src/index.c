@@ -402,12 +402,17 @@ void index_create()
                 seed = seed->next;
 
                 distribute_index_t *dpu_cmp;
+                bool dpu_inserted = false;
                 TAILQ_FOREACH(dpu_cmp, &head, entries)
                 {
                     if (dpu->workload >= dpu_cmp->workload) {
                         TAILQ_INSERT_BEFORE(dpu_cmp, dpu, entries);
+                        dpu_inserted = true;
                         break;
                     }
+                }
+                if (!dpu_inserted) {
+                    TAILQ_INSERT_HEAD(&head, dpu, entries);
                 }
             }
         }
