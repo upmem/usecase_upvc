@@ -9,6 +9,7 @@
 
 #include <dpu.h>
 #include <dpu_log.h>
+#include <dpu_management.h>
 
 #include "accumulateread.h"
 #include "common.h"
@@ -23,6 +24,12 @@
 
 DPU_INCBIN(upvc_dpu_program, DPU_BINARY);
 
+struct triplet{
+    uint32_t rank;
+    uint32_t ci;
+    uint32_t dpu;
+} ;
+
 typedef struct {
     unsigned int nb_dpus_per_rank[NB_RANKS_MAX];
     unsigned int rank_mram_offset[NB_RANKS_MAX];
@@ -30,6 +37,7 @@ typedef struct {
     struct dpu_set_t ranks[NB_RANKS_MAX];
     pthread_mutex_t log_mutex;
     FILE *log_file;
+    struct triplet *dpus;
 } devices_t;
 
 static devices_t devices;
@@ -268,6 +276,16 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_
     sprintf(filename, "%s_log.txt", get_input_path());
     devices.log_file = fopen(filename, "w");
     CHECK_FILE(devices.log_file, filename);
+
+    struct dpu_set_t dpu;
+    uint32_t each_dpu;
+    devices.dpus = malloc(sizeof(struct triplet) * nb_dpus);
+    DPU_FOREACH(devices.all_ranks, dpu, each_dpu) {
+        struct dpu_t *dpu_t = dpu_from_set(dpu);
+        devices.dpus[each_dpu].rank = dpu_get_rank_id(dpu_get_rank(dpu_t));
+        devices.dpus[each_dpu].ci = dpu_get_slice_id(dpu_t);
+        devices.dpus[each_dpu].dpu = dpu_get_member_id(dpu_t);
+    }
 }
 
 void free_backend_dpu()
@@ -310,4 +328,10 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neig
     DPU_FOREACH (rank, dpu, each_dpu) {
         free(mram[each_dpu]);
     }
+}
+
+void get_dpu_info(uint32_t numdpu, uint32_t *rank, uint32_t *ci, uint32_t *dpu) {
+    *rank = devices.dpus[numdpu].rank;
+    *ci = devices.dpus[numdpu].ci;
+    *dpu = devices.dpus[numdpu].dpu;
 }

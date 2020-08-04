@@ -2,11 +2,13 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#define _GNU_SOURCE
 #include "accumulateread.h"
 #include "common.h"
 #include "index.h"
 #include "upvc.h"
 
+#include <dpu_backend.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -190,6 +192,15 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     // compute the total number of resultat for all DPUs
     nb_result_t total_nb_res = 0;
     for (unsigned int numdpu = 0; numdpu < nb_dpus_used_current_run; numdpu++) {
+        uint32_t rank, ci, dpu;
+        get_dpu_info(numdpu, &rank, &ci, &dpu);
+        char *filename;
+        asprintf(&filename, "results/%u_%u_%u_%u.%u.%u.bin", pass_id, dpu_offset, numdpu, rank, ci, dpu);
+        FILE *f = fopen(filename, "w");
+        fwrite(acc_res[numdpu].results, sizeof(acc_res[numdpu].results[0]) * acc_res[numdpu].nb_res, 1, f);
+        fclose(f);
+        free(filename);
+
         dpu_offset_res[numdpu] = total_nb_res;
         total_nb_res += acc_res[numdpu].nb_res;
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
