@@ -7,6 +7,7 @@
 #include "index.h"
 #include "upvc.h"
 
+#include <dpu_backend.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -192,9 +193,11 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     for (unsigned int numdpu = 0; numdpu < nb_dpus_used_current_run; numdpu++) {
         dpu_offset_res[numdpu] = total_nb_res;
         total_nb_res += acc_res[numdpu].nb_res;
+        uint32_t rank, ci, dpu;
+        get_dpu_info(numdpu, &rank, &ci, &dpu);
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
-            ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u\n", __func__, pass_id,
-                dpu_offset, numdpu);
+            ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u (0x%x.%u.%u)\n", __func__,
+                pass_id, dpu_offset, numdpu, rank, ci, dpu);
         }
     }
 
