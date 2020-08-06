@@ -433,6 +433,10 @@ typedef struct {
     FILE *fpe2;
 } process_read_arg_t;
 
+static uint64_t nr_reads_total = 0ULL;
+static uint64_t nr_reads_non_mapped = 0ULL;
+static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static void do_process_read(process_read_arg_t *arg)
 {
     const unsigned int nb_match = arg->nb_match;
@@ -528,8 +532,14 @@ static void do_process_read(process_read_arg_t *arg)
             set_variant(result_tab[P1[x]], ref_genome, reads_buffer, size_neighbour_in_symbols);
             set_variant(result_tab[P2[x]], ref_genome, reads_buffer, size_neighbour_in_symbols);
         } else {
+            pthread_mutex_lock(&nr_reads_mutex);
+            nr_reads_non_mapped ++;
+            pthread_mutex_unlock(&nr_reads_mutex);
             add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
         }
+        pthread_mutex_lock(&nr_reads_mutex);
+        nr_reads_total ++;
+        pthread_mutex_unlock(&nr_reads_mutex);
     }
 }
 
@@ -597,4 +607,5 @@ void process_read_free()
     assert(pthread_barrier_destroy(&barrier) == 0);
     assert(pthread_mutex_destroy(&curr_match_mutex) == 0);
     assert(pthread_mutex_destroy(&non_mapped_mutex) == 0);
+    fprintf(stderr, "%% reads non mapped: %f%%\n", (float)nr_reads_non_mapped*100.0 / (float)nr_reads_total);
 }
