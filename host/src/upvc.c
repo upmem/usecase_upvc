@@ -411,6 +411,9 @@ int main(int argc, char *argv[])
     printf("Information:\n");
     printf("\tread size: %d\n", SIZE_READ);
     printf("\tseed size: %u\n", SIZE_SEED);
+    struct timespec start_time, start_process_time, stop_time, stop_process_time;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start_time);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_process_time);
 
     if (get_simulation_mode()) {
         backends_functions.init_backend = init_backend_simulation;
@@ -439,6 +442,17 @@ int main(int argc, char *argv[])
     default:
         ERROR_EXIT(ERR_NO_GOAL_DEFINED, "goal has not been specified!");
     }
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &stop_time);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop_process_time);
+
+    double time = (float)((stop_time.tv_sec - start_time.tv_sec) * 1e9 + stop_time.tv_nsec - start_time.tv_nsec) / (1e9);
+    double process_time = (float)((stop_process_time.tv_sec - start_process_time.tv_sec) * 1e9 + stop_process_time.tv_nsec
+                              - start_process_time.tv_nsec)
+        / (1e9);
+    printf("time: %f\n"
+           "process time: %f\n"
+           "ratio: %f\n", time, process_time, process_time / time * 100.0);
 
     index_free();
     genome_free();
