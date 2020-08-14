@@ -48,8 +48,3 @@ To check the quality of the results use:
 ```
 python3 <path_to_build>/../tests/compareVCF.py <reference_vcf> <dataset_prefix>_upvc.vcf
 ```
-
-Paper link
-----------
-
-https://drive.google.com/open?id=1NJYijXnVzEpsVQdHgtMZ7RoL4d_BW-CJ
