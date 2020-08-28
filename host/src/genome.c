@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "genome.h"
 #include "parse_args.h"
@@ -113,4 +114,12 @@ void genome_free()
 {
     free(genome.data);
     free(genome.mapping_coverage);
+}
+
+bool genome_check_result(uint32_t seq, uint32_t seed) {
+  if (seq >= MAX_SEQ_GEN)
+    return false;
+  if (seed >= genome.len_seq[seq])
+    return false;
+  return true;
 }

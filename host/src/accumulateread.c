@@ -6,7 +6,9 @@
 #include "common.h"
 #include "index.h"
 #include "upvc.h"
+#include "genome.h"
 
+#include <dpu_backend.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -182,6 +184,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
     return (acc_results_t) { .nb_res = (size / sizeof(dpu_result_out_t)) - 1, .results = results };
 }
 
+
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
     nb_dpus_used_current_run = MIN(index_get_nb_dpu() - dpu_offset, nb_dpus_per_run);
@@ -193,9 +196,20 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         dpu_offset_res[numdpu] = total_nb_res;
         total_nb_res += acc_res[numdpu].nb_res;
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
-            ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u\n", __func__, pass_id,
-                dpu_offset, numdpu);
+	  unsigned int rank_id, slice_id, dpu_id;
+	  get_dpu_id(numdpu, &rank_id, &slice_id, &dpu_id);
+            ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u (%u.%u.%u)\n", __func__, pass_id,
+		       dpu_offset, numdpu, rank_id, slice_id, dpu_id);
         }
+	for (unsigned int each_res = 0; each_res < acc_res[numdpu].nb_res; each_res++) {
+	  dpu_result_out_t *res = &acc_res[numdpu].results[each_res];
+	  if (!genome_check_result(res->coord.seq_nr, res->coord.seed_nr)) {
+	    unsigned int rank_id, slice_id, dpu_id;
+	    get_dpu_id(numdpu, &rank_id, &slice_id, &dpu_id);
+            ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: wrong result (%u, %u) in DPU#%u (%u.%u.%u)\n", __func__, pass_id,
+		       dpu_offset, res->coord.seq_nr, res->coord.seed_nr, numdpu, rank_id, slice_id, dpu_id);
+	  }
+	}
     }
 
     if (total_nb_res == 0) {

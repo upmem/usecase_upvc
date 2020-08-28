@@ -14,7 +14,7 @@ include(${UPMEM_HOME}/share/upmem/cmake/include/host/DpuHost.cmake)
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 set(DPU_BINARY_NAME dpu_task)
 set(NR_TASKLETS 16)
-set(CMAKE_C_FLAGS "--std=gnu99 -O3 -Wall -Wextra -Werror -g3 -DNR_TASKLETS=${NR_TASKLETS} -DDPU_BINARY=\\\"${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/${DPU_BINARY_NAME}\\\"")
+set(CMAKE_C_FLAGS "--std=gnu99 -O3 -Wall -Wextra -lnuma -Werror -g3 -DNR_TASKLETS=${NR_TASKLETS} -DDPU_BINARY=\\\"${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/${DPU_BINARY_NAME}\\\"")
 link_directories("${DPU_HOST_LINK_DIRECTORIES}")
 
 file(GLOB_RECURSE SOURCES src/*.c)

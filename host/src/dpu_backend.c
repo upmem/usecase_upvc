@@ -9,6 +9,8 @@
 
 #include <dpu.h>
 #include <dpu_log.h>
+#include <dpu_management.h>
+#include <dpu_runner.h>
 
 #include "accumulateread.h"
 #include "common.h"
@@ -34,10 +36,45 @@ typedef struct {
 
 static devices_t devices;
 
+void get_dpu_id(unsigned int numdpu, unsigned int *rank_id, unsigned *slice_id, unsigned *dpu_id) {
+  unsigned int i = 0;
+  struct dpu_set_t dpu;
+  uint32_t each_dpu;
+
+  while (numdpu > devices.rank_mram_offset[i + 1]) i++;
+
+  *rank_id = -1;
+  *slice_id = -1;
+  *dpu_id = -1;
+  DPU_FOREACH(devices.ranks[i], dpu, each_dpu) {
+    if (each_dpu == numdpu - devices.rank_mram_offset[i]) {
+      *rank_id = dpu_get_rank_id(dpu_get_rank(dpu_from_set(dpu)));
+      *slice_id = dpu_get_slice_id(dpu_from_set(dpu));
+      *dpu_id = dpu_get_member_id(dpu_from_set(dpu));
+    }
+  }
+}
+
 static void dpu_try_run(unsigned int rank_id)
 {
     struct dpu_set_t rank = devices.ranks[rank_id];
-    dpu_error_t status = dpu_launch(rank, DPU_SYNCHRONOUS);
+    uint32_t timeout = 500000, nb_dpu_running;
+    dpu_error_t status = dpu_boot_rank(dpu_rank_from_set(rank)); //dpu_launch(rank, DPU_ASYNCHRONOUS);
+    uint32_t ret;
+
+    do {
+        ret = dpu_poll_rank(dpu_rank_from_set(rank));
+        if (ret != DPU_OK){
+            printf("ERROR polling rank %d\n", rank_id);
+            return;
+        }
+        nb_dpu_running = dpu_get_run_context(dpu_rank_from_set(rank))->nb_dpu_running;
+    } while (nb_dpu_running && timeout-- > 0);
+    if (timeout <= 0) {
+        printf("ERROR timeout polling rank %d\n", rank_id);
+        return;
+    }
+
     if (status == DPU_ERR_DPU_FAULT) {
         struct dpu_set_t dpu;
         unsigned int each_dpu;
@@ -262,7 +299,9 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_
     }
     assert(nb_dpus == *nb_dpus_per_run);
     printf("%u DPUs allocated\n", nb_dpus);
-
+    unsigned int rank_id, slice_id, dpu_id;
+    get_dpu_id(356, &rank_id, &slice_id, &dpu_id);
+    printf("%d %u.%u.%u\n", 356, rank_id, slice_id, dpu_id);
     pthread_mutex_init(&devices.log_mutex, NULL);
     char filename[1024];
     sprintf(filename, "%s_log.txt", get_input_path());
@@ -311,3 +350,8 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neig
         free(mram[each_dpu]);
     }
 }
+
+int get_rank_numa_node(int rank_id) {
+    return dpu_get_numa_node(dpu_rank_from_set(devices.ranks[rank_id]));
+}
+

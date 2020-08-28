@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <numa.h>
 
 #include "accumulateread.h"
 #include "dispatch.h"
@@ -73,6 +74,12 @@ void *thread_exec_rank(void *arg)
     double t1, t2;
     const unsigned int rank_id = *(unsigned int *)arg;
     const unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
+
+    int ret = numa_run_on_node(get_rank_numa_node(rank_id));
+    if (ret < 0) {
+        printf("ERROR numa failed\n");
+        return NULL;
+    }
 
     FOREACH_RUN(dpu_offset)
     {

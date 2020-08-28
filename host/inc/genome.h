@@ -6,6 +6,7 @@
 #define __GENOME_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define MAX_SEQ_GEN (24) // max number of chromosomes
 #define MAX_SEQ_NAME_SIZE (8)
@@ -29,5 +30,7 @@ void genome_load();
 void genome_free();
 
 genome_t *genome_get();
+
+bool genome_check_result(uint32_t seq, uint32_t seed);
 
 #endif /* __GENOME_H__ */
