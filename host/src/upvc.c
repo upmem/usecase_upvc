@@ -75,6 +75,7 @@ void *thread_exec_rank(void *arg)
     const unsigned int rank_id = *(unsigned int *)arg;
     const unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
 
+    //int ret = numa_run_on_node(3 - get_rank_numa_node(rank_id));
     int ret = numa_run_on_node(get_rank_numa_node(rank_id));
     if (ret < 0) {
         printf("ERROR numa failed\n");
