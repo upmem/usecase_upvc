@@ -15,7 +15,7 @@
 #define ALIGN_DPU(val) (((val) + 7) & ~7)
 
 #define MAX_DPU_REQUEST (1 << 16)
-#define MAX_DPU_RESULTS (1 << 20)
+#define MAX_DPU_RESULTS (1 << 19)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
 #define SIZE_READ 150

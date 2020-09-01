@@ -18,6 +18,10 @@
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
+extern sem_t *acc_to_exec_sem;
+extern unsigned int nb_ranks_per_run;
+#define FOREACH_RANK(each_rank) for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++)
+
 static FILE **result_file;
 static acc_results_t *results_buffers[NB_DISPATCH_AND_ACC_BUFFER];
 #define RESULTS_BUFFERS(pass_id) results_buffers[(pass_id) % NB_DISPATCH_AND_ACC_BUFFER]
@@ -196,8 +200,13 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         dpu_offset_res[numdpu] = total_nb_res;
         total_nb_res += acc_res[numdpu].nb_res;
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
-	  unsigned int rank_id, slice_id, dpu_id;
-	  get_dpu_id(numdpu, &rank_id, &slice_id, &dpu_id);
+            FOREACH_RANK(each_rank)
+            {
+                while (sem_trywait(&acc_to_exec_sem[each_rank]) != EAGAIN)
+                    ;
+            }
+            unsigned int rank_id, slice_id, dpu_id;
+            get_dpu_id(numdpu, &rank_id, &slice_id, &dpu_id);
             ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u (%u.%u.%u)\n", __func__, pass_id,
 		       dpu_offset, numdpu, rank_id, slice_id, dpu_id);
         }

@@ -34,8 +34,9 @@ unsigned int nb_dpus_per_run;
 static backends_functions_t backends_functions;
 static unsigned int round;
 static FILE *fipe1, *fipe2, *fope1, *fope2;
-static sem_t *getreads_to_dispatch_sem, *dispatch_to_exec_sem, *exec_to_dispatch_sem, *exec_to_acc_sem, *acc_to_exec_sem,
+static sem_t *getreads_to_dispatch_sem, *dispatch_to_exec_sem, *exec_to_dispatch_sem, *exec_to_acc_sem,
     *accprocess_to_getreads_sem, *acc_to_process_sem;
+sem_t *acc_to_exec_sem;
 
 #define LAST_RUN(dpu_offset) (((dpu_offset) + nb_dpus_per_run) >= index_get_nb_dpu())
 #define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < index_get_nb_dpu(); dpu_offset += nb_dpus_per_run)

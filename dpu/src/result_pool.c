@@ -27,7 +27,9 @@ typedef struct {
     uintptr_t cur_write;
 } result_pool_t;
 
-__host nb_result_t DPU_NB_RESULT_VAR;
+__host nb_result_t DPU_NB_RESULT_VAR1;
+__host nb_result_t DPU_NB_RESULT_VAR2;
+nb_result_t *DPU_NB_RESULT_VAR;
 
 /**
  * @brief The result pool shared by tasklets.
@@ -38,11 +40,22 @@ MUTEX_INIT(result_pool_mutex);
 /**
  * @brief The buffer of result in mram.
  */
-__mram_noinit dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
+__mram_noinit dpu_result_out_t DPU_RESULT_VAR1[MAX_DPU_RESULTS];
+__mram_noinit dpu_result_out_t DPU_RESULT_VAR2[MAX_DPU_RESULTS];
+
+__mram_ptr dpu_result_out_t *DPU_RESULT_VAR;
+__host uint32_t dpu_result_var_idx;
 
 void result_pool_init()
 {
-    DPU_NB_RESULT_VAR = 0;
+    if (dpu_result_var_idx & 0x1) {
+        DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR1;
+        DPU_RESULT_VAR = DPU_RESULT_VAR1;
+    } else {
+        DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR2;
+        DPU_RESULT_VAR = DPU_RESULT_VAR2;
+    }
+    *DPU_NB_RESULT_VAR = 0;
     result_pool.cur_write = (uintptr_t)DPU_RESULT_VAR;
 }
 
@@ -57,7 +70,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
     for (pageno = 0; pageno < results->nb_page_out; pageno++) {
         __mram_ptr void *source_addr = dout_swap_page_addr(results, pageno);
 
-        if (DPU_NB_RESULT_VAR + MAX_LOCAL_RESULTS_PER_READ >= (MAX_DPU_RESULTS - 1)) {
+        if (*DPU_NB_RESULT_VAR + MAX_LOCAL_RESULTS_PER_READ >= (MAX_DPU_RESULTS - 1)) {
             printf("WARNING! too many result in DPU! (from swap)\n");
             halt();
         }
@@ -71,22 +84,22 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         STATS_INCR_STORE_RESULT(stats, LOCAL_RESULTS_PAGE_SIZE);
         mram_write(result_pool.cache, (__mram_ptr void *)result_pool.cur_write, LOCAL_RESULTS_PAGE_SIZE);
 
-        DPU_NB_RESULT_VAR += MAX_LOCAL_RESULTS_PER_READ;
+        *DPU_NB_RESULT_VAR += MAX_LOCAL_RESULTS_PER_READ;
         result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
     }
 
-    while ((each_result < results->nb_cached_out) && (DPU_NB_RESULT_VAR < (MAX_DPU_RESULTS - 1))) {
+    while ((each_result < results->nb_cached_out) && (*DPU_NB_RESULT_VAR < (MAX_DPU_RESULTS - 1))) {
         /* Ensure that the size of a result out structure is two longs. */
         ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[each_result]), sizeof(dpu_result_out_t));
         STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
         STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
         mram_write((void *)&(results->outs[each_result]), (__mram_ptr void *)result_pool.cur_write, sizeof(dpu_result_out_t));
 
-        DPU_NB_RESULT_VAR++;
+        *DPU_NB_RESULT_VAR += 1;
         result_pool.cur_write += sizeof(dpu_result_out_t);
         each_result++;
     }
-    if (DPU_NB_RESULT_VAR >= (MAX_DPU_RESULTS - 1)) {
+    if (*DPU_NB_RESULT_VAR >= (MAX_DPU_RESULTS - 1)) {
         printf("WARNING! too many result in DPU! (from local)\n");
         halt();
     }

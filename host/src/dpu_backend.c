@@ -92,6 +92,19 @@ static void dpu_try_run(unsigned int rank_id)
     DPU_ASSERT(status);
 }
 
+const char *get_nb_result_var(unsigned int pass_id) {
+    if (pass_id & 0x1)
+        return "DPU_NB_RESULT_VAR1";
+    else
+        return "DPU_NB_RESULT_VAR2";
+}
+const char *get_result_var(unsigned int pass_id) {
+    if (pass_id & 0x1)
+        return "DPU_RESULT_VAR1";
+    else
+        return "DPU_RESULT_VAR2";
+}
+
 static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id)
 {
     static const dpu_request_t dummy_dpu_requests[MAX_DPU_REQUEST];
@@ -103,6 +116,9 @@ static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int 
 
     unsigned int nb_dpus_per_rank = devices.nb_dpus_per_rank[rank_id];
     dispatch_request_t *io_header[nb_dpus_per_rank];
+
+    uint32_t dpu_result_var_idx = pass_id & 0x1;
+    DPU_ASSERT(dpu_copy_to(rank, "dpu_result_var_idx", 0, &dpu_result_var_idx, sizeof(uint32_t)));
 
     struct dpu_set_t dpu;
     unsigned int each_dpu;
@@ -221,6 +237,9 @@ static void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_o
     unsigned int mram_offset = devices.rank_mram_offset[rank_id];
     dpu_offset += mram_offset;
 
+    const char *dpu_nb_result_var = get_nb_result_var(pass_id);
+    const char *dpu_result_var = get_result_var(pass_id);
+
     DPU_FOREACH (rank, dpu, each_dpu) {
         if ((each_dpu + dpu_offset) < nb_dpu) {
             results[each_dpu] = (uint8_t *)&(accumulate_get_buffer(each_dpu + mram_offset, pass_id)->nb_res);
@@ -229,7 +248,7 @@ static void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_o
         }
         DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
     }
-    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_FROM_DPU, XSTR(DPU_NB_RESULT_VAR), 0, sizeof(nb_result_t), DPU_XFER_DEFAULT));
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_FROM_DPU, dpu_nb_result_var, 0, sizeof(nb_result_t), DPU_XFER_DEFAULT));
 
     unsigned int max_nb_result = 0;
     DPU_FOREACH (rank, dpu, each_dpu) {
@@ -243,7 +262,7 @@ static void dpu_try_get_results_and_log(unsigned int rank_id, unsigned int dpu_o
         DPU_ASSERT(dpu_prepare_xfer(dpu, results[each_dpu]));
     }
     DPU_ASSERT(dpu_push_xfer(
-        rank, DPU_XFER_FROM_DPU, XSTR(DPU_RESULT_VAR), 0, (max_nb_result + 1) * sizeof(dpu_result_out_t), DPU_XFER_DEFAULT));
+        rank, DPU_XFER_FROM_DPU, dpu_result_var, 0, (max_nb_result + 1) * sizeof(dpu_result_out_t), DPU_XFER_DEFAULT));
 
     dpu_try_log(rank_id, dpu_offset);
 }
