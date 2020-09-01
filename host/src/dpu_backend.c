@@ -58,7 +58,8 @@ void get_dpu_id(unsigned int numdpu, unsigned int *rank_id, unsigned *slice_id, 
 static void dpu_try_run(unsigned int rank_id)
 {
     struct dpu_set_t rank = devices.ranks[rank_id];
-    uint32_t timeout = 500000, nb_dpu_running;
+    uint32_t nb_dpu_running;
+    int timeout = 5000000;
     dpu_error_t status = dpu_boot_rank(dpu_rank_from_set(rank)); //dpu_launch(rank, DPU_ASYNCHRONOUS);
     uint32_t ret;
 
