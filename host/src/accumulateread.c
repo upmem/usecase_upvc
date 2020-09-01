@@ -202,7 +202,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
             FOREACH_RANK(each_rank)
             {
-                while (sem_trywait(&acc_to_exec_sem[each_rank]) != EAGAIN)
+                while (sem_trywait(&acc_to_exec_sem[each_rank]) == 0)
                     ;
             }
             unsigned int rank_id, slice_id, dpu_id;
