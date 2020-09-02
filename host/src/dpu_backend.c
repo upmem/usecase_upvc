@@ -40,8 +40,9 @@ void get_dpu_id(unsigned int numdpu, unsigned int *rank_id, unsigned *slice_id, 
   unsigned int i = 0;
   struct dpu_set_t dpu;
   uint32_t each_dpu;
-
-  while (numdpu > devices.rank_mram_offset[i + 1]) i++;
+  uint32_t nb_ranks;
+  dpu_get_nr_ranks(devices.all_ranks, &nb_ranks);
+  while (i + 1 < nb_ranks && numdpu > devices.rank_mram_offset[i + 1]) i++;
 
   *rank_id = -1;
   *slice_id = -1;
@@ -354,7 +355,7 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_
     assert(nb_dpus == *nb_dpus_per_run);
     printf("%u DPUs allocated\n", nb_dpus);
     unsigned int rank_id, slice_id, dpu_id;
-    get_dpu_id(356, &rank_id, &slice_id, &dpu_id);
+    get_dpu_id(1206, &rank_id, &slice_id, &dpu_id);
     printf("%d %u.%u.%u\n", 356, rank_id, slice_id, dpu_id);
     pthread_mutex_init(&devices.log_mutex, NULL);
     char filename[1024];

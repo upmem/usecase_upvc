@@ -38,8 +38,8 @@ static sem_t *getreads_to_dispatch_sem, *dispatch_to_exec_sem, *exec_to_dispatch
     *accprocess_to_getreads_sem, *acc_to_process_sem;
 sem_t *acc_to_exec_sem;
 
-#define DEBUG_DPU_OFFSET 2412
-#define DEBUG_PASS 3
+//#define DEBUG_DPU_OFFSET 0
+//#define DEBUG_PASS 447
 
 #define LAST_RUN(dpu_offset) (((dpu_offset) + nb_dpus_per_run) >= index_get_nb_dpu())
 #ifndef DEBUG_DPU_OFFSET
