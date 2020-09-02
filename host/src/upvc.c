@@ -38,10 +38,21 @@ static sem_t *getreads_to_dispatch_sem, *dispatch_to_exec_sem, *exec_to_dispatch
     *accprocess_to_getreads_sem, *acc_to_process_sem;
 sem_t *acc_to_exec_sem;
 
+#define DEBUG_DPU_OFFSET 2412
+#define DEBUG_PASS 3
+
 #define LAST_RUN(dpu_offset) (((dpu_offset) + nb_dpus_per_run) >= index_get_nb_dpu())
+#ifndef DEBUG_DPU_OFFSET
 #define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < index_get_nb_dpu(); dpu_offset += nb_dpus_per_run)
+#else
+#define FOREACH_RUN(dpu_offset) __attribute__((unused)) unsigned int dpu_offset = DEBUG_DPU_OFFSET;
+#endif
 #define FOREACH_RANK(each_rank) for (unsigned int each_rank = 0; each_rank < nb_ranks_per_run; each_rank++)
+#ifndef DEBUG_PASS
 #define FOREACH_PASS(each_pass) for (unsigned int each_pass = 0; get_reads_in_buffer(each_pass) != 0; each_pass++)
+#else
+#define FOREACH_PASS(each_pass) unsigned int each_pass = DEBUG_PASS;
+#endif
 #define FOR(loop) for (int _i = 0; _i < (loop); _i++)
 
 void *thread_get_reads(__attribute__((unused)) void *arg)
@@ -52,6 +63,11 @@ void *thread_get_reads(__attribute__((unused)) void *arg)
 
         unsigned int each_pass = 0;
         do {
+#ifdef DEBUG_PASS
+            for (each_pass = 0; each_pass < DEBUG_PASS; each_pass++) {
+                get_reads(fipe1, fipe2, each_pass);
+            }
+#endif
             sem_wait(accprocess_to_getreads_sem);
 
             PRINT_TIME_GET_READS();
@@ -59,6 +75,9 @@ void *thread_get_reads(__attribute__((unused)) void *arg)
             PRINT_TIME_GET_READS();
 
             sem_post(getreads_to_dispatch_sem);
+#ifdef DEBUG_PASS
+            return NULL;
+#endif
         } while (get_reads_in_buffer(each_pass++) != 0);
 
         fseek(fipe1, 0, SEEK_SET);
