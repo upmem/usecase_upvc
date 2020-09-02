@@ -96,7 +96,7 @@ const char *get_nb_result_var(unsigned int pass_id) {
   unsigned int pass_id_mod = pass_id % 4;
     if (pass_id_mod == 0)
         return "DPU_NB_RESULT_VAR0";
-    else if (pass_id_mod == 1) 
+    else if (pass_id_mod == 1)
         return "DPU_NB_RESULT_VAR1";
     else if (pass_id_mod == 2)
       return "DPU_NB_RESULT_VAR2";
@@ -107,12 +107,34 @@ const char *get_result_var(unsigned int pass_id) {
   unsigned int pass_id_mod = pass_id % 4;
     if (pass_id_mod == 0)
         return "DPU_RESULT_VAR0";
-    else if (pass_id_mod == 1) 
+    else if (pass_id_mod == 1)
         return "DPU_RESULT_VAR1";
     else if (pass_id_mod == 2)
       return "DPU_RESULT_VAR2";
     else
       return "DPU_RESULT_VAR3";
+}
+const char *get_nb_request_var(unsigned int pass_id) {
+  unsigned int pass_id_mod = pass_id % 4;
+    if (pass_id_mod == 0)
+        return "DPU_NB_REQUEST_VAR0";
+    else if (pass_id_mod == 1)
+        return "DPU_NB_REQUEST_VAR1";
+    else if (pass_id_mod == 2)
+      return "DPU_NB_REQUEST_VAR2";
+    else
+      return "DPU_NB_REQUEST_VAR3";
+}
+const char *get_request_var(unsigned int pass_id) {
+  unsigned int pass_id_mod = pass_id % 4;
+    if (pass_id_mod == 0)
+        return "DPU_REQUEST_VAR0";
+    else if (pass_id_mod == 1)
+        return "DPU_REQUEST_VAR1";
+    else if (pass_id_mod == 2)
+      return "DPU_REQUEST_VAR2";
+    else
+      return "DPU_REQUEST_VAR3";
 }
 
 static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id)
@@ -144,15 +166,17 @@ static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int 
         }
         max_dispatch_size = MAX(max_dispatch_size, io_header[each_dpu]->nb_reads * sizeof(dpu_request_t));
     }
+    const char *dpu_nb_request_var = get_nb_request_var(pass_id);
+    const char *dpu_request_var = get_request_var(pass_id);
     DPU_FOREACH (rank, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &io_header[each_dpu]->nb_reads));
     }
-    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, XSTR(DPU_NB_REQUEST_VAR), 0, sizeof(nb_request_t), DPU_XFER_DEFAULT));
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, dpu_nb_request_var, 0, sizeof(nb_request_t), DPU_XFER_DEFAULT));
 
     DPU_FOREACH (rank, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, io_header[each_dpu]->dpu_requests));
     }
-    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, XSTR(DPU_REQUEST_VAR), 0, max_dispatch_size, DPU_XFER_DEFAULT));
+    DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, dpu_request_var, 0, max_dispatch_size, DPU_XFER_DEFAULT));
 }
 
 static void dpu_try_log(unsigned int rank_id, unsigned int dpu_offset)
