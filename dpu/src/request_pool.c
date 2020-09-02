@@ -31,9 +31,19 @@ typedef struct {
     uintptr_t cur_read;
 } request_pool_t;
 
-__host nb_request_t DPU_NB_REQUEST_VAR;
+__host nb_request_t DPU_NB_REQUEST_VAR0;
+__host nb_request_t DPU_NB_REQUEST_VAR1;
+__host nb_request_t DPU_NB_REQUEST_VAR2;
+__host nb_request_t DPU_NB_REQUEST_VAR3;
+nb_request_t *DPU_NB_REQUEST_VAR;
 
-__mram_noinit dpu_request_t DPU_REQUEST_VAR[MAX_DPU_REQUEST];
+__mram_noinit dpu_request_t DPU_REQUEST_VAR0[MAX_DPU_REQUEST];
+__mram_noinit dpu_request_t DPU_REQUEST_VAR1[MAX_DPU_REQUEST];
+__mram_noinit dpu_request_t DPU_REQUEST_VAR2[MAX_DPU_REQUEST];
+__mram_noinit dpu_request_t DPU_REQUEST_VAR3[MAX_DPU_REQUEST];
+
+__mram_ptr dpu_request_t *DPU_REQUEST_VAR;
+extern uint32_t dpu_result_var_idx;
 
 /**
  * @brief Common request pool, shared by every tasklet.
@@ -43,6 +53,20 @@ MUTEX_INIT(request_pool_mutex);
 
 void request_pool_init()
 {
+    if (dpu_result_var_idx % 4 == 0) {
+        DPU_NB_REQUEST_VAR = &DPU_NB_REQUEST_VAR0;
+        DPU_REQUEST_VAR = DPU_REQUEST_VAR0;
+    } else if (dpu_result_var_idx % 4 == 1) {
+        DPU_NB_REQUEST_VAR = &DPU_NB_REQUEST_VAR1;
+        DPU_REQUEST_VAR = DPU_REQUEST_VAR1;
+    } else if (dpu_result_var_idx % 4 == 2) {
+        DPU_NB_REQUEST_VAR = &DPU_NB_REQUEST_VAR2;
+        DPU_REQUEST_VAR = DPU_REQUEST_VAR2;
+    } else if (dpu_result_var_idx % 4 == 3) {
+        DPU_NB_REQUEST_VAR = &DPU_NB_REQUEST_VAR3;
+        DPU_REQUEST_VAR = DPU_REQUEST_VAR3;
+    }
+
     request_pool.rdidx = 0;
     request_pool.cur_read = (uintptr_t)DPU_REQUEST_VAR;
 }
@@ -50,7 +74,7 @@ void request_pool_init()
 bool request_pool_next(dpu_request_t *request, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
     mutex_lock(request_pool_mutex);
-    if (request_pool.rdidx == DPU_NB_REQUEST_VAR) {
+    if (request_pool.rdidx == *DPU_NB_REQUEST_VAR) {
         mutex_unlock(request_pool_mutex);
         return false;
     }

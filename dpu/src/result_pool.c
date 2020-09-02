@@ -52,17 +52,16 @@ __host uint32_t dpu_result_var_idx;
 
 void result_pool_init()
 {
-  dpu_result_var_idx%=4;
-    if (dpu_result_var_idx ==0) {
+    if (dpu_result_var_idx%4 ==0) {
         DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR0;
         DPU_RESULT_VAR = DPU_RESULT_VAR0;
-    } else if (dpu_result_var_idx == 1){
+    } else if (dpu_result_var_idx%4 == 1){
         DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR1;
         DPU_RESULT_VAR = DPU_RESULT_VAR1;
-    } else if (dpu_result_var_idx == 2){
+    } else if (dpu_result_var_idx%4 == 2){
         DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR2;
         DPU_RESULT_VAR = DPU_RESULT_VAR2;
-    } else if (dpu_result_var_idx == 3){
+    } else if (dpu_result_var_idx%4 == 3){
         DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR3;
         DPU_RESULT_VAR = DPU_RESULT_VAR3;
     }
