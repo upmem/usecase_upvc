@@ -228,6 +228,8 @@ int main()
         perfcounter_config(COUNT_CYCLES, true);
         current_time = start_time = perfcounter_get();
 
+        check_end_mark();
+
         request_pool_init();
         result_pool_init();
 
@@ -244,6 +246,8 @@ int main()
     barrier_wait(&init_barrier);
 
     if (tasklet_id == 0) {
+        check_end_mark();
+
         get_time_and_accumulate(&DPU_COMPUTE_TIME_VAR, &current_time);
         DPU_COMPUTE_TIME_VAR = (DPU_COMPUTE_TIME_VAR + current_time) - start_time;
     }

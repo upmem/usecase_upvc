@@ -121,7 +121,6 @@ void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
 {
     __dma_aligned static const dpu_result_out_t end_of_results
         = { .num = (unsigned int)-1, .score = (unsigned int)-1, .coord.seq_nr = 0, .coord.seed_nr = 0 };
-    __dma_aligned dpu_result_out_t toto;
     /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
      * has a num equal to -1.
      */
@@ -130,13 +129,32 @@ void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
      * point.
      */
     mram_write((void *)&end_of_results, (__mram_ptr void *)result_pool.cur_write, sizeof(dpu_result_out_t));
-    mram_read((__mram_ptr void *)result_pool.cur_write, (void *)&toto, sizeof(dpu_result_out_t));
-    if (toto.num != -1 || toto.score != -1 || toto.coord.seq_nr != 0 || toto.coord.seed_nr != 0) {
-        //printf("0x%x 0x%x 0x%x 0x%x\n", toto.num, toto.score, toto.coord.seq_nr, toto.coord.seed_nr);
-        halt();
-    }
     STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
     STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
 
     mutex_unlock(result_pool_mutex);
+}
+
+void check_end_mark() {
+    __dma_aligned dpu_result_out_t res;
+    mram_read((__mram_ptr void *)((64 << 20) - sizeof(dpu_result_out_t)), (void *)&res, sizeof(dpu_result_out_t));
+    mram_read((__mram_ptr void *)&DPU_RESULT_VAR0[DPU_NB_RESULT_VAR0], (void *)&res, sizeof(dpu_result_out_t));
+    if (res.num != -1 || res.score != -1 || res.coord.seq_nr != 0 || res.coord.seed_nr != 0) {
+        halt();
+    }
+    mram_read((__mram_ptr void *)((64 << 20) - sizeof(dpu_result_out_t)), (void *)&res, sizeof(dpu_result_out_t));
+    mram_read((__mram_ptr void *)&DPU_RESULT_VAR1[DPU_NB_RESULT_VAR1], (void *)&res, sizeof(dpu_result_out_t));
+    if (res.num != -1 || res.score != -1 || res.coord.seq_nr != 0 || res.coord.seed_nr != 0) {
+        halt();
+    }
+    mram_read((__mram_ptr void *)((64 << 20) - sizeof(dpu_result_out_t)), (void *)&res, sizeof(dpu_result_out_t));
+    mram_read((__mram_ptr void *)&DPU_RESULT_VAR2[DPU_NB_RESULT_VAR2], (void *)&res, sizeof(dpu_result_out_t));
+    if (res.num != -1 || res.score != -1 || res.coord.seq_nr != 0 || res.coord.seed_nr != 0) {
+        halt();
+    }
+    mram_read((__mram_ptr void *)((64 << 20) - sizeof(dpu_result_out_t)), (void *)&res, sizeof(dpu_result_out_t));
+    mram_read((__mram_ptr void *)&DPU_RESULT_VAR3[DPU_NB_RESULT_VAR3], (void *)&res, sizeof(dpu_result_out_t));
+    if (res.num != -1 || res.score != -1 || res.coord.seq_nr != 0 || res.coord.seed_nr != 0) {
+        halt();
+    }
 }

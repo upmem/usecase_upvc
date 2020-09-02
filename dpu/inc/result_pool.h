@@ -26,4 +26,6 @@ void result_pool_init();
  */
 void result_pool_finish(dpu_tasklet_stats_t *stats);
 
+void check_end_mark();
+
 #endif /* __RESULT_POOL_H__ */
