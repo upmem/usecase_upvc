@@ -27,8 +27,10 @@ typedef struct {
     uintptr_t cur_write;
 } result_pool_t;
 
+__host nb_result_t DPU_NB_RESULT_VAR0;
 __host nb_result_t DPU_NB_RESULT_VAR1;
 __host nb_result_t DPU_NB_RESULT_VAR2;
+__host nb_result_t DPU_NB_RESULT_VAR3;
 nb_result_t *DPU_NB_RESULT_VAR;
 
 /**
@@ -40,20 +42,29 @@ MUTEX_INIT(result_pool_mutex);
 /**
  * @brief The buffer of result in mram.
  */
+__mram_noinit dpu_result_out_t DPU_RESULT_VAR0[MAX_DPU_RESULTS];
 __mram_noinit dpu_result_out_t DPU_RESULT_VAR1[MAX_DPU_RESULTS];
 __mram_noinit dpu_result_out_t DPU_RESULT_VAR2[MAX_DPU_RESULTS];
+__mram_noinit dpu_result_out_t DPU_RESULT_VAR3[MAX_DPU_RESULTS];
 
 __mram_ptr dpu_result_out_t *DPU_RESULT_VAR;
 __host uint32_t dpu_result_var_idx;
 
 void result_pool_init()
 {
-    if (dpu_result_var_idx & 0x1) {
+  dpu_result_var_idx%=4;
+    if (dpu_result_var_idx ==0) {
+        DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR0;
+        DPU_RESULT_VAR = DPU_RESULT_VAR0;
+    } else if (dpu_result_var_idx == 1){
         DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR1;
         DPU_RESULT_VAR = DPU_RESULT_VAR1;
-    } else {
+    } else if (dpu_result_var_idx == 2){
         DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR2;
         DPU_RESULT_VAR = DPU_RESULT_VAR2;
+    } else if (dpu_result_var_idx == 3){
+        DPU_NB_RESULT_VAR = &DPU_NB_RESULT_VAR3;
+        DPU_RESULT_VAR = DPU_RESULT_VAR3;
     }
     *DPU_NB_RESULT_VAR = 0;
     result_pool.cur_write = (uintptr_t)DPU_RESULT_VAR;

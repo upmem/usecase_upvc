@@ -8,7 +8,7 @@
 #define VERSION "VERSION 1.8"
 #define MAX_READS_BUFFER (1048576) /* Maximum number of read by round        */
 #define NB_READS_BUFFER (16)
-#define NB_DISPATCH_AND_ACC_BUFFER (4)
+#define NB_DISPATCH_AND_ACC_BUFFER (2)
 #define NB_ROUND (1)
 
 #define COST_SUB 10

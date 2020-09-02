@@ -93,16 +93,26 @@ static void dpu_try_run(unsigned int rank_id)
 }
 
 const char *get_nb_result_var(unsigned int pass_id) {
-    if (pass_id & 0x1)
+  unsigned int pass_id_mod = pass_id % 4;
+    if (pass_id_mod == 0)
+        return "DPU_NB_RESULT_VAR0";
+    else if (pass_id_mod == 1) 
         return "DPU_NB_RESULT_VAR1";
+    else if (pass_id_mod == 2)
+      return "DPU_NB_RESULT_VAR2";
     else
-        return "DPU_NB_RESULT_VAR2";
+      return "DPU_NB_RESULT_VAR3";
 }
 const char *get_result_var(unsigned int pass_id) {
-    if (pass_id & 0x1)
+  unsigned int pass_id_mod = pass_id % 4;
+    if (pass_id_mod == 0)
+        return "DPU_RESULT_VAR0";
+    else if (pass_id_mod == 1) 
         return "DPU_RESULT_VAR1";
+    else if (pass_id_mod == 2)
+      return "DPU_RESULT_VAR2";
     else
-        return "DPU_RESULT_VAR2";
+      return "DPU_RESULT_VAR3";
 }
 
 static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int dpu_offset, unsigned int pass_id)
@@ -117,7 +127,7 @@ static void dpu_try_write_dispatch_into_mram(unsigned int rank_id, unsigned int 
     unsigned int nb_dpus_per_rank = devices.nb_dpus_per_rank[rank_id];
     dispatch_request_t *io_header[nb_dpus_per_rank];
 
-    uint32_t dpu_result_var_idx = pass_id & 0x1;
+    uint32_t dpu_result_var_idx = pass_id % 4;
     DPU_ASSERT(dpu_copy_to(rank, "dpu_result_var_idx", 0, &dpu_result_var_idx, sizeof(uint32_t)));
 
     struct dpu_set_t dpu;
