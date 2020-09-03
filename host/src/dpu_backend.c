@@ -367,8 +367,10 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_
     const dpu_result_out_t end_of_results
         = { .num = (unsigned int)-1, .score = (unsigned int)-1, .coord.seq_nr = 0, .coord.seed_nr = 0 };
     for (unsigned int pass_id = 0; pass_id < 4; pass_id++) {
-        DPU_ASSERT(dpu_copy_to(devices.all_ranks, get_nb_result_var(pass_id), 0, &init_nb_result_var, sizeof(uint32_t)));
-        DPU_ASSERT(dpu_copy_to(devices.all_ranks, get_result_var(pass_id), 0, &end_of_results, sizeof(dpu_result_out_t)));
+        DPU_RANK_FOREACH(devices.all_ranks, rank) {
+            DPU_ASSERT(dpu_copy_to(rank, get_nb_result_var(pass_id), 0, &init_nb_result_var, sizeof(uint32_t)));
+            DPU_ASSERT(dpu_copy_to(rank, get_result_var(pass_id), 0, &end_of_results, sizeof(dpu_result_out_t)));
+        }
     }
 }
 
