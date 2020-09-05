@@ -417,6 +417,6 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neig
 }
 
 int get_rank_numa_node(int rank_id) {
-    return dpu_get_numa_node(dpu_rank_from_set(devices.ranks[rank_id]));
+    return dpu_get_rank_numa_node(dpu_rank_from_set(devices.ranks[rank_id]));
 }
 
