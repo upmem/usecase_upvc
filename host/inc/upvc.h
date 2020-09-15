@@ -23,8 +23,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 
 #include <stddef.h>
 #include <time.h>
@@ -111,9 +111,9 @@ static inline void check_ulimit_n(unsigned int expected_limit)
 extern unsigned int nb_dpus_per_run;
 extern unsigned int nb_ranks_per_run;
 #define TABULATION "         "
-#define LINE       "---------"
-#define SEPARATOR  '|'
-#define ENDLINE    "|\n\0"
+#define LINE "---------"
+#define SEPARATOR '|'
+#define ENDLINE "|\n\0"
 static inline void print(const uint32_t rank_id, const char *fmt, ...)
 {
     uint32_t each_rank;

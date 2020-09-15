@@ -452,7 +452,8 @@ int main(int argc, char *argv[])
         / (1e9);
     printf("time: %f\n"
            "process time: %f\n"
-           "ratio: %f\n", time, process_time, process_time / time * 100.0);
+           "ratio: %f\n",
+        time, process_time, process_time / time * 100.0);
 
     index_free();
     genome_free();

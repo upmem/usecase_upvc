@@ -24,11 +24,11 @@
 
 DPU_INCBIN(upvc_dpu_program, DPU_BINARY);
 
-struct triplet{
+struct triplet {
     uint32_t rank;
     uint32_t ci;
     uint32_t dpu;
-} ;
+};
 
 typedef struct {
     unsigned int nb_dpus_per_rank[NB_RANKS_MAX];
@@ -281,7 +281,7 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_
     struct dpu_set_t dpu;
     uint32_t each_dpu;
     devices.dpus = malloc(sizeof(struct triplet) * nb_dpus);
-    DPU_FOREACH(devices.all_ranks, dpu, each_dpu) {
+    DPU_FOREACH (devices.all_ranks, dpu, each_dpu) {
         struct dpu_t *dpu_t = dpu_from_set(dpu);
         devices.dpus[each_dpu].rank = dpu_get_rank_id(dpu_get_rank(dpu_t));
         devices.dpus[each_dpu].ci = dpu_get_slice_id(dpu_t);
@@ -332,7 +332,8 @@ void load_mram_dpu(unsigned int dpu_offset, unsigned int rank_id, int delta_neig
     }
 }
 
-void get_dpu_info(uint32_t numdpu, uint32_t *rank, uint32_t *ci, uint32_t *dpu) {
+void get_dpu_info(uint32_t numdpu, uint32_t *rank, uint32_t *ci, uint32_t *dpu)
+{
     if (!dpu_backend_initialized) {
         return;
     }

@@ -7,8 +7,8 @@
 #include "index.h"
 #include "upvc.h"
 
-#include <dpu_backend.h>
 #include <assert.h>
+#include <dpu_backend.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
