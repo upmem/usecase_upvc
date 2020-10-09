@@ -35,26 +35,6 @@ static inline double my_clock(void)
     return (1.0e-9 * t.tv_nsec + t.tv_sec);
 }
 
-extern FILE *time_file;
-extern pthread_mutex_t time_file_mutex;
-#define PRINT_TIME(str, pass)                                                                                                    \
-    do {                                                                                                                         \
-        pthread_mutex_lock(&time_file_mutex);                                                                                    \
-        fprintf(time_file, str, my_clock(), pass);                                                                               \
-        fflush(time_file);                                                                                                       \
-        pthread_mutex_unlock(&time_file_mutex);                                                                                  \
-    } while (0)
-
-#define PRINT_TIME_GET_READS() PRINT_TIME("%lf, %lf\n", 0.0)
-#define PRINT_TIME_DISPATCH() PRINT_TIME("%lf, , %lf\n", 0.1)
-#define PRINT_TIME_ACC_READ() PRINT_TIME("%lf, , , %lf\n", 0.2)
-#define PRINT_TIME_PROCESS_READ() PRINT_TIME("%lf, , , , %lf\n", 0.3)
-#define PRINT_TIME_WRITE_MRAM(rank) PRINT_TIME("%lf, , , , , %lf\n", 0.4 + rank * 0.1)
-#define PRINT_TIME_WRITE_READS(rank) PRINT_TIME("%lf, , , , , , %lf\n", 0.4 + rank * 0.1)
-#define PRINT_TIME_COMPUTE(rank) PRINT_TIME("%lf, , , , , , , %lf\n", 0.4 + rank * 0.1)
-#define PRINT_TIME_READ_RES(rank) PRINT_TIME("%lf, , , , , , , , %lf\n", 0.4 + rank * 0.1)
-#define PRINT_TIME_MAP_READ(rank) PRINT_TIME("%lf, , , , , , , , , %lf\n", 0.4 + rank * 0.1)
-
 #include <stdlib.h>
 
 enum error_code {
@@ -81,6 +61,7 @@ enum error_code {
 #define ERROR_EXIT(err_code, fmt, ...)                                                                                           \
     do {                                                                                                                         \
         ERROR(fmt, ##__VA_ARGS__);                                                                                               \
+        exit(0);\
         exit((err_code));                                                                                                        \
     } while (0)
 
@@ -107,38 +88,5 @@ static inline void check_ulimit_n(unsigned int expected_limit)
 #define STR(s) #s
 
 #define NB_RANKS_MAX (64)
-
 extern unsigned int nb_dpus_per_run;
-extern unsigned int nb_ranks_per_run;
-#define TABULATION "         "
-#define LINE "---------"
-#define SEPARATOR '|'
-#define ENDLINE "|\n\0"
-static inline void print(const uint32_t rank_id, const char *fmt, ...)
-{
-    uint32_t each_rank;
-    va_list args;
-    va_start(args, fmt);
-    char str[NB_RANKS_MAX * (strlen(TABULATION) + strlen(XSTR(SEPARATOR))) + strlen(ENDLINE) + 1 /* for '\0' */];
-    int str_i = 0;
-    for (each_rank = 0; each_rank < rank_id; each_rank++) {
-        str[str_i++] = SEPARATOR;
-        memcpy(&str[str_i], TABULATION, strlen(TABULATION));
-        str_i += strlen(TABULATION);
-    }
-    str[str_i++] = SEPARATOR;
-    int fmt_size = vsprintf(&str[str_i], fmt, args);
-    memcpy(&str[str_i + fmt_size], TABULATION, strlen(TABULATION) - fmt_size);
-    str_i += strlen(TABULATION);
-    for (each_rank++; each_rank < nb_ranks_per_run; each_rank++) {
-        str[str_i++] = SEPARATOR;
-        memcpy(&str[str_i], TABULATION, strlen(TABULATION));
-        str_i += strlen(TABULATION);
-    }
-    memcpy(&str[str_i], ENDLINE, strlen(ENDLINE) + 1 /* for '\0' */);
-    fprintf(stdout, "%s", str);
-}
-
-static inline void print_line(const uint32_t rank_id) { print(rank_id, LINE); }
-
 #endif /* __UPVC_H__ */

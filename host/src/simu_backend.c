@@ -21,8 +21,16 @@
 
 #define MAX_SCORE 40
 
+#define FOREACH_THREAD(it) for (unsigned int it = 0; it < get_nb_thread_for_simu(); it++)
+
 static coords_and_nbr_t **mrams;
 static const int delta_neighbour = 0;
+
+static pthread_barrier_t barrier;
+static pthread_t *tids;
+static bool stop_threads = false;
+static unsigned int dpu_offset_shared;
+static unsigned int pass_id_shared;
 
 static int min(int a, int b) { return a < b ? a : b; }
 
@@ -229,36 +237,80 @@ static void align_on_dpu(unsigned int dpu_offset, unsigned rank_id, int pass_id)
     acc_res->nb_res = nb_map;
 }
 
-void run_dpu_simulation(
-    unsigned int dpu_offset, unsigned rank_id, unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem)
-{
-    sem_wait(acc_wait_sem);
-    align_on_dpu(dpu_offset, rank_id, pass_id);
-    sem_post(dispatch_free_sem);
+static void *align_on_dpu_fct(void *arg) {
+    const unsigned int dpu_id = (unsigned int)(uintptr_t)arg;
+
+    pthread_barrier_wait(&barrier);
+    while (!stop_threads) {
+        align_on_dpu(dpu_offset_shared, dpu_id, pass_id_shared);
+        pthread_barrier_wait(&barrier);
+        pthread_barrier_wait(&barrier);
+    }
+    return NULL;
 }
 
-void init_backend_simulation(unsigned int *nb_dpus_per_run, unsigned int *nb_ranks_per_run)
+void run_dpu_simulation(unsigned int dpu_offset, unsigned int pass_id, sem_t *dispatch_free_sem, sem_t *acc_wait_sem,
+    sem_t *exec_to_acc_sem, sem_t *dispatch_to_exec_sem)
+{
+    sem_wait(acc_wait_sem);
+
+    dpu_offset_shared = dpu_offset;
+    pass_id_shared = pass_id;
+
+    pthread_barrier_wait(&barrier);
+    pthread_barrier_wait(&barrier);
+
+    sem_post(dispatch_free_sem);
+    sem_post(exec_to_acc_sem);
+    sem_wait(dispatch_to_exec_sem);
+}
+
+void init_backend_simulation(unsigned int *nb_dpus_per_run)
 {
     unsigned int nb_thread_for_simu = get_nb_thread_for_simu();
-    *nb_ranks_per_run = nb_thread_for_simu;
     *nb_dpus_per_run = nb_thread_for_simu;
     mrams = (coords_and_nbr_t **)calloc(nb_thread_for_simu, sizeof(coords_and_nbr_t *));
     assert(mrams != NULL);
+
+    tids = malloc(nb_thread_for_simu * sizeof(pthread_t));
+    assert(tids != NULL);
+
+    assert(pthread_barrier_init(&barrier, NULL, nb_thread_for_simu + 1) == 0);
+
+    FOREACH_THREAD(each_dpu)
+    {
+        int ret = pthread_create(&tids[each_dpu], NULL, align_on_dpu_fct, (void *)(uintptr_t)each_dpu);
+        assert(ret == 0);
+    }
 }
 
 void free_backend_simulation()
 {
-    for (unsigned int each_dpu = 0; each_dpu < get_nb_thread_for_simu(); each_dpu++) {
+    stop_threads = true;
+    pthread_barrier_wait(&barrier);
+    assert(pthread_barrier_destroy(&barrier) == 0);
+
+    FOREACH_THREAD(each_dpu)
+    {
+        int ret = pthread_join(tids[each_dpu], NULL);
+        assert(ret == 0);
         free(mrams[each_dpu]);
     }
+
+    free(tids);
     free(mrams);
 }
 
-void load_mram_simulation(unsigned int dpu_offset, unsigned int rank_id, __attribute__((unused)) int _delta_neighbour)
+void load_mram_simulation(unsigned int dpu_offset, __attribute__((unused)) int _delta_neighbour)
 {
-    unsigned int dpu_id = dpu_offset + rank_id;
-    if (dpu_id >= index_get_nb_dpu())
-        return;
-    free(mrams[rank_id]);
-    mram_load((uint8_t **)&mrams[rank_id], dpu_id);
+    FOREACH_THREAD(each_dpu)
+    {
+        unsigned int dpu_id = dpu_offset + each_dpu;
+        if (dpu_id >= index_get_nb_dpu())
+            return;
+        free(mrams[each_dpu]);
+        mram_load((uint8_t **)&mrams[each_dpu], dpu_id);
+    }
 }
+
+void wait_dpu_simulation() { return; }
