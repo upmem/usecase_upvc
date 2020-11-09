@@ -1,5 +1,5 @@
-Common work Dominique Lavenier (INRIA) and UPMEM.
-=================================================
+UPVC: Common work Dominique Lavenier (INRIA) and UPMEM.
+=======================================================
 
 Installation
 ------------
