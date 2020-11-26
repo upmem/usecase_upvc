@@ -185,6 +185,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
+  printf("DPU_OFFSET: %u - PASS_ID: %u\n", dpu_offset, pass_id);
     nb_dpus_used_current_run = MIN(index_get_nb_dpu() - dpu_offset, nb_dpus_per_run);
     acc_res = RESULTS_BUFFERS(pass_id);
 

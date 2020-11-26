@@ -6,9 +6,9 @@
 #define __UPVC_H__
 
 #define VERSION "VERSION 1.8"
-#define MAX_READS_BUFFER (1048576) /* Maximum number of read by round        */
-#define NB_READS_BUFFER (16)
-#define NB_DISPATCH_AND_ACC_BUFFER (4)
+#define MAX_READS_BUFFER (1048576 / 2) /* Maximum number of read by round        */
+#define NB_READS_BUFFER (64)
+#define NB_DISPATCH_AND_ACC_BUFFER (16)
 #define NB_ROUND (1)
 
 #define COST_SUB 10
@@ -61,7 +61,6 @@ enum error_code {
 #define ERROR_EXIT(err_code, fmt, ...)                                                                                           \
     do {                                                                                                                         \
         ERROR(fmt, ##__VA_ARGS__);                                                                                               \
-        exit(0);\
         exit((err_code));                                                                                                        \
     } while (0)
 

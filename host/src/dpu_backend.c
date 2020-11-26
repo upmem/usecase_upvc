@@ -43,6 +43,7 @@ typedef struct {
 
 static bool dpu_backend_initialized = false;
 static devices_t devices;
+static int *dpu_tid;
 
 static void dpu_try_write_dispatch_into_mram(unsigned int dpu_offset, unsigned int pass_id)
 {
@@ -59,7 +60,7 @@ static void dpu_try_write_dispatch_into_mram(unsigned int dpu_offset, unsigned i
     unsigned int nb_dpu = index_get_nb_dpu();
     unsigned int max_dispatch_size = 0;
     DPU_FOREACH (devices.all_ranks, dpu, each_dpu) {
-        unsigned int this_dpu = each_dpu + dpu_offset;
+        unsigned int this_dpu = dpu_tid[each_dpu + dpu_offset];
         if (this_dpu < nb_dpu) {
             io_header[each_dpu] = dispatch_get(this_dpu, pass_id);
         } else {
@@ -144,7 +145,7 @@ static __attribute__((used)) dpu_error_t dpu_try_log(struct dpu_set_t rank, uint
         fprintf(devices.log_file, "LOG DPU=%u LOAD=%u\n", this_dpu, agreagated_stats.mram_load);
         fprintf(devices.log_file, "LOG DPU=%u STORE=%u\n", this_dpu, agreagated_stats.mram_store);
 
-        DPU_ASSERT(dpu_log_read(dpu, devices.log_file));
+        /* DPU_ASSERT(dpu_log_read(dpu, devices.log_file)); */
     }
     fflush(devices.log_file);
     pthread_mutex_unlock(&devices.log_mutex);
@@ -211,7 +212,7 @@ static void dpu_try_get_results_and_log(unsigned int dpu_offset, unsigned int pa
     pass_info_t info = { .dpu_offset = dpu_offset, .pass_id = pass_id };
     DPU_ASSERT(dpu_callback(devices.all_ranks, dpu_get_results, (void *)info.info, DPU_CALLBACK_ASYNC));
 #ifdef STATS_ON
-    DPU_ASSERT(dpu_callback(devices.all_ranks, dpu_try_log, (void *)dpu_offset, DPU_CALLBACK_ASYNC));
+    DPU_ASSERT(dpu_callback(devices.all_ranks, dpu_try_log, (void *)(uintptr_t)dpu_offset, DPU_CALLBACK_ASYNC));
 #endif
 }
 
@@ -284,10 +285,25 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run)
         devices.dpus[each_dpu].dpu = dpu_get_member_id(dpu_t);
     }
     dpu_backend_initialized = true;
+
+    const int average_dpu_per_rank = 64;
+    dpu_tid = malloc(sizeof(int) * *nb_dpus_per_run);
+    memset(dpu_tid, -1, sizeof(int) * *nb_dpus_per_run);
+    for (uint32_t each_dpu = 0, tdpu = 0; each_dpu < *nb_dpus_per_run; each_dpu++) {
+      while (dpu_tid[tdpu] != -1) {
+	tdpu = (tdpu + 1) % *nb_dpus_per_run;
+      }
+      dpu_tid[tdpu] = each_dpu;
+      tdpu += average_dpu_per_rank;
+      if (tdpu > *nb_dpus_per_run) {
+	tdpu = 0;
+      }
+    }
 }
 
 void free_backend_dpu()
 {
+  free(dpu_tid);
     DPU_ASSERT(dpu_free(devices.all_ranks));
 #ifdef STATS_ON
     pthread_mutex_destroy(&devices.log_mutex);
@@ -319,7 +335,7 @@ static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void 
     struct dpu_set_t dpu;
     dpu_offset += devices.rank_mram_offset[rank_id];
     DPU_FOREACH (rank, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_offset + each_dpu;
+        unsigned int this_dpu = dpu_tid[dpu_offset + each_dpu];
         if (this_dpu < nb_dpu) {
             mram_size[each_dpu] = mram_load(&mram[each_dpu], this_dpu);
         }
@@ -342,8 +358,11 @@ static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void 
 
 void load_mram_dpu(unsigned int dpu_offset, int delta_neighbour)
 {
+    double start_time = my_clock();
+    printf("%s:\n", __func__);
     load_info_t info = {.dpu_offset = dpu_offset, delta_neighbour = delta_neighbour};
-    dpu_callback(devices.all_ranks, load_mram_rank, (void *)info.info, DPU_CALLBACK_ASYNC);
+    dpu_callback(devices.all_ranks, load_mram_rank, (void *)info.info, DPU_CALLBACK_DEFAULT);
+    printf("\ttime: %lf s\n", my_clock() - start_time);
 }
 
 void wait_dpu_dpu() {

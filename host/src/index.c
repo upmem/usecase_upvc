@@ -51,7 +51,7 @@ void index_copy_neighbour(int8_t *dst, int8_t *src) { code_neighbour(&src[SIZE_S
 
 #define NB_SEED (1 << (SIZE_SEED << 1)) /* NB_SEED = 4 ^ (SIZE_SEED) */
 
-#define MAX_SIZE_IDX_SEED (1000)
+#define MAX_SIZE_IDX_SEED (500)
 
 typedef struct hashtable_header {
     uint32_t magic;
