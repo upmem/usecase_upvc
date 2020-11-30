@@ -142,7 +142,7 @@ static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_
     }
 
     if (dout->nb_results >= MAX_RESULTS_PER_READ) {
-        printf("WARNING! too many results for request!\n");
+        //printf("WARNING! too many results for request!\n");
         /* Trigger a fault, since this should never happen. */
         halt();
     }
@@ -232,7 +232,7 @@ int main()
         result_pool_init();
 
         if (((NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR) + 2) * 3 * 16) >= 0x10000) {
-            printf("cannot run code: symbol length is larger than mulub operation\n");
+            //printf("cannot run code: symbol length is larger than mulub operation\n");
             halt();
         }
     }

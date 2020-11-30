@@ -31,6 +31,11 @@ static void write_mem_DPU(index_seed_t *seed, int8_t *read, int num_read)
 {
     while (seed != NULL) {
         unsigned int num_dpu = seed->num_dpu;
+        if (num_dpu != 8) {
+            seed = seed->next;
+            continue;
+        }
+        num_dpu = 0;
         unsigned int nb_reads = __sync_fetch_and_add(&requests[num_dpu].nb_reads, 1);
         dpu_request_t *new_read = &requests[num_dpu].dpu_requests[nb_reads];
         new_read->offset = seed->offset;

@@ -185,7 +185,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
-    nb_dpus_used_current_run = MIN(index_get_nb_dpu() - dpu_offset, nb_dpus_per_run);
+    nb_dpus_used_current_run = 1;
     acc_res = RESULTS_BUFFERS(pass_id);
 
     // compute the total number of resultat for all DPUs
@@ -195,6 +195,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         total_nb_res += acc_res[numdpu].nb_res;
         uint32_t rank, ci, dpu;
         get_dpu_info(numdpu, &rank, &ci, &dpu);
+        printf("number of variants (results): %u\n", acc_res[numdpu].nb_res);
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
             ERROR_EXIT(ERR_ACC_END_MARK_MISSING, "%s:[P%u, M%u]: end mark is not there in DPU#%u (0x%x.%u.%u)\n", __func__,
                 pass_id, dpu_offset, numdpu, rank, ci, dpu);

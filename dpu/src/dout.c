@@ -34,7 +34,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
         /* Local cache is full, copy into the swap area.
          * This shall never happen, but let's verify that we remain inside our assigned swap area. */
         if (dout->nb_page_out >= MAX_RESULTS_PER_READ / MAX_LOCAL_RESULTS_PER_READ) {
-            printf("WARNING! too many swapped pages!\n");
+            //printf("WARNING! too many swapped pages!\n");
             halt();
         }
         swap_addr = dout_swap_page_addr(dout, dout->nb_page_out);

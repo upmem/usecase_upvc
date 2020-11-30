@@ -236,6 +236,7 @@ void run_on_dpu(unsigned int dpu_offset, unsigned int pass_id, sem_t *dispatch_f
 
     DPU_ASSERT(dpu_callback(devices.all_ranks, sem_post_dispatch_free_sem, dispatch_free_sem,
         DPU_CALLBACK_ASYNC | DPU_CALLBACK_NONBLOCKING | DPU_CALLBACK_SINGLE_CALL));
+    DPU_ASSERT(dpu_sync(devices.all_ranks));
     DPU_ASSERT(dpu_launch(devices.all_ranks, DPU_ASYNCHRONOUS));
     sem_wait(acc_wait_sem);
 
@@ -266,6 +267,7 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run)
     printf("%u DPUs allocated\n", devices.nb_dpus);
     assert(devices.nb_dpus == *nb_dpus_per_run);
 
+    *nb_dpus_per_run = index_get_nb_dpu();
 #ifdef STATS_ON
     pthread_mutex_init(&devices.log_mutex, NULL);
     char filename[1024];

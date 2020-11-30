@@ -58,7 +58,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         __mram_ptr void *source_addr = dout_swap_page_addr(results, pageno);
 
         if (DPU_NB_RESULT_VAR + MAX_LOCAL_RESULTS_PER_READ >= (MAX_DPU_RESULTS - 1)) {
-            printf("WARNING! too many result in DPU! (from swap)\n");
+            //printf("WARNING! too many result in DPU! (from swap)\n");
             halt();
         }
 
@@ -87,7 +87,7 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
         each_result++;
     }
     if (DPU_NB_RESULT_VAR >= (MAX_DPU_RESULTS - 1)) {
-        printf("WARNING! too many result in DPU! (from local)\n");
+        //printf("WARNING! too many result in DPU! (from local)\n");
         halt();
     }
 

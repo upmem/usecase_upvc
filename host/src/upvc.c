@@ -48,7 +48,10 @@ void *thread_get_reads(__attribute__((unused)) void *arg)
             sem_wait(&accprocess_to_getreads_sem);
             get_reads(fipe1, fipe2, each_pass);
             sem_post(&getreads_to_dispatch_sem);
+            break;
         } while (get_reads_in_buffer(each_pass++) != 0);
+        sem_wait(&accprocess_to_getreads_sem);
+        sem_post(&getreads_to_dispatch_sem);
 
         fseek(fipe1, 0, SEEK_SET);
         fseek(fipe2, 0, SEEK_SET);
