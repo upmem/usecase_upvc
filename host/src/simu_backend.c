@@ -237,7 +237,8 @@ static void align_on_dpu(unsigned int dpu_offset, unsigned rank_id, int pass_id)
     acc_res->nb_res = nb_map;
 }
 
-static void *align_on_dpu_fct(void *arg) {
+static void *align_on_dpu_fct(void *arg)
+{
     const unsigned int dpu_id = (unsigned int)(uintptr_t)arg;
 
     pthread_barrier_wait(&barrier);

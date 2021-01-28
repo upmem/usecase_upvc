@@ -71,7 +71,8 @@ static void dpu_try_write_dispatch_into_mram(unsigned int dpu_offset, unsigned i
     DPU_FOREACH (devices.all_ranks, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &io_header[each_dpu]->nb_reads));
     }
-    DPU_ASSERT(dpu_push_xfer(devices.all_ranks, DPU_XFER_TO_DPU, XSTR(DPU_NB_REQUEST_VAR), 0, sizeof(nb_request_t), DPU_XFER_ASYNC));
+    DPU_ASSERT(
+        dpu_push_xfer(devices.all_ranks, DPU_XFER_TO_DPU, XSTR(DPU_NB_REQUEST_VAR), 0, sizeof(nb_request_t), DPU_XFER_ASYNC));
 
     DPU_FOREACH (devices.all_ranks, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, io_header[each_dpu]->dpu_requests));
@@ -145,7 +146,7 @@ static __attribute__((used)) dpu_error_t dpu_try_log(struct dpu_set_t rank, uint
         fprintf(devices.log_file, "LOG DPU=%u LOAD=%u\n", this_dpu, agreagated_stats.mram_load);
         fprintf(devices.log_file, "LOG DPU=%u STORE=%u\n", this_dpu, agreagated_stats.mram_store);
 
-        DPU_ASSERT(dpu_log_read(dpu, devices.log_file));
+        /* DPU_ASSERT(dpu_log_read(dpu, devices.log_file)); */
     }
     fflush(devices.log_file);
     pthread_mutex_unlock(&devices.log_mutex);
@@ -207,12 +208,13 @@ static void dpu_try_get_results_and_log(unsigned int dpu_offset, unsigned int pa
         }
         DPU_ASSERT(dpu_prepare_xfer(dpu, results));
     }
-    DPU_ASSERT(dpu_push_xfer(devices.all_ranks, DPU_XFER_FROM_DPU, XSTR(DPU_NB_RESULT_VAR), 0, sizeof(nb_result_t), DPU_XFER_ASYNC));
+    DPU_ASSERT(
+        dpu_push_xfer(devices.all_ranks, DPU_XFER_FROM_DPU, XSTR(DPU_NB_RESULT_VAR), 0, sizeof(nb_result_t), DPU_XFER_ASYNC));
 
     pass_info_t info = { .dpu_offset = dpu_offset, .pass_id = pass_id };
     DPU_ASSERT(dpu_callback(devices.all_ranks, dpu_get_results, (void *)info.info, DPU_CALLBACK_ASYNC));
 #ifdef STATS_ON
-    DPU_ASSERT(dpu_callback(devices.all_ranks, dpu_try_log, (void *)dpu_offset, DPU_CALLBACK_ASYNC));
+    DPU_ASSERT(dpu_callback(devices.all_ranks, dpu_try_log, (void *)(uintptr_t)dpu_offset, DPU_CALLBACK_ASYNC));
 #endif
 }
 
@@ -319,7 +321,8 @@ typedef union {
     uint64_t info;
 } load_info_t;
 
-static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void *args) {
+static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void *args)
+{
     load_info_t info = (load_info_t)(uintptr_t)args;
     unsigned int dpu_offset = info.dpu_offset;
     unsigned int delta_neighbour = info.delta_neighbour;

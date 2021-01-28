@@ -61,7 +61,6 @@ enum error_code {
 #define ERROR_EXIT(err_code, fmt, ...)                                                                                           \
     do {                                                                                                                         \
         ERROR(fmt, ##__VA_ARGS__);                                                                                               \
-        exit(0);\
         exit((err_code));                                                                                                        \
     } while (0)
 
