@@ -61,12 +61,8 @@ void *thread_get_reads(__attribute__((unused)) void *arg)
 
 void exec_dpus()
 {
-    const unsigned int delta_neighbour = (SIZE_SEED * round) / 4;
-
     FOREACH_RUN(dpu_offset)
     {
-        backends_functions.load_mram(dpu_offset, delta_neighbour);
-
         sem_wait(&dispatch_to_exec_sem);
 
         FOREACH_PASS(each_pass)
@@ -275,8 +271,9 @@ static void exec_round()
 
 static void do_mapping()
 {
-    variant_tree_init();
     backends_functions.init_backend(&nb_dpus_per_run);
+    backends_functions.load_mram(0, 0);
+    variant_tree_init();
     dispatch_init();
     process_read_init();
 
@@ -291,8 +288,8 @@ static void do_mapping()
 
     process_read_free();
     dispatch_free();
-    backends_functions.free_backend();
     variant_tree_free();
+    backends_functions.free_backend();
 }
 
 static void print_time()

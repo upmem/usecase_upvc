@@ -358,13 +358,14 @@ static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void 
 
 void load_mram_dpu(unsigned int dpu_offset, int delta_neighbour)
 {
-    load_info_t info = {.dpu_offset = dpu_offset, delta_neighbour = delta_neighbour};
-    dpu_callback(devices.all_ranks, load_mram_rank, (void *)info.info, DPU_CALLBACK_ASYNC);
+    double start_time = my_clock();
+    printf("%s:\n", __func__);
+    load_info_t info = { .dpu_offset = dpu_offset, delta_neighbour = delta_neighbour };
+    dpu_callback(devices.all_ranks, load_mram_rank, (void *)info.info, DPU_CALLBACK_DEFAULT);
+    printf("\ttime: %lf s\n", my_clock() - start_time);
 }
 
-void wait_dpu_dpu() {
-    DPU_ASSERT(dpu_sync(devices.all_ranks));
-}
+void wait_dpu_dpu() { DPU_ASSERT(dpu_sync(devices.all_ranks)); }
 
 void get_dpu_info(uint32_t numdpu, uint32_t *rank, uint32_t *ci, uint32_t *dpu)
 {
