@@ -60,7 +60,7 @@ static void dpu_try_write_dispatch_into_mram(unsigned int dpu_offset, unsigned i
     unsigned int nb_dpu = index_get_nb_dpu();
     unsigned int max_dispatch_size = 0;
     DPU_FOREACH (devices.all_ranks, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_tid[each_dpu + dpu_offset];
+        unsigned int this_dpu = dpu_offset + dpu_tid[each_dpu];
         if (this_dpu < nb_dpu) {
             io_header[each_dpu] = dispatch_get(this_dpu, pass_id);
         } else {
@@ -338,7 +338,7 @@ static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void 
     struct dpu_set_t dpu;
     dpu_offset += devices.rank_mram_offset[rank_id];
     DPU_FOREACH (rank, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_tid[dpu_offset + each_dpu];
+        unsigned int this_dpu = dpu_offset + dpu_tid[each_dpu];
         if (this_dpu < nb_dpu) {
             mram_size[each_dpu] = mram_load(&mram[each_dpu], this_dpu);
         }

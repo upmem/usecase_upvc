@@ -63,6 +63,8 @@ void exec_dpus()
 {
     FOREACH_RUN(dpu_offset)
     {
+        backends_functions.load_mram(dpu_offset, 0);
+
         sem_wait(&dispatch_to_exec_sem);
 
         FOREACH_PASS(each_pass)
@@ -272,7 +274,6 @@ static void exec_round()
 static void do_mapping()
 {
     backends_functions.init_backend(&nb_dpus_per_run);
-    backends_functions.load_mram(0, 0);
     variant_tree_init();
     dispatch_init();
     process_read_init();
