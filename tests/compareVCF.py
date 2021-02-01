@@ -35,7 +35,7 @@ parser.add_argument(
 parser.add_argument(
     "-c",
     dest="check_results",
-    help="Check that TP and CM are above 99%",
+    help="Check that TP and CM are above 98%",
     action="store_true")
 
 args = parser.parse_args()
@@ -304,7 +304,7 @@ def compute_data(V_ref, V_upvc, len_ref, len_upvc):
         print_VCF_quality(tp, fp, fn, cm, len_upvc, len_ref)
 
     if args.check_results:
-        if per(tp, len_upvc) < 99.0 or per(cm, len_ref) < 99:
+        if per(tp, len_upvc) < 98.0 or per(cm, len_ref) < 98.0:
             sys.exit(-1)
 
 
