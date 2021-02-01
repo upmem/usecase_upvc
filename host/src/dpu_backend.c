@@ -336,9 +336,9 @@ static dpu_error_t load_mram_rank(struct dpu_set_t rank, uint32_t rank_id, void 
 
     unsigned int each_dpu;
     struct dpu_set_t dpu;
-    dpu_offset += devices.rank_mram_offset[rank_id];
+    unsigned int mram_offset = devices.rank_mram_offset[rank_id];
     DPU_FOREACH (rank, dpu, each_dpu) {
-        unsigned int this_dpu = dpu_offset + dpu_tid[each_dpu];
+        unsigned int this_dpu = dpu_offset + dpu_tid[each_dpu + mram_offset];
         if (this_dpu < nb_dpu) {
             mram_size[each_dpu] = mram_load(&mram[each_dpu], this_dpu);
         }
@@ -363,7 +363,7 @@ void load_mram_dpu(unsigned int dpu_offset, int delta_neighbour)
 {
     double start_time = my_clock();
     printf("%s:\n", __func__);
-    load_info_t info = { .dpu_offset = dpu_offset, delta_neighbour = delta_neighbour };
+    load_info_t info = { .dpu_offset = dpu_offset, .delta_neighbour = delta_neighbour };
     dpu_callback(devices.all_ranks, load_mram_rank, (void *)info.info, DPU_CALLBACK_DEFAULT);
     printf("\ttime: %lf s\n", my_clock() - start_time);
 }
