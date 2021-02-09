@@ -18,7 +18,7 @@
 #define MAX_DPU_RESULTS (1 << 19)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
-#define SIZE_READ 120
+#define SIZE_READ 150
 #define SIZE_SEED 14
 #define SIZE_NEIGHBOUR_IN_BYTES ((SIZE_READ - SIZE_SEED) / 4)
 #define DELTA_NEIGHBOUR(round) ((SIZE_SEED * round) / 4)

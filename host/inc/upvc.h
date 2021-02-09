@@ -7,8 +7,8 @@
 
 #define VERSION "VERSION 1.8"
 #define MAX_READS_BUFFER (512 * 1024) /* Maximum number of read by round        */
-#define NB_READS_BUFFER (16) /* To be increase if enough legacy memory available */
-#define NB_DISPATCH_AND_ACC_BUFFER (4) /* To be increase if enough legacy memory available */
+#define NB_READS_BUFFER (128) /* To be increase if enough legacy memory available */
+#define NB_DISPATCH_AND_ACC_BUFFER (32) /* To be increase if enough legacy memory available */
 #define NB_ROUND (1)
 
 #define COST_SUB 10
