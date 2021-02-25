@@ -199,6 +199,38 @@ print:
     return true;
 }
 
+static variant_t * get_most_frequent_variant(genome_t * ref_genome, float ** frequency_table, uint64_t genome_pos) {
+
+  static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
+
+  float max = 0;
+  int8_t nucId = -1;
+  for(int i = 0; i < 5; ++i) {
+    float freq = frequency_table[i][genome_pos]++; 
+    if(freq > max) {
+      max = freq;
+      nucId = i;
+    }
+  }
+
+  if(nucId >= 0 && (nucId != ref_genome->data[genome_pos])) {
+
+    assert(nucId < 4);
+
+    // this is a substitution, create variant
+    variant_t *var = (variant_t *)malloc(sizeof(variant_t));
+    var->score = max;
+    var->depth = 1; // TODO
+    var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
+    var->alt[0] = nucleotide[nucId];
+
+    return var;
+  }
+
+  return NULL;
+}
+
+//TODO here read frequency table and write vcf (take max of frequency table to find substitution if any)
 void create_vcf()
 {
     double start_time = my_clock();
@@ -235,15 +267,23 @@ void create_vcf()
 
     /* ####### END OF HEADER ####### */
 
+    float **frequency_table = get_frequency_table();
+
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
         /* for each position in the sequence */
         for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
-            variant_t *var = variant_list[seq_number][seq_position];
-            while (var != NULL) {
-                nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
-                var = var->next;
+            
+            uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
+            variant_t *var = get_most_frequent_variant(ref_genome, frequency_table, genome_pos);
+            if(var) {
+              nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
             }
+            //variant_t *var = variant_list[seq_number][seq_position];
+            //while (var != NULL) {
+            //    nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
+            //    var = var->next;
+            //}
         }
     }
 

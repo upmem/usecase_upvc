@@ -114,3 +114,18 @@ void genome_free()
     free(genome.data);
     free(genome.mapping_coverage);
 }
+
+static float* frequency_table[5];
+
+float** get_frequency_table() { 
+
+  if(!frequency_table[0]) {
+    // allocate frequency_table on first call
+    for(int i = 0; i < 5; ++i) {
+      frequency_table[i] = (float*)calloc(genome.fasta_file_size, sizeof(float));
+    }
+  }
+  return frequency_table; 
+}
+
+

@@ -202,6 +202,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
  * The code is return in "code" as a table of int8_t
  */
 
+#if 0
 static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, unsigned size_neighbour_in_symbols)
 {
     int code_idx, computed_score, backtrack_idx;
@@ -377,6 +378,7 @@ static void set_variant(
             newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
     }
 }
+#endif
 
 static pthread_mutex_t non_mapped_mutex;
 static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
@@ -405,6 +407,20 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     }
     fprintf(fpe2, "\n");
     pthread_mutex_unlock(&non_mapped_mutex);
+}
+
+static void update_frequency_table(
+    genome_t *ref_genome, 
+    dpu_result_out_t *result_tab, 
+    int8_t *reads_buffer, 
+    int pos) {
+
+  float **frequency_table = get_frequency_table();
+  uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr;
+  int num = result_tab[pos].num;
+  int8_t *read = reads_buffer + (num * SIZE_READ);
+  for(int j = 0; j < SIZE_READ; ++j)
+    frequency_table[read[j]][genome_pos]++; 
 }
 
 static volatile unsigned int curr_match;
@@ -446,7 +462,7 @@ static void do_process_read(process_read_arg_t *arg)
     genome_t *ref_genome = arg->ref_genome;
     FILE *fpe1 = arg->fpe1;
     FILE *fpe2 = arg->fpe2;
-    unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
+    //unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
 
     /*
      * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -512,25 +528,14 @@ static void do_process_read(process_read_arg_t *arg)
             }
         }
         if (np > 0) {
-            // choose the less covered zone on the genome
-            int x = 0;
-            uint64_t genome_pos;
-            int cov1, cov2;
-            int min_cov = 1000;
-            ;
-            for (unsigned int kk = 0; kk < np; kk++) {
-                genome_pos = ref_genome->pt_seq[result_tab[P1[kk]].coord.seq_nr] + result_tab[P1[kk]].coord.seed_nr;
-                cov1 = ref_genome->mapping_coverage[genome_pos];
-                genome_pos = ref_genome->pt_seq[result_tab[P2[kk]].coord.seq_nr] + result_tab[P2[kk]].coord.seed_nr;
-                cov2 = ref_genome->mapping_coverage[genome_pos];
-                if (cov1 + cov2 < min_cov) {
-                    x = kk;
-                    min_cov = cov1 + cov2;
-                }
-            }
 
-            set_variant(result_tab[P1[x]], ref_genome, reads_buffer, size_neighbour_in_symbols);
-            set_variant(result_tab[P2[x]], ref_genome, reads_buffer, size_neighbour_in_symbols);
+            // update frequency table 
+            for (unsigned int i = 0; i < np; i++) {
+
+              // for each matching position of this read in the reference genome, add +1 in the corresponding nucleotide column
+              update_frequency_table(ref_genome, result_tab, reads_buffer, P1[i]);
+              update_frequency_table(ref_genome, result_tab, reads_buffer, P2[i]);
+            }
         } else {
             pthread_mutex_lock(&nr_reads_mutex);
             nr_reads_non_mapped++;

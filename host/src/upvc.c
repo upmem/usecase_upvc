@@ -172,6 +172,7 @@ static void exec_round()
         fipe1 = fopen(filename, "r");
         CHECK_FILE(fipe1, filename);
         assert(get_input_info(fipe1, &read_size1, &nb_read1) == 0);
+        printf("read_size1 %zu SIZE_READ %u\n", read_size1, SIZE_READ);
         assert(read_size1 == SIZE_READ);
 
         sprintf(filename, "%s_PE2.fastq", input_prefix);
