@@ -36,5 +36,6 @@ struct frequency_info {
   unsigned int score;
 };
 struct frequency_info** get_frequency_table(); 
+void free_frequency_table();
 
 #endif /* __GENOME_H__ */

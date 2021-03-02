@@ -131,4 +131,15 @@ struct frequency_info** get_frequency_table() {
   return frequency_table; 
 }
 
+void free_frequency_table() {
+
+  if(init_frequency_table) {
+    for(int i = 0; i < 5; ++i) {
+      free(frequency_table[i]);
+    }
+    init_frequency_table = false;
+  }
+}
+
+
 

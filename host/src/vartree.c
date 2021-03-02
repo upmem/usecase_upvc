@@ -69,6 +69,7 @@ typedef struct {
     uint32_t score;
 } depth_filter_t;
 
+#if 0
 #if (SIZE_READ == 120)
 depth_filter_t sub_filter[] = {
     [3] = { 15, 16 },
@@ -140,6 +141,7 @@ depth_filter_t indel_filter[] = {
 #else
 #error "Filter not defined for this size of read"
 #endif
+#endif
 
 static bool homopolymer(int8_t *seq, int offset)
 {
@@ -190,9 +192,9 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
         } else if (depth > 11) {
             depth = 11;
         }
-        if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
-            return false;
-        }
+        //if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
+        //    return false;
+        //}
     }
 
 print:
@@ -294,14 +296,10 @@ void create_vcf()
                 nb_pos_multiple_var++;
             }
             free(results);
-            //variant_t *var = variant_list[seq_number][seq_position];
-            //while (var != NULL) {
-            //    nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
-            //    var = var->next;
-            //}
         }
     }
 
+    free_frequency_table();
     fclose(vcf_file);
 
     printf("\tnumber of variants: %d (multiple %d)\n", nb_variant, nb_pos_multiple_var);
