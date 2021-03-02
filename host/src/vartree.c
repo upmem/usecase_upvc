@@ -207,18 +207,26 @@ static variant_t * get_most_frequent_variant(genome_t * ref_genome, struct frequ
 
   static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
 
+  float total = 0;
+  for(int i = 0; i < 5; ++i) {
+    total += frequency_table[i][genome_pos].freq; 
+  }
+
   float max = 0;
   int8_t nucId = -1;
   for(int i = 0; i < 5; ++i) {
-    float freq = frequency_table[i][genome_pos].freq; 
-    if(freq > max) {
-      max = freq;
-      nucId = i;
+    float freq = frequency_table[i][genome_pos].freq;
+    if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
+    if((freq / total > 0.2) && freq > 3) { // if frequency > 20% and depth > 3, consider it a variant
+      if(freq > max) { // keep variant of max frequency
+        max = freq;
+        nucId = i;
+      }
     }
   }
   //printf("get_most_frequent_variant: genome_pos %lu, nucleotide max freq %d %f %c\n", genome_pos, nucId, max, nucId >= 0 ? nucleotide[nucId] : '-');
 
-  if(nucId >= 0 && (nucId != ref_genome->data[genome_pos])) {
+  if(nucId >= 0) {
 
     assert(nucId < 4);
 
@@ -226,7 +234,7 @@ static variant_t * get_most_frequent_variant(genome_t * ref_genome, struct frequ
     variant_t *var = (variant_t *)malloc(sizeof(variant_t));
     var->score = frequency_table[nucId][genome_pos].score;
     // TODO: at the moment the number of matches and the score is the same. If we start having weights, we should store both the count and score in frequency table
-    var->depth = max;
+    var->depth = frequency_table[nucId][genome_pos].freq;
     var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
     var->ref[1] = '\0';
     var->alt[0] = nucleotide[nucId];
