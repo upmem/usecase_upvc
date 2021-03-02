@@ -203,47 +203,36 @@ print:
     return true;
 }
 
-static variant_t * get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint64_t genome_pos) {
+static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint64_t genome_pos) {
 
   static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
 
+  variant_t** results = calloc(5, sizeof(variant_t*));
   float total = 0;
   for(int i = 0; i < 5; ++i) {
     total += frequency_table[i][genome_pos].freq; 
   }
 
-  float max = 0;
-  int8_t nucId = -1;
   for(int i = 0; i < 5; ++i) {
     float freq = frequency_table[i][genome_pos].freq;
     if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
     if((freq / total > 0.2) && freq > 3) { // if frequency > 20% and depth > 3, consider it a variant
-      if(freq > max) { // keep variant of max frequency
-        max = freq;
-        nucId = i;
-      }
+
+      // this is a substitution, create variant
+      variant_t *var = (variant_t *)malloc(sizeof(variant_t));
+      var->score = frequency_table[i][genome_pos].score;
+      // TODO: at the moment the number of matches and the score is the same. If we start having weights, we should store both the count and score in frequency table
+      var->depth = frequency_table[i][genome_pos].freq;
+      var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
+      var->ref[1] = '\0';
+      var->alt[0] = nucleotide[i];
+      var->alt[1] = '\0';
+      results[i] = var;
     }
   }
   //printf("get_most_frequent_variant: genome_pos %lu, nucleotide max freq %d %f %c\n", genome_pos, nucId, max, nucId >= 0 ? nucleotide[nucId] : '-');
 
-  if(nucId >= 0) {
-
-    assert(nucId < 4);
-
-    // this is a substitution, create variant
-    variant_t *var = (variant_t *)malloc(sizeof(variant_t));
-    var->score = frequency_table[nucId][genome_pos].score;
-    // TODO: at the moment the number of matches and the score is the same. If we start having weights, we should store both the count and score in frequency table
-    var->depth = frequency_table[nucId][genome_pos].freq;
-    var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
-    var->ref[1] = '\0';
-    var->alt[0] = nucleotide[nucId];
-    var->alt[1] = '\0';
-
-    return var;
-  }
-
-  return NULL;
+  return results;
 }
 
 //TODO here read frequency table and write vcf (take max of frequency table to find substitution if any)
@@ -284,6 +273,7 @@ void create_vcf()
     /* ####### END OF HEADER ####### */
 
     struct frequency_info **frequency_table = get_frequency_table();
+    uint32_t nb_pos_multiple_var = 0;
 
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
@@ -291,10 +281,19 @@ void create_vcf()
         for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
             
             uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
-            variant_t *var = get_most_frequent_variant(ref_genome, frequency_table, genome_pos);
-            if(var) {
-              nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
+            variant_t ** results = get_most_frequent_variant(ref_genome, frequency_table, genome_pos);
+            int nb_var = 0;
+            for(int i = 0; i < 5; ++i) {
+              variant_t * var = results[i];
+              if(var) {
+                nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
+                free(var);
+                nb_var++;
+              }
+              if(nb_var > 1)
+                nb_pos_multiple_var++;
             }
+            free(results);
             //variant_t *var = variant_list[seq_number][seq_position];
             //while (var != NULL) {
             //    nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
@@ -305,6 +304,6 @@ void create_vcf()
 
     fclose(vcf_file);
 
-    printf("\tnumber of variants: %d\n", nb_variant);
+    printf("\tnumber of variants: %d (multiple %d)\n", nb_variant, nb_pos_multiple_var);
     printf("\ttime: %lf s\n", my_clock() - start_time);
 }
