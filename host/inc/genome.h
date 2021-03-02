@@ -30,6 +30,11 @@ void genome_free();
 
 genome_t *genome_get();
 
-float** get_frequency_table(); 
+struct frequency_info {
+
+  float freq;
+  unsigned int score;
+};
+struct frequency_info** get_frequency_table(); 
 
 #endif /* __GENOME_H__ */

@@ -173,13 +173,16 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
         goto print;
 
     if (ref_len == alt_len) { /* SUBSTITUTION */
-        if (depth < 3) {
-            return false;
-        } else if (depth > 20) {
+        //if (depth < 3) {
+        //    return false;
+        //} else if (depth > 20) {
+        //    depth = 20;
+        //}
+        //if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
+        //    return false;
+        //}
+        if (depth > 20) {
             depth = 20;
-        }
-        if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
-            return false;
         }
     } else { /* INSERTION OR DELETION */
         if (depth < 2) {
@@ -193,25 +196,27 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
     }
 
 print:
-    fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos, var->ref, var->alt, var->depth, cov,
+    //TODO
+    fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos+1, var->ref, var->alt, var->depth, cov,
         score);
 
     return true;
 }
 
-static variant_t * get_most_frequent_variant(genome_t * ref_genome, float ** frequency_table, uint64_t genome_pos) {
+static variant_t * get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint64_t genome_pos) {
 
   static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
 
   float max = 0;
   int8_t nucId = -1;
   for(int i = 0; i < 5; ++i) {
-    float freq = frequency_table[i][genome_pos]++; 
+    float freq = frequency_table[i][genome_pos].freq; 
     if(freq > max) {
       max = freq;
       nucId = i;
     }
   }
+  //printf("get_most_frequent_variant: genome_pos %lu, nucleotide max freq %d %f %c\n", genome_pos, nucId, max, nucId >= 0 ? nucleotide[nucId] : '-');
 
   if(nucId >= 0 && (nucId != ref_genome->data[genome_pos])) {
 
@@ -219,10 +224,13 @@ static variant_t * get_most_frequent_variant(genome_t * ref_genome, float ** fre
 
     // this is a substitution, create variant
     variant_t *var = (variant_t *)malloc(sizeof(variant_t));
-    var->score = max;
-    var->depth = 1; // TODO
+    var->score = frequency_table[nucId][genome_pos].score;
+    // TODO: at the moment the number of matches and the score is the same. If we start having weights, we should store both the count and score in frequency table
+    var->depth = max;
     var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
+    var->ref[1] = '\0';
     var->alt[0] = nucleotide[nucId];
+    var->alt[1] = '\0';
 
     return var;
   }
@@ -267,7 +275,7 @@ void create_vcf()
 
     /* ####### END OF HEADER ####### */
 
-    float **frequency_table = get_frequency_table();
+    struct frequency_info **frequency_table = get_frequency_table();
 
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {

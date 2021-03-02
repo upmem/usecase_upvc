@@ -121,15 +121,15 @@ static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_
     STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));
     STATS_INCR_NB_NODP_CALLS(*tasklet_stats);
 
-    if (score_nodp == UINT_MAX) {
-        STATS_GET_START_TIME(start, acc, end);
+    //if (score_nodp == UINT_MAX) {
+    //    STATS_GET_START_TIME(start, acc, end);
 
-        score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR));
+    //    score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR));
 
-        STATS_GET_END_TIME(end, acc);
-        STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
-        STATS_INCR_NB_ODPD_CALLS(*tasklet_stats);
-    }
+    //    STATS_GET_END_TIME(end, acc);
+    //    STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
+    //    STATS_INCR_NB_ODPD_CALLS(*tasklet_stats);
+    //}
 
     if (score > *mini) {
         return;

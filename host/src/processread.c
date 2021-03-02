@@ -415,12 +415,18 @@ static void update_frequency_table(
     int8_t *reads_buffer, 
     int pos) {
 
-  float **frequency_table = get_frequency_table();
-  uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr;
+  struct frequency_info **frequency_table = get_frequency_table();
+  uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr; 
   int num = result_tab[pos].num;
   int8_t *read = reads_buffer + (num * SIZE_READ);
-  for(int j = 0; j < SIZE_READ; ++j)
-    frequency_table[read[j]][genome_pos]++; 
+  for(int j = 0; j < SIZE_READ; ++j) {
+    if(genome_pos + j < genome_get()->fasta_file_size) {
+      frequency_table[read[j]][genome_pos+j].freq++;
+      frequency_table[read[j]][genome_pos+j].score += result_tab[pos].score;
+    }
+    else
+      printf("WARNING: reads matched at position that exceeds genome size\n");
+  }
 }
 
 static volatile unsigned int curr_match;
