@@ -143,6 +143,7 @@ depth_filter_t indel_filter[] = {
 #endif
 #endif
 
+#if 0
 static bool homopolymer(int8_t *seq, int offset)
 {
     for (int i = 0; i < offset - 1; i++) {
@@ -152,6 +153,7 @@ static bool homopolymer(int8_t *seq, int offset)
     }
     return true;
 }
+#endif
 
 static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
 {
@@ -160,16 +162,16 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
     uint32_t cov = ref_genome->mapping_coverage[genome_pos];
     uint32_t depth = var->depth;
     uint32_t score = var->score / depth;
-    uint32_t percentage = 100;
-    if (cov != 0) {
-        percentage = depth * 100 / cov;
-    }
+    //uint32_t percentage = 100;
+    //if (cov != 0) {
+    //    percentage = depth * 100 / cov;
+    //}
 
     uint32_t ref_len = strlen(var->ref);
     uint32_t alt_len = strlen(var->alt);
-    if (ref_len > alt_len && percentage <= 25 && homopolymer(&ref_genome->data[genome_pos - 12], 12)) {
-        return false;
-    }
+    //if (ref_len > alt_len && percentage <= 25 && homopolymer(&ref_genome->data[genome_pos - 12], 12)) {
+    //    return false;
+    //}
 
     if (get_no_filter())
         goto print;
@@ -205,6 +207,9 @@ print:
     return true;
 }
 
+#define FREQUENCY_THRESHOLD 0.20
+#define DEPTH_THRESHOLD 2
+
 static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint64_t genome_pos) {
 
   static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
@@ -218,12 +223,12 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
   for(int i = 0; i < 5; ++i) {
     float freq = frequency_table[i][genome_pos].freq;
     if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
-    if((freq / total > 0.2) && freq > 3) { // if frequency > 20% and depth > 3, consider it a variant
+    if((freq / total > FREQUENCY_THRESHOLD) 
+        && freq > DEPTH_THRESHOLD) { // if frequency > 20% and depth > 3, consider it a variant
 
       // this is a substitution, create variant
       variant_t *var = (variant_t *)malloc(sizeof(variant_t));
       var->score = frequency_table[i][genome_pos].score;
-      // TODO: at the moment the number of matches and the score is the same. If we start having weights, we should store both the count and score in frequency table
       var->depth = frequency_table[i][genome_pos].freq;
       var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
       var->ref[1] = '\0';

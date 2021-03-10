@@ -503,8 +503,12 @@ static void do_process_read(process_read_arg_t *arg)
         unsigned int P1[1000];
         unsigned int P2[1000];
         unsigned int np = 0;
+        unsigned int P1_all[1000];
+        unsigned int P2_all[1000];
+        unsigned int np_all = 0;
         unsigned int pos1, pos2, t1, t2;
         unsigned int best_score = 1000;
+        unsigned int best_score_all = 1000;
         // test all significant pairs of reads (0,3) & (1,2)
         for (unsigned int x1 = i; x1 < j; x1++) {
             t1 = result_tab[x1].num % 4;
@@ -514,7 +518,7 @@ static void do_process_read(process_read_arg_t *arg)
                 t2 = result_tab[x2].num % 4;
                 if (t1 + t2 == 3) // select significant pair
                 {
-                    if ((abs((int)pos2 - (int)pos1) > 130 && (abs((int)pos2 - (int)pos1) < 430))) {
+                    if ((abs((int)pos2 - (int)pos1) > 50 && (abs((int)pos2 - (int)pos1) < 1000))) {
                         if (result_tab[x1].score + result_tab[x2].score < best_score) {
                             np = 0;
                             best_score = result_tab[x1].score + result_tab[x2].score;
@@ -530,6 +534,21 @@ static void do_process_read(process_read_arg_t *arg)
                             }
                         }
                     }
+                    else {
+                      
+                        if (result_tab[x1].score + result_tab[x2].score < best_score_all) {
+                            np_all = 0;
+                            best_score_all = result_tab[x1].score + result_tab[x2].score;
+                            P1_all[np_all] = x1;
+                            P2_all[np_all] = x2;
+                            np_all++;
+                        } else if (result_tab[x1].score + result_tab[x2].score == best_score_all) {
+                                P1_all[np_all] = x1;
+                                P2_all[np_all] = x2;
+                                if (np_all < 999)
+                                    np_all++;
+                        }
+                    }
                 }
             }
         }
@@ -541,6 +560,16 @@ static void do_process_read(process_read_arg_t *arg)
               // for each matching position of this read in the reference genome, add +1 in the corresponding nucleotide column
               update_frequency_table(ref_genome, result_tab, reads_buffer, P1[i]);
               update_frequency_table(ref_genome, result_tab, reads_buffer, P2[i]);
+            }
+        }
+        else if (np_all > 0) {
+
+            // update frequency table 
+            for (unsigned int i = 0; i < np_all; i++) {
+
+              // for each matching position of this read in the reference genome, add +1 in the corresponding nucleotide column
+              update_frequency_table(ref_genome, result_tab, reads_buffer, P1_all[i]);
+              update_frequency_table(ref_genome, result_tab, reads_buffer, P2_all[i]);
             }
         } else {
             pthread_mutex_lock(&nr_reads_mutex);
