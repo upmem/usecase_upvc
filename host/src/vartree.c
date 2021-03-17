@@ -207,8 +207,10 @@ print:
     return true;
 }
 
-#define FREQUENCY_THRESHOLD 0.20
+#define FREQUENCY_THRESHOLD 0.15
 #define DEPTH_THRESHOLD 2
+
+FILE * dbg_file = NULL;
 
 static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint64_t genome_pos) {
 
@@ -237,6 +239,9 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
       results[i] = var;
     }
   }
+  fprintf(dbg_file, "pos: %lu ref nucleotide %c frequencies: A:%f C:%f T:%f G:%f\n", genome_pos, nucleotide[ref_genome->data[genome_pos]], 
+          frequency_table[0][genome_pos].freq, frequency_table[1][genome_pos].freq, 
+          frequency_table[2][genome_pos].freq, frequency_table[3][genome_pos].freq);
   //printf("get_most_frequent_variant: genome_pos %lu, nucleotide max freq %d %f %c\n", genome_pos, nucId, max, nucId >= 0 ? nucleotide[nucId] : '-');
 
   return results;
@@ -282,6 +287,8 @@ void create_vcf()
     struct frequency_info **frequency_table = get_frequency_table();
     uint32_t nb_pos_multiple_var = 0;
 
+    dbg_file = fopen("freq_debug.txt", "w");
+
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
         /* for each position in the sequence */
@@ -303,6 +310,8 @@ void create_vcf()
             free(results);
         }
     }
+
+    fclose(dbg_file);
 
     free_frequency_table();
     fclose(vcf_file);

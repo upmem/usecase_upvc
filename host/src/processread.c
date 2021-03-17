@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "accumulateread.h"
 #include "genome.h"
@@ -34,6 +35,7 @@
 #define PATH_SUBSTITUTION (0)
 #define PATH_INSERTION (1)
 #define PATH_DELETION (2)
+#define MAX_SUBSTITUTION (4)
 
 typedef struct {
     int type;
@@ -413,7 +415,8 @@ static void update_frequency_table(
     genome_t *ref_genome, 
     dpu_result_out_t *result_tab, 
     int8_t *reads_buffer, 
-    int pos) {
+    int pos,
+    float mapq) {
 
   struct frequency_info **frequency_table = get_frequency_table();
   uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr; 
@@ -421,7 +424,7 @@ static void update_frequency_table(
   int8_t *read = reads_buffer + (num * SIZE_READ);
   for(int j = 0; j < SIZE_READ; ++j) {
     if(genome_pos + j < genome_get()->fasta_file_size) {
-      frequency_table[read[j]][genome_pos+j].freq++;
+      frequency_table[read[j]][genome_pos+j].freq += mapq;
       frequency_table[read[j]][genome_pos+j].score += result_tab[pos].score;
     }
     else
@@ -459,6 +462,33 @@ static uint64_t nr_reads_total = 0ULL;
 static uint64_t nr_reads_non_mapped = 0ULL;
 static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+#define MISMATCH_COUNT(X) (X.score / 10) 
+#define DIST_PAIR_THRESHOLD 0
+#define DIST_SINGLE_THRESHOLD 0
+#define MAPQ_SCALING_FACTOR 2
+
+static void keep_best_2_scores(unsigned score, unsigned* P1, unsigned *P2, unsigned x1, unsigned x2, unsigned* best_score) {
+
+  if(score < best_score[0]) {
+
+    // move current to next position
+    best_score[1] = best_score[0];
+    P1[1] = P1[0];
+    P2[1] = P2[0];
+    // update first position
+    best_score[0] = score;
+    P1[0] = x1;
+    P2[0] = x2;
+  }
+  else if (score < best_score[1]) {
+
+    // update second position
+    best_score[1] = score;
+    P1[1] = x1;
+    P2[1] = x2;
+  }
+}
+
 static void do_process_read(process_read_arg_t *arg)
 {
     const unsigned int nb_match = arg->nb_match;
@@ -485,93 +515,176 @@ static void do_process_read(process_read_arg_t *arg)
      */
 
     while (true) {
-        unsigned int i;
-        if ((i = acquire_curr_match()) >= nb_match) {
-            release_curr_match(i);
-            return;
-        }
-        int numpair = result_tab[i].num / 4;
-        unsigned int j = i;
-        while ((j < nb_match) && (numpair == result_tab[j].num / 4)) {
-            j++;
-        }
-        release_curr_match(j);
+      unsigned int i;
+      if ((i = acquire_curr_match()) >= nb_match) {
+        release_curr_match(i);
+        return;
+      }
+      int numpair = result_tab[i].num / 4;
+      unsigned int j = i;
+      while ((j < nb_match) && (numpair == result_tab[j].num / 4)) {
+        j++;
+      }
+      release_curr_match(j);
 
-        // i = start index in result_tab
-        // j = stop index in result_tab
-        // select best couples of paired reads
-        unsigned int P1[1000];
-        unsigned int P2[1000];
-        unsigned int np = 0;
-        unsigned int P1_all[1000];
-        unsigned int P2_all[1000];
-        unsigned int np_all = 0;
-        unsigned int pos1, pos2, t1, t2;
-        unsigned int best_score = 1000;
-        unsigned int best_score_all = 1000;
-        // test all significant pairs of reads (0,3) & (1,2)
-        for (unsigned int x1 = i; x1 < j; x1++) {
-            t1 = result_tab[x1].num % 4;
-            pos1 = result_tab[x1].coord.seed_nr;
-            for (unsigned int x2 = i + 1; x2 < j; x2++) {
-                pos2 = result_tab[x2].coord.seed_nr;
-                t2 = result_tab[x2].num % 4;
-                if (t1 + t2 == 3) // select significant pair
-                {
-                    if ((abs((int)pos2 - (int)pos1) > 50 && (abs((int)pos2 - (int)pos1) < 1000))) {
-                        if (result_tab[x1].score + result_tab[x2].score < best_score) {
-                            np = 0;
-                            best_score = result_tab[x1].score + result_tab[x2].score;
-                            P1[np] = x1;
-                            P2[np] = x2;
-                            np++;
-                        } else {
-                            if (result_tab[x1].score + result_tab[x2].score == best_score) {
-                                P1[np] = x1;
-                                P2[np] = x2;
-                                if (np < 999)
-                                    np++;
-                            }
-                        }
-                    }
-                    else {
-                      
-                        if (result_tab[x1].score + result_tab[x2].score < best_score_all) {
-                            np_all = 0;
-                            best_score_all = result_tab[x1].score + result_tab[x2].score;
-                            P1_all[np_all] = x1;
-                            P2_all[np_all] = x2;
-                            np_all++;
-                        } else if (result_tab[x1].score + result_tab[x2].score == best_score_all) {
-                                P1_all[np_all] = x1;
-                                P2_all[np_all] = x2;
-                                if (np_all < 999)
-                                    np_all++;
-                        }
-                    }
-                }
+      // i = start index in result_tab
+      // j = stop index in result_tab
+      // select best couples of paired reads
+      unsigned int P1[2];
+      unsigned int P2[2];
+      //unsigned int P1_all[1000];
+      //unsigned int P2_all[1000];
+      //unsigned int np_all = 0;
+      unsigned int pos1, pos2, t1, t2;
+      unsigned int best_score[2] = { 1000, 1000 };
+      /*unsigned int best_score_all = 1000;*/
+      // test all significant pairs of reads (0,3) & (1,2)
+      for (unsigned int x1 = i; x1 < j; x1++) {
+        t1 = result_tab[x1].num % 4;
+        pos1 = result_tab[x1].coord.seed_nr;
+        for (unsigned int x2 = i + 1; x2 < j; x2++) {
+          pos2 = result_tab[x2].coord.seed_nr;
+          t2 = result_tab[x2].num % 4;
+          if (t1 + t2 == 3) // select significant pair
+          {
+            if ((abs((int)pos2 - (int)pos1) > 50 && (abs((int)pos2 - (int)pos1) < 2000))) {
+              // update if this is one of the two best scores
+              keep_best_2_scores(result_tab[x1].score + result_tab[x2].score, P1, P2, x1, x2, best_score);
             }
+          }
         }
-        if (np > 0) {
+      }
 
-            // update frequency table 
-            for (unsigned int i = 0; i < np; i++) {
+      bool update = false;
+      unsigned np = 0;
+      if(best_score[0] < 1000) {
+        np++;
+        if(best_score[1] < 1000) np++;
+      }
+      if (np > 0) {
 
-              // for each matching position of this read in the reference genome, add +1 in the corresponding nucleotide column
-              update_frequency_table(ref_genome, result_tab, reads_buffer, P1[i]);
-              update_frequency_table(ref_genome, result_tab, reads_buffer, P2[i]);
-            }
+        if(np == 2) {
+
+          // found at least 2 matching pairs of positions. Check the delta between the two pairs to 
+          // decide whether we should keep the best pair
+          int delta = abs((MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) 
+              - (MISMATCH_COUNT(result_tab[P1[1]]) + MISMATCH_COUNT(result_tab[P2[1]])));
+
+          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) 
+            + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
+          if(delta_corrected < 0) {
+            printf("WARNING: negative delta for square root %d\n", delta_corrected);
+          }
+          else if(delta > DIST_PAIR_THRESHOLD) {
+            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            update = true;
+          }
         }
-        else if (np_all > 0) {
+        else if(np) { // only one result, take it
+          int delta = abs((MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) - (2 * (MAX_SUBSTITUTION + 1)));
+          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
+          if(delta_corrected < 0) {
+            printf("WARNING: negative delta (np == 1) for square root %d\n", delta_corrected);
+          }
+          else if(delta > DIST_PAIR_THRESHOLD) {
+            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            update = true;
+          }
+          //update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0]);
+          //update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0]);
+          //update = true;
+        }
+      }
+      if(true) {
 
-            // update frequency table 
-            for (unsigned int i = 0; i < np_all; i++) {
+        // check mapping of R1 and R2 independently
+        unsigned int best_score_R1[2] = { 1000, 1000 };
+        unsigned int best_score_R2[2] = { 1000, 1000 };
+        P1[0] = 0;
+        P2[0] = 0;
+        P1[1] = 0;
+        P2[1] = 0;
+        for (unsigned int read = i; read < j; read++) {
+          unsigned t1 = result_tab[read].num % 4;
+          if(t1 < 2) { // PE1 or RPE1
+            keep_best_2_scores(result_tab[read].score, P1, P2, read, 0, best_score_R1);
+          }
+          else { // PE2 or RPE2
+            keep_best_2_scores(result_tab[read].score, P1, P2, 0, read, best_score_R2);
+          }
+        }
 
-              // for each matching position of this read in the reference genome, add +1 in the corresponding nucleotide column
-              update_frequency_table(ref_genome, result_tab, reads_buffer, P1_all[i]);
-              update_frequency_table(ref_genome, result_tab, reads_buffer, P2_all[i]);
-            }
-        } else {
+        unsigned np1 = 0, np2 = 0;
+        if(best_score_R1[0] < 1000) np1++;
+        if(best_score_R1[1] < 1000) np1++;
+        if(best_score_R2[0] < 1000) np2++;
+        if(best_score_R2[1] < 1000) np2++;
+        if(np1 == 2) {
+
+          int delta = abs(MISMATCH_COUNT(result_tab[P1[0]]) - MISMATCH_COUNT(result_tab[P1[1]]));
+
+          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
+
+          if(delta_corrected < 0) {
+            printf("WARNING: negative delta (np1 == 2) for square root %d\n", delta_corrected);
+          }
+          else if(delta > DIST_SINGLE_THRESHOLD) {
+            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
+            update = true;
+          }
+        }
+        else if(np1) {
+          int delta = abs(MISMATCH_COUNT(result_tab[P1[0]]) - (MAX_SUBSTITUTION + 1));
+
+          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
+
+          if(delta_corrected < 0) {
+            printf("WARNING: negative delta (np1 == 1) for square root %d\n", delta_corrected);
+          }
+          else if(delta > DIST_SINGLE_THRESHOLD) {
+            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
+            update = true;
+          }
+        }
+
+        if(np2 == 2) {
+
+          int delta = abs(MISMATCH_COUNT(result_tab[P2[0]]) - MISMATCH_COUNT(result_tab[P2[1]]));
+
+          int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
+
+          if(delta_corrected < 0) {
+            printf("WARNING: negative delta (np2 == 2) for square root %d, %d %d %d %d\n", 
+                delta_corrected, MISMATCH_COUNT(result_tab[P2[0]]), MISMATCH_COUNT(result_tab[P2[1]]), MAX_SUBSTITUTION + 1, delta);
+          }
+          else if(delta > DIST_SINGLE_THRESHOLD) {
+            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            update = true;
+          }
+        }
+        else if(np2) {
+          int delta = abs(MISMATCH_COUNT(result_tab[P2[0]]) - (MAX_SUBSTITUTION + 1));
+
+          int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
+
+          if(delta_corrected < 0) {
+            printf("WARNING: negative delta (np2 == 1) for square root %d\n", delta_corrected);
+          }
+          else if (delta > DIST_SINGLE_THRESHOLD) {
+            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            update = true;
+          }
+        }
+        if(!update) {
             pthread_mutex_lock(&nr_reads_mutex);
             nr_reads_non_mapped++;
             pthread_mutex_unlock(&nr_reads_mutex);
@@ -580,6 +693,7 @@ static void do_process_read(process_read_arg_t *arg)
         pthread_mutex_lock(&nr_reads_mutex);
         nr_reads_total++;
         pthread_mutex_unlock(&nr_reads_mutex);
+      }
     }
 }
 

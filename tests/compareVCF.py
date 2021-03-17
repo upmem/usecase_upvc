@@ -256,12 +256,15 @@ def compute(V1, V2, tp_stat, fp_stat):
     tp = 0
     fp = 0
     for (chr, pos), v1_infos in V1.items():
+        prev_fp = fp
         if (chr, pos) in V2:
             tp, fp = compute_for_pos(
                 v1_infos, V2[(chr, pos)], tp, fp, tp_stat, fp_stat)
         else:
             fp += len(v1_infos)
             update_stat_for_pos(fp_stat, v1_infos)
+        #if(fp > prev_fp):
+        #    print chr, pos
     return tp, fp
 
 
