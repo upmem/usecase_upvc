@@ -415,6 +415,7 @@ static void update_frequency_table(
     genome_t *ref_genome, 
     dpu_result_out_t *result_tab, 
     int8_t *reads_buffer, 
+    float *reads_quality_buffer, 
     int pos,
     float mapq) {
 
@@ -422,9 +423,13 @@ static void update_frequency_table(
   uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr; 
   int num = result_tab[pos].num;
   int8_t *read = reads_buffer + (num * SIZE_READ);
+  float *read_quality = reads_quality_buffer + (num/2 * SIZE_READ);
+  //TODO: read the quality in the correct order (inverted or not)
+  bool inv = num & 1;
+  //TODO: assume no offset here
   for(int j = 0; j < SIZE_READ; ++j) {
     if(genome_pos + j < genome_get()->fasta_file_size) {
-      frequency_table[read[j]][genome_pos+j].freq += mapq;
+      frequency_table[read[j]][genome_pos+j].freq += mapq * read_quality[inv ? SIZE_READ - j - 1 : j];
       frequency_table[read[j]][genome_pos+j].score += result_tab[pos].score;
     }
     else
@@ -453,6 +458,7 @@ typedef struct {
     dpu_result_out_t *result_tab;
     int round;
     int8_t *reads_buffer;
+    float *reads_quality_buffer;
     genome_t *ref_genome;
     FILE *fpe1;
     FILE *fpe2;
@@ -463,7 +469,7 @@ static uint64_t nr_reads_non_mapped = 0ULL;
 static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define MISMATCH_COUNT(X) (X.score / 10) 
-#define DIST_PAIR_THRESHOLD 0
+#define DIST_PAIR_THRESHOLD 1
 #define DIST_SINGLE_THRESHOLD 0
 #define MAPQ_SCALING_FACTOR 2
 
@@ -489,12 +495,14 @@ static void keep_best_2_scores(unsigned score, unsigned* P1, unsigned *P2, unsig
   }
 }
 
+/*#define USE_MAPQ_SCORE*/
 static void do_process_read(process_read_arg_t *arg)
 {
     const unsigned int nb_match = arg->nb_match;
     dpu_result_out_t *result_tab = arg->result_tab;
     int round = arg->round;
     int8_t *reads_buffer = arg->reads_buffer;
+    float *reads_quality_buffer = arg->reads_quality_buffer;
     genome_t *ref_genome = arg->ref_genome;
     FILE *fpe1 = arg->fpe1;
     FILE *fpe2 = arg->fpe2;
@@ -570,28 +578,38 @@ static void do_process_read(process_read_arg_t *arg)
           int delta = abs((MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) 
               - (MISMATCH_COUNT(result_tab[P1[1]]) + MISMATCH_COUNT(result_tab[P2[1]])));
 
+          float mapq = 1.0f;
+#ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) 
             + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
           if(delta_corrected < 0) {
             printf("WARNING: negative delta for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_PAIR_THRESHOLD) {
-            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+#else
+          if(delta > DIST_PAIR_THRESHOLD) {
+#endif
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
         else if(np) { // only one result, take it
           int delta = abs((MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) - (2 * (MAX_SUBSTITUTION + 1)));
+          float mapq = 1.0f;
+#ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
           if(delta_corrected < 0) {
             printf("WARNING: negative delta (np == 1) for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_PAIR_THRESHOLD) {
-            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+#else
+          if(delta > DIST_PAIR_THRESHOLD) {
+#endif
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
           //update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0]);
@@ -627,28 +645,38 @@ static void do_process_read(process_read_arg_t *arg)
 
           int delta = abs(MISMATCH_COUNT(result_tab[P1[0]]) - MISMATCH_COUNT(result_tab[P1[1]]));
 
+          float mapq = 1.0f;
+#ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
             printf("WARNING: negative delta (np1 == 2) for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_SINGLE_THRESHOLD) {
-            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
+            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+#else
+          if(delta > DIST_SINGLE_THRESHOLD) {
+#endif
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             update = true;
           }
         }
         else if(np1) {
           int delta = abs(MISMATCH_COUNT(result_tab[P1[0]]) - (MAX_SUBSTITUTION + 1));
 
+          float mapq = 1.0f;
+#ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
             printf("WARNING: negative delta (np1 == 1) for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_SINGLE_THRESHOLD) {
-            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P1[0], mapq);
+            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+#else
+          if(delta > DIST_SINGLE_THRESHOLD) {
+#endif
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             update = true;
           }
         }
@@ -657,6 +685,8 @@ static void do_process_read(process_read_arg_t *arg)
 
           int delta = abs(MISMATCH_COUNT(result_tab[P2[0]]) - MISMATCH_COUNT(result_tab[P2[1]]));
 
+          float mapq = 1.0f;
+#ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
@@ -664,23 +694,31 @@ static void do_process_read(process_read_arg_t *arg)
                 delta_corrected, MISMATCH_COUNT(result_tab[P2[0]]), MISMATCH_COUNT(result_tab[P2[1]]), MAX_SUBSTITUTION + 1, delta);
           }
           else if(delta > DIST_SINGLE_THRESHOLD) {
-            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+#else
+          if(delta > DIST_SINGLE_THRESHOLD) {
+#endif
 
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
         else if(np2) {
           int delta = abs(MISMATCH_COUNT(result_tab[P2[0]]) - (MAX_SUBSTITUTION + 1));
 
+          float mapq = 1.0f;
+#ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
             printf("WARNING: negative delta (np2 == 1) for square root %d\n", delta_corrected);
           }
           else if (delta > DIST_SINGLE_THRESHOLD) {
-            float mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-            update_frequency_table(ref_genome, result_tab, reads_buffer, P2[0], mapq);
+            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
+#else
+          if (delta > DIST_SINGLE_THRESHOLD) {
+#endif
+            update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
@@ -706,6 +744,7 @@ static bool stop_threads = false;
 void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 {
     int8_t *reads_buffer = get_reads_buffer(pass_id);
+    float *reads_quality_buffer = get_reads_quality_buffer(pass_id);
     acc_results_t acc_res = accumulate_get_result(pass_id);
 
     curr_match = 0;
@@ -714,6 +753,7 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
     args.result_tab = acc_res.results;
     args.round = round;
     args.reads_buffer = reads_buffer;
+    args.reads_quality_buffer = reads_quality_buffer;
     args.fpe1 = fpe1;
     args.fpe2 = fpe2;
 

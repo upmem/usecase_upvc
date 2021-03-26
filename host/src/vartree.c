@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "common.h"
 #include "genome.h"
@@ -207,14 +208,63 @@ print:
     return true;
 }
 
-#define FREQUENCY_THRESHOLD 0.15
-#define DEPTH_THRESHOLD 2
+#define FREQUENCY_THRESHOLD 0.20
+#define DEPTH_THRESHOLD 3
+/*
+great that you have implemented the quality score weights in the frequency table. I think using D=1 is not advisable since the number of false positives becomes extremely high, also with D=2 we need to be very careful. Thus, I would recommend to test the accuracy using Q-scores with our previously used parameters first (e.g. D>=3 and 20%, and the ones I have suggested in (1) (i, ii, and iii) and compare them to our old results. 
+
+(i) D=3: 25%, D=4: 20%, D=5: 15%; D>=6: 10%
+(ii) D=2: 30%, D=3: 25%, D=4: 20%, D=5: 15%; D>=6: 10%
+(iii) D=3: 20%, D=4: 15%, D>=5: 10%;
+ *
+ * */
+
+__attribute__((unused)) int32_t depth_filter1(float freq) {
+  if(freq < 10.0f)
+    return UINT_MAX;
+  if(freq < 15.0f)
+    return 6;
+  if(freq < 20.0f)
+    return 5;
+  if(freq < 25.0f)
+    return 4;
+  return 5;
+};
+
+__attribute__((unused)) int32_t depth_filter2(float freq) {
+  if(freq < 10.0f)
+    return UINT_MAX;
+  if(freq < 15.0f)
+    return 6;
+  if(freq < 20.0f)
+    return 5;
+  if(freq < 25.0f)
+    return 4;
+  if(freq < 30.0f)
+    return 3;
+  return 2;
+};
+
+__attribute__((unused)) int32_t depth_filter3(float freq) {
+  if(freq < 10.0f)
+    return UINT_MAX;
+  if(freq < 15.0f)
+    return 5;
+  if(freq < 20.0f)
+    return 4;
+  return 3;
+};
+
+#define depth_filter depth_filter1
 
 FILE * dbg_file = NULL;
+FILE * sub_file = NULL;
 
-static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint64_t genome_pos) {
+static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint32_t seq_number, uint64_t seq_position) {
 
   static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
+
+  uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
 
   variant_t** results = calloc(5, sizeof(variant_t*));
   float total = 0;
@@ -226,7 +276,7 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
     float freq = frequency_table[i][genome_pos].freq;
     if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
     if((freq / total > FREQUENCY_THRESHOLD) 
-        && freq > DEPTH_THRESHOLD) { // if frequency > 20% and depth > 3, consider it a variant
+        && freq > depth_filter(freq)) { // if frequency and depth pass the threshold, consider it a variant
 
       // this is a substitution, create variant
       variant_t *var = (variant_t *)malloc(sizeof(variant_t));
@@ -239,9 +289,6 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
       results[i] = var;
     }
   }
-  fprintf(dbg_file, "pos: %lu ref nucleotide %c frequencies: A:%f C:%f T:%f G:%f\n", genome_pos, nucleotide[ref_genome->data[genome_pos]], 
-          frequency_table[0][genome_pos].freq, frequency_table[1][genome_pos].freq, 
-          frequency_table[2][genome_pos].freq, frequency_table[3][genome_pos].freq);
   //printf("get_most_frequent_variant: genome_pos %lu, nucleotide max freq %d %f %c\n", genome_pos, nucId, max, nucId >= 0 ? nucleotide[nucId] : '-');
 
   return results;
@@ -288,14 +335,40 @@ void create_vcf()
     uint32_t nb_pos_multiple_var = 0;
 
     dbg_file = fopen("freq_debug.txt", "w");
+    sub_file = fopen("subst.txt", "r");
+    unsigned seq = 0;
+    uint64_t pos = 0;
+    static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
+    fprintf(dbg_file, "# seq pos ref-nucleotide frequencies:A C T G\n");
+    while (EOF != fscanf(sub_file, "%u %lu\n", &seq, &pos))
+    {
+      assert(seq > 0);
+      seq--;
+      assert(pos > 0);
+      pos--;
+      for (int inc = -2; inc <= 2; inc++) {
+        if(inc > 0 && pos + inc >= ref_genome->len_seq[seq]) continue;
+        if(inc < 0 && pos < abs(inc)) continue;
+        uint64_t genome_pos = ref_genome->pt_seq[seq] + pos + inc;
+        if(genome_pos > genome_get()->fasta_file_size) {
+          printf("WARNING: wrong genome position %lu. seq %u pos %lu inc %d\n", genome_pos, seq, pos, inc);
+          continue;
+        }
+        fprintf(dbg_file, "%u %lu %c %f %f %f %f\n", seq + 1, pos + inc + 1, 
+            nucleotide[ref_genome->data[genome_pos]],
+            frequency_table[0][genome_pos].freq, frequency_table[1][genome_pos].freq,
+            frequency_table[2][genome_pos].freq, frequency_table[3][genome_pos].freq);
+      }
+    }
+    fclose(dbg_file);
+    fclose(sub_file);
 
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
         /* for each position in the sequence */
         for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
             
-            uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
-            variant_t ** results = get_most_frequent_variant(ref_genome, frequency_table, genome_pos);
+            variant_t ** results = get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position);
             int nb_var = 0;
             for(int i = 0; i < 5; ++i) {
               variant_t * var = results[i];
@@ -310,8 +383,6 @@ void create_vcf()
             free(results);
         }
     }
-
-    fclose(dbg_file);
 
     free_frequency_table();
     fclose(vcf_file);

@@ -241,7 +241,7 @@ def print_stat(tp_stats, fp_stats, nb_tp, nb_fp, nb_cm):
 ###############################################################################
 
 
-def compute_for_pos(v1_infos, v2_infos, tp, fp, tp_stat, fp_stat):
+def compute_for_pos(v1_infos, v2_infos, tp, fp, tp_stat, fp_stat, chr, pos, dump):
     for (ref, alt), v1_info in v1_infos.items():
         if (ref, alt) in v2_infos:
             tp += 1
@@ -249,22 +249,24 @@ def compute_for_pos(v1_infos, v2_infos, tp, fp, tp_stat, fp_stat):
         else:
             fp += 1
             update_stat(fp_stat, v1_info)
+            if(dump):
+                print(chr, pos, ref, "->", alt)
     return tp, fp
 
 
-def compute(V1, V2, tp_stat, fp_stat):
+def compute(V1, V2, tp_stat, fp_stat, dump):
     tp = 0
     fp = 0
     for (chr, pos), v1_infos in V1.items():
-        prev_fp = fp
         if (chr, pos) in V2:
             tp, fp = compute_for_pos(
-                v1_infos, V2[(chr, pos)], tp, fp, tp_stat, fp_stat)
+                v1_infos, V2[(chr, pos)], tp, fp, tp_stat, fp_stat, chr, pos, dump)
         else:
             fp += len(v1_infos)
             update_stat_for_pos(fp_stat, v1_infos)
-        #if(fp > prev_fp):
-        #    print chr, pos
+            if(dump):
+                for (ref, alt), v1_info in v1_infos.items():
+                    print(chr, pos, ref, "->", alt)
     return tp, fp
 
 
@@ -275,13 +277,13 @@ def print_VCF_quality(tp, fp, fn, cm, len_upvc, len_ref):
     print("cm:\t%.2f%%\t(%d/%d)" % (per(cm, len_ref), cm, len_ref))
 
 
-def compute_data(V_ref, V_upvc, len_ref, len_upvc):
+def compute_data(V_ref, V_upvc, len_ref, len_upvc, dump=False):
     stats = {"tp": {}, "fp": {}} if args.enable_stat else None
     tp_stat = stats["tp"] if args.enable_stat else None
     fp_stat = stats["fp"] if args.enable_stat else None
 
-    tp, fp = compute(V_upvc, V_ref, tp_stat, fp_stat)
-    cm, fn = compute(V_ref, V_upvc, None, None)
+    tp, fp = compute(V_upvc, V_ref, tp_stat, fp_stat, False)
+    cm, fn = compute(V_ref, V_upvc, None, None, dump)
 
     # print_stat(tp_stat, fp_stat, tp, fp, cm)
 
@@ -441,7 +443,7 @@ SUB_upvc, INS_upvc, DEL_upvc, len_upvc_sub, len_upvc_ins, len_upvc_del = get_dat
     args.upvc_file, True)
 
 print("\nsubstitution")
-compute_data(SUB_ref, SUB_upvc, len_ref_sub, len_upvc_sub)
+compute_data(SUB_ref, SUB_upvc, len_ref_sub, len_upvc_sub, True)
 
 print("\ninsertions")
 compute_data(INS_ref, INS_upvc, len_ref_ins, len_upvc_ins)
