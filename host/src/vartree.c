@@ -219,7 +219,7 @@ great that you have implemented the quality score weights in the frequency table
  *
  * */
 
-__attribute__((unused)) int32_t depth_filter1(float freq) {
+__attribute__((unused)) uint32_t depth_filter1(float freq) {
   if(freq < 10.0f)
     return UINT_MAX;
   if(freq < 15.0f)
@@ -229,9 +229,9 @@ __attribute__((unused)) int32_t depth_filter1(float freq) {
   if(freq < 25.0f)
     return 4;
   return 5;
-};
+}
 
-__attribute__((unused)) int32_t depth_filter2(float freq) {
+__attribute__((unused)) uint32_t depth_filter2(float freq) {
   if(freq < 10.0f)
     return UINT_MAX;
   if(freq < 15.0f)
@@ -243,9 +243,9 @@ __attribute__((unused)) int32_t depth_filter2(float freq) {
   if(freq < 30.0f)
     return 3;
   return 2;
-};
+}
 
-__attribute__((unused)) int32_t depth_filter3(float freq) {
+__attribute__((unused)) uint32_t depth_filter3(float freq) {
   if(freq < 10.0f)
     return UINT_MAX;
   if(freq < 15.0f)
@@ -253,9 +253,9 @@ __attribute__((unused)) int32_t depth_filter3(float freq) {
   if(freq < 20.0f)
     return 4;
   return 3;
-};
+}
 
-#define depth_filter depth_filter1
+#define depth_filter depth_filter3
 
 FILE * dbg_file = NULL;
 FILE * sub_file = NULL;
@@ -271,12 +271,15 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
   for(int i = 0; i < 5; ++i) {
     total += frequency_table[i][genome_pos].freq; 
   }
+  if(total == 0) 
+    return results;
 
   for(int i = 0; i < 5; ++i) {
     float freq = frequency_table[i][genome_pos].freq;
+    uint32_t score = frequency_table[i][genome_pos].score;
     if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
     if((freq / total > FREQUENCY_THRESHOLD) 
-        && freq > depth_filter(freq)) { // if frequency and depth pass the threshold, consider it a variant
+        && score >= depth_filter(freq * 100.0 / total)) { // if frequency and depth pass the threshold, consider it a variant
 
       // this is a substitution, create variant
       variant_t *var = (variant_t *)malloc(sizeof(variant_t));

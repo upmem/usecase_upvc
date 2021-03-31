@@ -18,8 +18,8 @@
 #define MAX_DPU_RESULTS (1 << 19)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
-#define SIZE_READ 148
-//#define SIZE_READ 120
+//#define SIZE_READ 148
+#define SIZE_READ 120
 #define SIZE_SEED 14
 #define SIZE_NEIGHBOUR_IN_BYTES ((SIZE_READ - SIZE_SEED) / 4)
 #define DELTA_NEIGHBOUR(round) ((SIZE_SEED * round) / 4)
@@ -37,13 +37,14 @@ typedef uint32_t delta_info_t;
  * @brief Coordonates of the read that matched in the reference genome.
  */
 typedef struct {
-    union {
-        uint64_t coord;
+    //union {
+        //uint64_t coord;
         struct {
             uint32_t seed_nr;
-            uint32_t seq_nr;
+            uint32_t seq_nr:31;
+            uint32_t nodp:1;
         };
-    };
+    //};
 } dpu_result_coord_t;
 
 /**
@@ -119,5 +120,7 @@ typedef struct {
     dpu_result_coord_t coord;
     uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
 } coords_and_nbr_t;
+
+#define USE_INDEL
 
 #endif /* __COMMON_H__ */

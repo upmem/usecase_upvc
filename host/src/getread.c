@@ -98,7 +98,7 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
 
         for(uint8_t i = 33; i < 76; ++i) {
             quality_lookup_table[i - 33] = MAX(0.001f, 1.0f - pow(10.0f, -(i-33)/10.0f));
-            printf("%d %f\n", i, quality_lookup_table[i - 33]);
+            /*printf("%d %f\n", i, quality_lookup_table[i - 33]);*/
         }
         lookup = true;
     }

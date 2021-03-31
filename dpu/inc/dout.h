@@ -68,8 +68,9 @@ void dout_init(unsigned int tid, dout_t *dout);
  * @param seed_nr  Recorded seed number.
  * @param seq_nr   Recorded sequence number.
  * @param stats    To update statistical report.
+ * @param nodp     True if the result was from nodp, false if from odpd.
  */
-void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, uint32_t seq_nr, dpu_tasklet_stats_t *stats);
+void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, uint32_t seq_nr, dpu_tasklet_stats_t *stats, uint8_t nodp);
 
 /**
  * @brief locates a swap page for a given data out structure.
