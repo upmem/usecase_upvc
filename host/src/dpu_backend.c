@@ -10,6 +10,7 @@
 #include <dpu.h>
 #include <dpu_log.h>
 #include <dpu_management.h>
+#include <dpu_target_macros.h>
 
 #include "accumulateread.h"
 #include "common.h"
@@ -252,6 +253,8 @@ void run_on_dpu(unsigned int dpu_offset, unsigned int pass_id, sem_t *dispatch_f
 void init_backend_dpu(unsigned int *nb_dpus_per_run)
 {
     const char *profile = "cycleAccurate=true,nrJobsPerRank=64";
+
+    accumulate_disable_dpus();
 
     DPU_ASSERT(dpu_alloc(get_nb_dpu(), profile, &devices.all_ranks));
     DPU_ASSERT(dpu_load_from_incbin(devices.all_ranks, &upvc_dpu_program, NULL));

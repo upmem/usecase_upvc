@@ -26,136 +26,85 @@
 
 unsigned int nb_dpus_per_run;
 
+static unsigned int max_nb_pass;
 static backends_functions_t backends_functions;
 static unsigned int round;
 static FILE *fipe1, *fipe2, *fope1, *fope2;
 static sem_t getreads_to_dispatch_sem, dispatch_to_exec_sem, exec_to_dispatch_sem, exec_to_acc_sem, acc_to_exec_sem,
     accprocess_to_getreads_sem, acc_to_process_sem;
 
-#define LAST_RUN(dpu_offset) (((dpu_offset) + nb_dpus_per_run) >= index_get_nb_dpu())
-#define FOREACH_RUN(dpu_offset) for (unsigned int dpu_offset = 0; dpu_offset < index_get_nb_dpu(); dpu_offset += nb_dpus_per_run)
 #define FOREACH_PASS(each_pass) for (unsigned int each_pass = 0; get_reads_in_buffer(each_pass) != 0; each_pass++)
 #define FOR(loop) for (int _i = 0; _i < (loop); _i++)
 
 void *thread_get_reads(__attribute__((unused)) void *arg)
 {
-    FOREACH_RUN(dpu_offset)
-    {
-        FOR(NB_READS_BUFFER) { sem_post(&accprocess_to_getreads_sem); }
+    FOR(NB_READS_BUFFER) { sem_post(&accprocess_to_getreads_sem); }
 
-        unsigned int each_pass = 0;
-        do {
-            sem_wait(&accprocess_to_getreads_sem);
-            get_reads(fipe1, fipe2, each_pass);
-            sem_post(&getreads_to_dispatch_sem);
-        } while (get_reads_in_buffer(each_pass++) != 0);
+    unsigned int each_pass = 0;
+    do {
+        sem_wait(&accprocess_to_getreads_sem);
+        get_reads(fipe1, fipe2, each_pass);
+        sem_post(&getreads_to_dispatch_sem);
+    } while (get_reads_in_buffer(each_pass++) != 0);
 
-        fseek(fipe1, 0, SEEK_SET);
-        fseek(fipe2, 0, SEEK_SET);
-
-        FOR(NB_READS_BUFFER) { sem_wait(&accprocess_to_getreads_sem); }
-    }
+    fseek(fipe1, 0, SEEK_SET);
+    fseek(fipe2, 0, SEEK_SET);
+    FOR(NB_READS_BUFFER) { sem_wait(&accprocess_to_getreads_sem); }
 
     return NULL;
 }
 
 void exec_dpus()
 {
-    FOREACH_RUN(dpu_offset)
+    backends_functions.load_mram(0, 0);
+
+    sem_wait(&dispatch_to_exec_sem);
+
+    FOREACH_PASS(each_pass)
     {
-        backends_functions.load_mram(dpu_offset, 0);
-
-        sem_wait(&dispatch_to_exec_sem);
-
-        FOREACH_PASS(each_pass)
-        {
-            backends_functions.run_dpu(
-                dpu_offset, each_pass, &exec_to_dispatch_sem, &acc_to_exec_sem, &exec_to_acc_sem, &dispatch_to_exec_sem);
-        }
-
-        backends_functions.wait_dpu();
-
-        sem_post(&exec_to_acc_sem);
+        backends_functions.run_dpu(
+            0, each_pass, &exec_to_dispatch_sem, &acc_to_exec_sem, &exec_to_acc_sem, &dispatch_to_exec_sem);
     }
+
+    backends_functions.wait_dpu();
+
+    sem_post(&exec_to_acc_sem);
 }
 
 void *thread_dispatch(__attribute__((unused)) void *arg)
 {
-    FOREACH_RUN(dpu_offset)
+    FOR(NB_DISPATCH_AND_ACC_BUFFER) { sem_post(&exec_to_dispatch_sem); }
+
+    sem_wait(&getreads_to_dispatch_sem);
+    FOREACH_PASS(each_pass)
     {
-        FOR(NB_DISPATCH_AND_ACC_BUFFER)
-        {
-            sem_post(&exec_to_dispatch_sem);
-        }
-
-        sem_wait(&getreads_to_dispatch_sem);
-        FOREACH_PASS(each_pass)
-        {
-            sem_wait(&exec_to_dispatch_sem);
-            dispatch_read(each_pass);
-            sem_post(&dispatch_to_exec_sem);
-            sem_wait(&getreads_to_dispatch_sem);
-        }
-
+        sem_wait(&exec_to_dispatch_sem);
+        dispatch_read(each_pass);
         sem_post(&dispatch_to_exec_sem);
-
-        FOR(NB_DISPATCH_AND_ACC_BUFFER)
-        {
-            sem_wait(&exec_to_dispatch_sem);
-        }
+        sem_wait(&getreads_to_dispatch_sem);
     }
+
+    sem_post(&dispatch_to_exec_sem);
+
+    FOR(NB_DISPATCH_AND_ACC_BUFFER) { sem_wait(&exec_to_dispatch_sem); }
     return NULL;
 }
 
 void *thread_acc(__attribute__((unused)) void *arg)
 {
-    FOREACH_RUN(dpu_offset)
-    {
-        FOR(NB_DISPATCH_AND_ACC_BUFFER)
-        {
-            sem_post(&acc_to_exec_sem);
-        }
+    FOR(NB_DISPATCH_AND_ACC_BUFFER) { sem_post(&acc_to_exec_sem); }
 
-        sem_wait(&exec_to_acc_sem);
-
-        FOREACH_PASS(each_pass)
-        {
-            accumulate_read(each_pass, dpu_offset);
-
-            sem_post(&acc_to_exec_sem);
-            if (LAST_RUN(dpu_offset)) {
-                sem_post(&acc_to_process_sem);
-            } else {
-                sem_post(&accprocess_to_getreads_sem);
-            }
-            sem_wait(&exec_to_acc_sem);
-        }
-        if (LAST_RUN(dpu_offset)) {
-            sem_post(&acc_to_process_sem);
-        } else {
-            sem_post(&accprocess_to_getreads_sem);
-        }
-        FOR(NB_DISPATCH_AND_ACC_BUFFER)
-        {
-            sem_wait(&acc_to_exec_sem);
-        }
-    }
-    return NULL;
-}
-
-void *thread_process(__attribute__((unused)) void *arg)
-{
-    sem_wait(&acc_to_process_sem);
+    sem_wait(&exec_to_acc_sem);
 
     FOREACH_PASS(each_pass)
     {
-        process_read(fope1, fope2, round, each_pass);
+        accumulate_read(each_pass, max_nb_pass);
+        sem_post(&acc_to_exec_sem);
         sem_post(&accprocess_to_getreads_sem);
-        sem_wait(&acc_to_process_sem);
+        sem_wait(&exec_to_acc_sem);
     }
-
     sem_post(&accprocess_to_getreads_sem);
-
+    FOR(NB_DISPATCH_AND_ACC_BUFFER) { sem_wait(&acc_to_exec_sem); }
     return NULL;
 }
 
@@ -163,7 +112,6 @@ static void exec_round()
 {
     char filename[FILENAME_MAX];
     char *input_prefix = get_input_path();
-    static unsigned int max_nb_pass;
 
     if (round == 0) {
         size_t read_size1, read_size2, nb_read1, nb_read2;
@@ -201,12 +149,9 @@ static void exec_round()
         assert(unlink(filename) == 0);
     }
 
-    accumulate_init(max_nb_pass);
-
     pthread_t tid_get_reads;
     pthread_t tid_dispatch;
     pthread_t tid_acc;
-    pthread_t tid_process;
 
     int ret;
 
@@ -233,8 +178,6 @@ static void exec_round()
     assert(ret == 0);
     ret = pthread_create(&tid_acc, NULL, thread_acc, NULL);
     assert(ret == 0);
-    ret = pthread_create(&tid_process, NULL, thread_process, NULL);
-    assert(ret == 0);
 
     // EXECUTE
     exec_dpus();
@@ -245,8 +188,6 @@ static void exec_round()
     ret = pthread_join(tid_dispatch, NULL);
     assert(ret == 0);
     ret = pthread_join(tid_acc, NULL);
-    assert(ret == 0);
-    ret = pthread_join(tid_process, NULL);
     assert(ret == 0);
 
     // DESTROY
@@ -265,32 +206,25 @@ static void exec_round()
     ret = sem_destroy(&accprocess_to_getreads_sem);
     assert(ret == 0);
 
-    accumulate_free();
-
     fclose(fipe1);
     fclose(fipe2);
 }
 
+#define NB_RUN_VALID_TO_END (3)
+
 static void do_mapping()
 {
-    backends_functions.init_backend(&nb_dpus_per_run);
-    variant_tree_init();
     dispatch_init();
-    process_read_init();
 
-    for (round = 0; round < NB_ROUND; round++) {
-        printf("#################\n"
-               "starting round %u\n"
-               "#################\n",
-            round);
+    uint32_t run_id = 1;
+    do {
+        printf("\n### RUN %u ###################################\n", run_id++);
+        backends_functions.init_backend(&nb_dpus_per_run);
         exec_round();
-    }
-    create_vcf();
+        backends_functions.free_backend();
+    } while (accumulate_valid_run() == NB_RUN_VALID_TO_END);
 
-    process_read_free();
     dispatch_free();
-    variant_tree_free();
-    backends_functions.free_backend();
 }
 
 static void print_time()
