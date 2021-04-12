@@ -21,7 +21,7 @@ void accumulate_disable_dpus(void);
 void accumulate_read(unsigned int pass_id, unsigned int max_nb_pass);
 uint32_t accumulate_valid_run();
 
-void accumulate_init(unsigned int max_nb_pass);
+void accumulate_init();
 void accumulate_free();
 
 #endif /* __ACCUMULATEREAD_H__ */

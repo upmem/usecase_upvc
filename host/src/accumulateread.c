@@ -109,6 +109,7 @@ void accumulate_read(unsigned int pass_id, uint32_t max_nb_pass)
     for (unsigned int numdpu = 0; numdpu < nb_dpus_per_run; numdpu++) {
         uint32_t rank, ci, dpu;
         get_dpu_info(numdpu, &rank, &ci, &dpu);
+        assert(rank < NB_RANK_MAX && ci < NB_CI && dpu < NB_DPU_PER_CI);
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
             dpu_error_res[rank][ci][dpu]++;
             error_in_run = true;
@@ -141,10 +142,24 @@ uint32_t accumulate_valid_run()
 
 void accumulate_free()
 {
+    for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
+            free(results_buffers[each_pass][each_dpu].results);
+        }
+        free(results_buffers[each_pass]);
+    }
 }
 
-void accumulate_init(__attribute__((unused)) unsigned int max_nb_pass)
+void accumulate_init()
 {
+    for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
+        results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpus_per_run);
+        assert(results_buffers[each_pass] != NULL);
+        for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
+            results_buffers[each_pass][each_dpu].results = (dpu_result_out_t *)malloc(sizeof(dpu_result_out_t) * MAX_DPU_RESULTS);
+            assert(results_buffers[each_pass][each_dpu].results != NULL);
+        }
+    }
 }
 
 acc_results_t *accumulate_get_buffer(unsigned int dpu_id, unsigned int pass_id) { return &(RESULTS_BUFFERS(pass_id)[dpu_id]); }

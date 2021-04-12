@@ -220,7 +220,9 @@ static void do_mapping()
     do {
         printf("\n### RUN %u ###################################\n", run_id++);
         backends_functions.init_backend(&nb_dpus_per_run);
+        accumulate_init();
         exec_round();
+        accumulate_free();
         backends_functions.free_backend();
     } while (accumulate_valid_run() == NB_RUN_VALID_TO_END);
 
