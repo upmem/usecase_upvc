@@ -285,7 +285,7 @@ void init_backend_dpu(unsigned int *nb_dpus_per_run)
     devices.dpus = malloc(sizeof(struct triplet) * devices.nb_dpus);
     DPU_FOREACH (devices.all_ranks, dpu, each_dpu) {
         struct dpu_t *dpu_t = dpu_from_set(dpu);
-        devices.dpus[each_dpu].rank = dpu_get_rank_id(dpu_get_rank(dpu_t));
+        devices.dpus[each_dpu].rank = dpu_get_rank_id(dpu_get_rank(dpu_t)) & DPU_TARGET_MASK;
         devices.dpus[each_dpu].ci = dpu_get_slice_id(dpu_t);
         devices.dpus[each_dpu].dpu = dpu_get_member_id(dpu_t);
     }

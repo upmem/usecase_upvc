@@ -217,14 +217,18 @@ static void do_mapping()
     dispatch_init();
 
     uint32_t run_id = 1;
+    uint32_t nb_run_consecutive = 0;
     do {
-        printf("\n### RUN %u ###################################\n", run_id++);
+        printf("\n### RUN %u (%u/%u OK) ############\n", run_id++, nb_run_consecutive, NB_RUN_VALID_TO_END);
         backends_functions.init_backend(&nb_dpus_per_run);
         accumulate_init();
         exec_round();
         accumulate_free();
+        printf("\n");
         backends_functions.free_backend();
-    } while (accumulate_valid_run() == NB_RUN_VALID_TO_END);
+    } while ((nb_run_consecutive = accumulate_valid_run()) < NB_RUN_VALID_TO_END);
+
+    accumulate_summary_dpu_disabled();
 
     dispatch_free();
 }

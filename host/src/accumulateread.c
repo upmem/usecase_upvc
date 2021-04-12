@@ -70,6 +70,23 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
 static uint32_t dpu_error_res[NB_RANK_MAX][NB_CI][NB_DPU_PER_CI] = { 0 };
 static bool error_in_run = false;
 
+void accumulate_summary_dpu_disabled() {
+    printf("\n\n######################################\n"
+           "### 3/3 OK! stopping now :) ##########\n\n");
+
+    printf("DISABLED DPUs:\n");
+    for (uint32_t each_rank = 0; each_rank < NB_RANK_MAX; each_rank++) {
+        for (uint32_t each_ci = 0; each_ci < NB_CI; each_ci++) {
+            for (uint32_t each_dpu = 0; each_dpu < NB_DPU_PER_CI; each_dpu++) {
+                if (dpu_error_res[each_rank][each_ci][each_dpu] != 0) {
+                    printf("\t%u.%u.%u\n", each_rank, each_ci, each_dpu);
+                }
+            }
+        }
+    }
+    printf("\n######################################\n");
+}
+
 static void disable_dpu(uint32_t rank, uint32_t ci, uint32_t dpu) {
     char *command;
     printf("Disabling dpu %u.%u.%u ...", rank, ci, dpu);
@@ -99,11 +116,24 @@ void accumulate_disable_dpus()
     printf("##############################################\n");
 }
 
+#define NB_CHAR_PER_LINE 50
 void accumulate_read(unsigned int pass_id, uint32_t max_nb_pass)
 {
     acc_res = RESULTS_BUFFERS(pass_id);
     genome_t *genome = genome_get();
-    printf("\rPASS %.4u/%u",pass_id, max_nb_pass);
+    uint32_t nb_char_max_nb_pass = snprintf(NULL, 0, "%u", max_nb_pass);
+    uint32_t done = NB_CHAR_PER_LINE * (float)(pass_id+1)/max_nb_pass;
+    static char progress_bar[NB_CHAR_PER_LINE + 1];
+    uint32_t each_char = 0;
+    for (; each_char < done; each_char++) {
+        progress_bar[each_char] = '#';
+    }
+    for (; each_char < NB_CHAR_PER_LINE; each_char++) {
+        progress_bar[each_char] = '-';
+    }
+    progress_bar[each_char] = '\0';
+    printf("\rPASS %*u [%s]", nb_char_max_nb_pass, pass_id, progress_bar);
+    fflush(stdout);
 
     // compute the total number of resultat for all DPUs
     for (unsigned int numdpu = 0; numdpu < nb_dpus_per_run; numdpu++) {
