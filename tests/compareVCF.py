@@ -282,8 +282,8 @@ def compute_data(V_ref, V_upvc, len_ref, len_upvc, dump=False):
     tp_stat = stats["tp"] if args.enable_stat else None
     fp_stat = stats["fp"] if args.enable_stat else None
 
-    tp, fp = compute(V_upvc, V_ref, tp_stat, fp_stat, False)
-    cm, fn = compute(V_ref, V_upvc, None, None, dump)
+    tp, fp = compute(V_upvc, V_ref, tp_stat, fp_stat, dump)
+    cm, fn = compute(V_ref, V_upvc, None, None, False)
 
     # print_stat(tp_stat, fp_stat, tp, fp, cm)
 

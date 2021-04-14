@@ -208,8 +208,6 @@ print:
     return true;
 }
 
-#define FREQUENCY_THRESHOLD 0.20
-#define DEPTH_THRESHOLD 3
 /*
 great that you have implemented the quality score weights in the frequency table. I think using D=1 is not advisable since the number of false positives becomes extremely high, also with D=2 we need to be very careful. Thus, I would recommend to test the accuracy using Q-scores with our previously used parameters first (e.g. D>=3 and 20%, and the ones I have suggested in (1) (i, ii, and iii) and compare them to our old results. 
 
@@ -228,7 +226,7 @@ __attribute__((unused)) uint32_t depth_filter1(float freq) {
     return 5;
   if(freq < 25.0f)
     return 4;
-  return 5;
+  return 3;
 }
 
 __attribute__((unused)) uint32_t depth_filter2(float freq) {
@@ -255,7 +253,27 @@ __attribute__((unused)) uint32_t depth_filter3(float freq) {
   return 3;
 }
 
-#define depth_filter depth_filter3
+__attribute__((unused)) uint32_t depth_filter_a(float freq) {
+    if(freq >= 20)
+        return 3;
+    if(freq >= 15)
+        return 5;
+    return UINT_MAX;
+}
+
+__attribute__((unused)) uint32_t depth_filter_fixed_3(float freq) {
+
+  if(freq < 20.0f)
+    return UINT_MAX;
+  return 3;
+}
+
+__attribute__((unused)) uint32_t depth_filter_fixed_3_f15(float freq) {
+
+  if(freq < 15.0f)
+    return UINT_MAX;
+  return 3;
+}
 
 FILE * dbg_file = NULL;
 FILE * sub_file = NULL;
@@ -278,13 +296,15 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
     float freq = frequency_table[i][genome_pos].freq;
     uint32_t score = frequency_table[i][genome_pos].score;
     if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
-    if((freq / total > FREQUENCY_THRESHOLD) 
-        && score >= depth_filter(freq * 100.0 / total)) { // if frequency and depth pass the threshold, consider it a variant
+    /*if((freq / total > FREQUENCY_THRESHOLD) */
+   if(score >= depth_filter(freq * 100.0 / total)) { // if frequency and depth pass the threshold, consider it a variant
 
+       /*printf("variant depth %u freq %f threshold %u\n", score, freq,*/
+               /*depth_filter(freq * 100.0 / total));*/
       // this is a substitution, create variant
       variant_t *var = (variant_t *)malloc(sizeof(variant_t));
       var->score = frequency_table[i][genome_pos].score;
-      var->depth = frequency_table[i][genome_pos].freq;
+      var->depth = frequency_table[i][genome_pos].score;
       var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
       var->ref[1] = '\0';
       var->alt[0] = nucleotide[i];
@@ -357,10 +377,17 @@ void create_vcf()
           printf("WARNING: wrong genome position %lu. seq %u pos %lu inc %d\n", genome_pos, seq, pos, inc);
           continue;
         }
-        fprintf(dbg_file, "%u %lu %c %f %f %f %f\n", seq + 1, pos + inc + 1, 
-            nucleotide[ref_genome->data[genome_pos]],
-            frequency_table[0][genome_pos].freq, frequency_table[1][genome_pos].freq,
-            frequency_table[2][genome_pos].freq, frequency_table[3][genome_pos].freq);
+        fprintf(dbg_file, "%u %lu %c ", seq + 1, pos + inc + 1, nucleotide[ref_genome->data[genome_pos]]);
+        float total = 0.0f;
+        for(int m = 0; m < 5; ++m) {
+            total += frequency_table[m][genome_pos].freq;
+        }
+        for(int m = 0; m < 5; ++m) {
+            fprintf(dbg_file, "(%f %u %f %u) ",
+            frequency_table[m][genome_pos].freq, frequency_table[m][genome_pos].score,
+            frequency_table[m][genome_pos].freq * 100.0 / total, depth_filter(frequency_table[m][genome_pos].freq * 100.0 / total));
+        }
+        fprintf(dbg_file, "\n");
       }
     }
     fclose(dbg_file);
