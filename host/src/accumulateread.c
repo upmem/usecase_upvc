@@ -86,8 +86,7 @@ void accumulate_summary_dpu_disabled() {
     }
     printf("\n######################################\n");
 }
-static FILE *f_disabled_dpus;
-static void disable_dpu(uint32_t rank, uint32_t ci, uint32_t dpu) {
+static void disable_dpu(uint32_t rank, uint32_t ci, uint32_t dpu, FILE *f_disabled_dpus) {
     char *command;
     printf("Disabling dpu %u.%u.%u (%u errors) ...", rank, ci, dpu, dpu_error_res[rank][ci][dpu]);
     assert(asprintf(&command, "upmem-dimm-configure.py --rank-path /dev/dpu_rank%u --disable-dpu %u.%u", rank, ci, dpu) == 0);
@@ -102,19 +101,38 @@ static void disable_dpu(uint32_t rank, uint32_t ci, uint32_t dpu) {
     free(command);
 }
 
+static void print_time(FILE *f_disabled_dpus, int round)
+{
+    time_t timer;
+    char time_buf[26];
+    struct tm *tm_info;
+
+    time(&timer);
+    tm_info = localtime(&timer);
+
+    strftime(time_buf, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+    fprintf(f_disabled_dpus, "%s run %u\n", time_buf, round);
+}
+
+
 void accumulate_disable_dpus()
 {
+    FILE *f_disabled_dpus = fopen("disabled_dpus.txt", "a");
+    assert(f_disabled_dpus != NULL);
+    static int round = 1;
+    print_time(f_disabled_dpus, round++);
     printf("### DISABLING DPUS ###########################\n");
     for (uint32_t each_rank = 0; each_rank < NB_RANK_MAX; each_rank++) {
         for (uint32_t each_ci = 0; each_ci < NB_CI; each_ci++) {
             for (uint32_t each_dpu = 0; each_dpu < NB_DPU_PER_CI; each_dpu++) {
                 if (dpu_error_res[each_rank][each_ci][each_dpu] != 0 && dpu_error_res[each_rank][each_ci][each_dpu] != UINT_MAX) {
-                    disable_dpu(each_rank, each_ci, each_dpu);
+                    disable_dpu(each_rank, each_ci, each_dpu, f_disabled_dpus);
                 }
             }
         }
     }
     printf("##############################################\n");
+    fclose(f_disabled_dpus);
 }
 
 #define NB_CHAR_PER_LINE 50
@@ -177,7 +195,6 @@ uint32_t accumulate_valid_run()
 
 void accumulate_free()
 {
-    fclose(f_disabled_dpus);
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
             free(results_buffers[each_pass][each_dpu].results);
@@ -186,24 +203,8 @@ void accumulate_free()
     }
 }
 
-static void print_time(int round)
+void accumulate_init()
 {
-    time_t timer;
-    char time_buf[26];
-    struct tm *tm_info;
-
-    time(&timer);
-    tm_info = localtime(&timer);
-
-    strftime(time_buf, 26, "%Y-%m-%d %H:%M:%S", tm_info);
-    fprintf(f_disabled_dpus, "%s run %u\n", time_buf, round);
-}
-
-void accumulate_init(int round)
-{
-    f_disabled_dpus = fopen("disabled_dpus.txt", "a");
-    assert(f_disabled_dpus != NULL);
-    print_time(round);
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpus_per_run);
         assert(results_buffers[each_pass] != NULL);
