@@ -89,7 +89,7 @@ void accumulate_summary_dpu_disabled() {
 static void disable_dpu(uint32_t rank, uint32_t ci, uint32_t dpu, FILE *f_disabled_dpus) {
     char *command;
     printf("Disabling dpu %u.%u.%u (%u errors) ...", rank, ci, dpu, dpu_error_res[rank][ci][dpu]);
-    assert(asprintf(&command, "upmem-dimm-configure.py --rank-path /dev/dpu_rank%u --disable-dpu %u.%u", rank, ci, dpu) == 0);
+    assert(asprintf(&command, "upmem-dimm-configure.py --rank /dev/dpu_rank%u --disable-dpu %u.%u", rank, ci, dpu) > 0);
     int ret = system(command);
     if (ret == 0) {
         printf("OK!\n");
