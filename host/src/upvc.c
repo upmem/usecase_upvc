@@ -221,7 +221,7 @@ static void do_mapping()
     do {
         printf("\n### RUN %u (%u/%u OK) ############\n", run_id++, nb_run_consecutive, NB_RUN_VALID_TO_END);
         backends_functions.init_backend(&nb_dpus_per_run);
-        accumulate_init();
+        accumulate_init(run_id - 1);
         exec_round();
         accumulate_free();
         printf("\n");

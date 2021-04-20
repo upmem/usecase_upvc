@@ -86,15 +86,16 @@ void accumulate_summary_dpu_disabled() {
     }
     printf("\n######################################\n");
 }
-
+static FILE *f_disabled_dpus;
 static void disable_dpu(uint32_t rank, uint32_t ci, uint32_t dpu) {
     char *command;
-    printf("Disabling dpu %u.%u.%u ...", rank, ci, dpu);
+    printf("Disabling dpu %u.%u.%u (%u errors) ...", rank, ci, dpu, dpu_error_res[rank][ci][dpu]);
     assert(asprintf(&command, "upmem-dimm-configure.py --rank-path /dev/dpu_rank%u --disable-dpu %u.%u", rank, ci, dpu) == 0);
     int ret = system(command);
     if (ret == 0) {
         printf("OK!\n");
         dpu_error_res[rank][ci][dpu] = UINT_MAX;
+        fprintf(f_disabled_dpus, "%u.%u.%u disabled\n", rank, ci, dpu);
     } else {
         printf("ERROR: %u\n", ret);
     }
@@ -141,17 +142,21 @@ void accumulate_read(unsigned int pass_id, uint32_t max_nb_pass)
         get_dpu_info(numdpu, &rank, &ci, &dpu);
         assert(rank < NB_RANK_MAX && ci < NB_CI && dpu < NB_DPU_PER_CI);
         if (acc_res[numdpu].results[acc_res[numdpu].nb_res].num != -1) {
-            dpu_error_res[rank][ci][dpu]++;
+            uint32_t nb_error = dpu_error_res[rank][ci][dpu]++;
             error_in_run = true;
-            printf("\n!! DPU %u.%u.%u wrong end-mark !!\n", rank, ci, dpu);
+            if (nb_error == 0) {
+                printf("\n!! DPU %u.%u.%u wrong end-mark !!\n", rank, ci, dpu);
+            }
         }
         for (unsigned int each_res = 0; each_res < acc_res[numdpu].nb_res; each_res++) {
             uint32_t seq_nr = acc_res[numdpu].results[each_res].coord.seq_nr;
             if ((seq_nr >= genome->nb_seq) || (acc_res[numdpu].results[each_res].coord.seed_nr >= genome->len_seq[seq_nr])){
-                dpu_error_res[rank][ci][dpu]++;
+                uint32_t nb_error = dpu_error_res[rank][ci][dpu]++;
                 error_in_run = true;
-                printf("\n!! DPU %u.%u.%u wrong result (%u/%u, %u/%lu) !!\n", rank, ci, dpu, seq_nr, genome->nb_seq,
-                    acc_res[numdpu].results[each_res].coord.seed_nr, genome->len_seq[seq_nr]);
+                if (nb_error == 0) {
+                    printf("\n!! DPU %u.%u.%u wrong result (%u/%u, %u/%lu) !!\n", rank, ci, dpu, seq_nr, genome->nb_seq,
+                        acc_res[numdpu].results[each_res].coord.seed_nr, genome->len_seq[seq_nr]);
+                }
             }
         }
     }
@@ -172,6 +177,7 @@ uint32_t accumulate_valid_run()
 
 void accumulate_free()
 {
+    fclose(f_disabled_dpus);
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         for (unsigned int each_dpu = 0; each_dpu < nb_dpus_per_run; each_dpu++) {
             free(results_buffers[each_pass][each_dpu].results);
@@ -180,8 +186,24 @@ void accumulate_free()
     }
 }
 
-void accumulate_init()
+static void print_time(int round)
 {
+    time_t timer;
+    char time_buf[26];
+    struct tm *tm_info;
+
+    time(&timer);
+    tm_info = localtime(&timer);
+
+    strftime(time_buf, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+    fprintf(f_disabled_dpus, "%s run %u\n", time_buf, round);
+}
+
+void accumulate_init(int round)
+{
+    f_disabled_dpus = fopen("disabled_dpus.txt", "a");
+    assert(f_disabled_dpus != NULL);
+    print_time(round);
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpus_per_run);
         assert(results_buffers[each_pass] != NULL);

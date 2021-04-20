@@ -23,7 +23,7 @@ uint32_t accumulate_valid_run();
 
 void accumulate_summary_dpu_disabled(void);
 
-void accumulate_init();
+void accumulate_init(int round);
 void accumulate_free();
 
 #endif /* __ACCUMULATEREAD_H__ */
