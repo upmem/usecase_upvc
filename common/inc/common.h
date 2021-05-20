@@ -18,8 +18,8 @@
 #define MAX_DPU_RESULTS (1 << 19)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
-//#define SIZE_READ 149
-#define SIZE_READ 120
+#define SIZE_READ 148
+//#define SIZE_READ 120
 #define SIZE_SEED 14
 #define SIZE_NEIGHBOUR_IN_BYTES ((SIZE_READ - SIZE_SEED) / 4)
 #define DELTA_NEIGHBOUR(round) ((SIZE_SEED * round) / 4)
@@ -125,7 +125,7 @@ typedef struct {
 // configuration for variant calling using frequency table
 
 // to activate use of reads with indels
-//#define USE_INDEL
+#define USE_INDEL
 // to activate use of mapq score
 //#define USE_MAPQ_SCORE
 
@@ -135,6 +135,6 @@ typedef struct {
 #define MAPQ_SCALING_FACTOR 2
 #define READ_DIST_LOWER_BOUND 50
 #define READ_DIST_UPPER_BOUND 2000
-#define depth_filter depth_filter_fixed_3
+#define depth_filter depth_filter3
 
 #endif /* __COMMON_H__ */

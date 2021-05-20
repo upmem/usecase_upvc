@@ -359,6 +359,7 @@ void create_vcf()
 
     dbg_file = fopen("freq_debug.txt", "w");
     sub_file = fopen("subst.txt", "r");
+    assert(sub_file);
     unsigned seq = 0;
     uint64_t pos = 0;
     static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
@@ -382,7 +383,7 @@ void create_vcf()
         for(int m = 0; m < 5; ++m) {
             total += frequency_table[m][genome_pos].freq;
         }
-        for(int m = 0; m < 5; ++m) {
+        for(int m = 0; m < 4; ++m) {
             fprintf(dbg_file, "(%f %u %f %u) ",
             frequency_table[m][genome_pos].freq, frequency_table[m][genome_pos].score,
             frequency_table[m][genome_pos].freq * 100.0 / total, depth_filter(frequency_table[m][genome_pos].freq * 100.0 / total));
