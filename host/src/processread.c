@@ -10,6 +10,7 @@
 #include <math.h>
 
 #include "accumulateread.h"
+#include "common.h"
 #include "genome.h"
 #include "getread.h"
 #include "processread.h"
@@ -399,7 +400,7 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
 }
 
 #ifdef USE_INDEL
-bool get_read_update_positions(
+int get_read_update_positions(
         uint64_t * update_genome_position,
         dpu_result_out_t *result_tab, 
         int pos,
@@ -421,41 +422,111 @@ bool get_read_update_positions(
         // with smith-waterman algorithm
         int64_t curr_pos = genome_pos;
         int code_result_index = 0;
-        int read_pos = 0;
-        bool hasIndel = false;
+        int64_t read_pos = 0;
+        int ref_pos = 0;
+        int nbIndels = 0;
         while (code_result_tab[code_result_index] != CODE_END) {
             int code_result = code_result_tab[code_result_index];
             int64_t pos_variant_read = code_result_tab[code_result_index + 1];
+            /*printf("pos variant: %lu\n", pos_variant_read);*/
+            int64_t pos_variant_genome = genome_pos + pos_variant_read;
             if (code_result == CODE_SUB) {
                 // do nothing for substitution
                 code_result_index += 3;
                 (*substCnt)++;
+                /*printf("S");*/
+                ref_pos++;
             }
             else if (code_result == CODE_INS) {
-                while(read_pos <= pos_variant_read) {
-                    update_genome_position[read_pos++] = curr_pos++;
+                if(nbIndels) {
+                    // for the moment support only one indel otherwise we have some issue FIXME
+                    printf("Z");
+                    break;
                 }
-                // insertion, skip these positions in the read 
+
+                int64_t ps_var_genome = pos_variant_genome;
+                int64_t ps_var_read = pos_variant_read;
                 code_result_index += 2;
-                while (code_result_tab[code_result_index] < 4) { 
-                    code_result_index++; 
+
+                while (code_result_tab[code_result_index] < 4) {
+                    ps_var_read++;
+                    code_result_index++;
+                }
+
+                while (ref_genome->data[ps_var_genome] == read[ps_var_read] && ps_var_genome 
+                        && pos_variant_read && pos_variant_read >= read_pos) {
+                    assert(ps_var_genome && ps_var_read && pos_variant_genome && pos_variant_read);
+                    ps_var_genome--;
+                    ps_var_read--;
+                    pos_variant_genome--;
+                    pos_variant_read--;
+                }
+
+                /*newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];*/
+                ref_pos++;
+
+                // skip first value which should be the equivalent of first element in ref genome
+                pos_variant_read++;
+                /*printf("read_pos %lu pos_variant_read %lu\n", read_pos, pos_variant_read);*/
+                if(!nbIndels)
+                    printf("SW results:\n");
+                while(read_pos < pos_variant_read) {
+                    assert(read_pos < SIZE_READ);
+                    update_genome_position[read_pos++] = curr_pos++;
+                    printf(" ");
+                }
+                /*printf("2 read_pos %lu pos_variant_read %lu\n", read_pos, pos_variant_read);*/
+                assert(read_pos == pos_variant_read);
+                while (pos_variant_read <= ps_var_read) {
                     update_genome_position[read_pos++] = UINT64_MAX;
+                    pos_variant_read++;
+                    printf("I");
                 }
                 /*printf("Insertion pos %lu\n", pos_variant_read);*/
-                hasIndel = true;
+                ++nbIndels;
             }
             else if (code_result == CODE_DEL) {
-                while(read_pos < pos_variant_read) {
-                    update_genome_position[read_pos++] = curr_pos++;
+                if(nbIndels) {
+                    // for the moment support only one indel otherwise we have some issue FIXME
+                    printf("Z");
+                    break;
                 }
-                // deletion, skip these positions in the reference genome
+
+                int64_t ps_var_genome = pos_variant_genome;
+                int64_t ps_var_read = pos_variant_read;
                 code_result_index += 2;
-                while (code_result_tab[code_result_index] < 4) { 
-                    code_result_index++; 
-                    curr_pos++;
+
+                while (code_result_tab[code_result_index] < 4) {
+                    ps_var_genome++;
+                    code_result_index++;
                 }
-                /*printf("Deletion pos %lu\n", pos_variant_read);*/
-                hasIndel = true;
+
+                while (ref_genome->data[ps_var_genome] == read[ps_var_read] && pos_variant_genome && ps_var_read) {
+                    assert(ps_var_genome && ps_var_read && pos_variant_genome && pos_variant_read);
+                    ps_var_read--;
+                    ps_var_genome--;
+                    pos_variant_genome--;
+                    pos_variant_read--;
+                }
+
+                /*newvar->alt[alt_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];*/
+                if(!nbIndels)
+                    printf("SW results:\n");
+
+                // skip first position which is same as in the read
+                while(read_pos <= pos_variant_read) {
+                    update_genome_position[read_pos++] = curr_pos++;
+                    printf(" ");
+                }
+                pos_variant_genome++;
+                while (pos_variant_genome <= ps_var_genome) {
+                    curr_pos++;
+                    printf("D");
+                    pos_variant_genome++;
+                    ref_pos++;
+                }
+                pos_variant_genome -= ref_pos;
+                ++nbIndels;
             }
             else
                 assert(0);
@@ -463,7 +534,11 @@ bool get_read_update_positions(
         while(read_pos < SIZE_READ)
             update_genome_position[read_pos++] = curr_pos++;
 
-        return hasIndel;
+        if(nbIndels) {
+            printf("\n");
+            fflush(stdout);
+        }
+        return nbIndels;
     }
     else
         assert(0);
@@ -503,12 +578,13 @@ bool update_frequency_table(
     uint64_t update_genome_position[SIZE_READ];
     uint32_t substCnt = 0;
     flag_dbg = false;
-    bool hasIndel = get_read_update_positions(update_genome_position, result_tab, pos,
+    pthread_mutex_lock(&freq_table_mutex);
+    int nbIndels = get_read_update_positions(update_genome_position, result_tab, pos,
             ref_genome, genome_pos, read, size_neighbour_in_symbols, &flag_dbg, &substCnt);
+    bool hasIndel = nbIndels;
 
     if(hasIndel && debug) {
 
-        assert(!result_tab[pos].coord.nodp);
         printf("Read:\n");
         for(int k = 0; k < SIZE_READ; ++k) {
             printf("%c", nucleotide[read[k]]);
@@ -556,6 +632,7 @@ bool update_frequency_table(
       }
       printf("\n\n");
       fflush(stdout);
+      assert(!result_tab[pos].coord.nodp);
     }
     else if(debug) {
         if(!result_tab[pos].coord.nodp) {
@@ -573,8 +650,9 @@ bool update_frequency_table(
         }
     }
 
-    pthread_mutex_lock(&freq_table_mutex);
-    if(substCnt <= MAX_SUBSTITUTION && (hasIndel || result_tab[pos].coord.nodp)) {
+    /*pthread_mutex_lock(&freq_table_mutex);*/
+    // for the moment support only one indel otherwise we have some issue FIXME
+    if(substCnt <= MAX_SUBSTITUTION && (hasIndel || result_tab[pos].coord.nodp) && nbIndels < 2) {
         for(uint64_t k = 0; k < SIZE_READ; ++k) {
             uint64_t update_genome_pos = update_genome_position[k];
             if(update_genome_pos < genome_get()->fasta_file_size) {
