@@ -46,26 +46,32 @@ typedef struct {
 static int min(int a, int b) { return a < b ? a : b; }
 
 static void DPD_compute(
-    int s1, int s2, int *Dij, int Dijm, int Dimj, int Dimjm, int *Pij, int Pijm, int *Qij, int Qimj)
+    int s1, int s2, int *Dij, int Dijm, int Dimj, int Dimjm, int *Pij, int Pijm, int *Qij, int Qimj, int *xij)
 {
     int min_QP, d;
 
     *Pij = min(Dijm + COST_GAPO, Pijm + COST_GAPE);
     *Qij = min(Dimj + COST_GAPO, Qimj + COST_GAPE);
+    *xij = 0;
 
+    int x;
     if (*Pij < *Qij) {
         min_QP = *Pij;
+        x = 2;
     } else {
         min_QP = *Qij;
+        x = 3;
     }
     d = Dimjm;
     if ((s1 & 3) != (s2 & 3)) {
         d += COST_SUB;
+        *xij = 1;
     }
     if (d < min_QP) {
         *Dij = d;
     } else {
         *Dij = min_QP;
+        *xij = x;
     }
 }
 
@@ -76,6 +82,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
     int D[matrix_size][matrix_size];
     int P[matrix_size][matrix_size];
     int Q[matrix_size][matrix_size];
+    int X[matrix_size][matrix_size];				
     int min_score = PQD_INIT_VAL;
     int min_score_i_idx = 0;
     int min_score_j_idx = 0;
@@ -98,7 +105,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
     for (int i = 1; i < diagonal; i++) {
         for (int j = 1; j < i + diagonal; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
-                &Q[i][j], Q[i - 1][j]);
+                &Q[i][j], Q[i - 1][j], &X[i][j]);
         }
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
@@ -108,7 +115,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[i][i - diagonal] = PQD_INIT_VAL;
         for (int j = i - diagonal + 1; j < i + diagonal; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
-                &Q[i][j], Q[i - 1][j]);
+                &Q[i][j], Q[i - 1][j], &X[i][j]);
         }
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
@@ -119,7 +126,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[i][i - diagonal] = PQD_INIT_VAL;
         for (int j = i - diagonal + 1; j < matrix_size; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
-                &Q[i][j], Q[i - 1][j]);
+                &Q[i][j], Q[i - 1][j], &X[i][j]);
         }
         if (D[i][matrix_size - 1] < min_score) {
             min_score = D[i][matrix_size - 1];
@@ -140,31 +147,48 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         int j = min_score_j_idx;
         backtrack[0].type = CODE_END;
         while ((i > 0) && (j > 0)) {
-            int hv = (D[i-1][j] < D[i][j-1]) ? D[i-1][j] : D[i][j-1];
-            if (D[i-1][j-1] <= hv) {
+            /*int hv = (D[i-1][j] < D[i][j-1]) ? D[i-1][j] : D[i][j-1];*/
+            /*if (D[i-1][j-1] <= hv) {*/
+            if(X[i][j] == 0) {
                 i--;
                 j--;
-                if (D[i][j] != D[i - 1][j - 1]) {
+                //if (D[i][j] != D[i - 1][j - 1]) {
+                //    backtrack[align_distance].type = CODE_SUB;
+                //    backtrack[align_distance].ix = i;
+                //    backtrack[align_distance].jx = j;
+                //    align_distance++;
+                //}
+            } else {
+                /*if (D[i-1][j] > D[i][j-1]) {*/
+                if(X[i][j] == 1) {
+                    i--;
+                    j--;
+                    /*backtrack[align_distance].type = CODE_INS;*/
                     backtrack[align_distance].type = CODE_SUB;
                     backtrack[align_distance].ix = i;
                     backtrack[align_distance].jx = j;
                     align_distance++;
-                }
-            } else {
-                if (D[i-1][j] > D[i][j-1]) {
-                    j--;
-                    flag_dbg = true;
-                    backtrack[align_distance].type = CODE_INS;
-                    backtrack[align_distance].ix = i;
-                    backtrack[align_distance].jx = j;
-                    align_distance++;
                 } else {
-                    i--;
-                    flag_dbg = true;
-                    backtrack[align_distance].type = CODE_DEL;
-                    backtrack[align_distance].ix = i;
-                    backtrack[align_distance].jx = j;
-                    align_distance++;
+                    if(X[i][j] == 2) {
+                        j--;
+                        backtrack[align_distance].type = CODE_INS;
+                        backtrack[align_distance].ix = i;
+                        backtrack[align_distance].jx = j;
+                        align_distance++;
+                    }
+                    else {
+                        i--;
+                        backtrack[align_distance].type = CODE_DEL;
+                        backtrack[align_distance].ix = i;
+                        backtrack[align_distance].jx = j;
+                        align_distance++;
+                    }
+                    //i--;
+                    //flag_dbg = true;
+                    //backtrack[align_distance].type = CODE_DEL;
+                    //backtrack[align_distance].ix = i;
+                    //backtrack[align_distance].jx = j;
+                    //align_distance++;
                 }
             }
         }
@@ -222,7 +246,7 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
         return code_idx;
 
     /* Otherwise, re-compute the matrix (only some diagonals) and put in backtrack the path */
-    backtrack_idx = DPD(gen, read, backtrak, size_neighbour_in_symbols);
+    backtrack_idx = DPD(gen, read, backtrak, size_neighbour_in_symbols + SIZE_SEED);
     if (backtrack_idx == -1) {
         code[0] = CODE_ERR;
         return 1;
@@ -409,22 +433,25 @@ int get_read_update_positions(
         int8_t *read,
         __attribute__((unused))int size_neighbour_in_symbols,
         bool * flag,
+        bool debug,
         uint32_t * substCnt) {
 
     // run smith and waterman algorithm to find indels
     uint8_t code_result_tab[256];
     code_alignment(code_result_tab, result_tab[pos].score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols, flag);
+    for(int read_pos = 0; read_pos < SIZE_READ; ++read_pos) {
+        update_genome_position[read_pos] = 0;
+    }
     if (code_result_tab[0] != CODE_ERR) {
 
         // array that will contain for each read position, the genome position that it matches too
         // This is the genome position that will be updated in the frequency table
         // This genome position takes into account the shift due to possible indels found 
         // with smith-waterman algorithm
-        int64_t curr_pos = genome_pos;
         int code_result_index = 0;
-        int64_t read_pos = 0;
         int ref_pos = 0;
         int nbIndels = 0;
+        bool ins = false;
         while (code_result_tab[code_result_index] != CODE_END) {
             int code_result = code_result_tab[code_result_index];
             int64_t pos_variant_read = code_result_tab[code_result_index + 1];
@@ -434,16 +461,10 @@ int get_read_update_positions(
                 // do nothing for substitution
                 code_result_index += 3;
                 (*substCnt)++;
-                /*printf("S");*/
                 ref_pos++;
             }
             else if (code_result == CODE_INS) {
-                if(nbIndels) {
-                    // for the moment support only one indel otherwise we have some issue FIXME
-                    printf("Z");
-                    break;
-                }
-
+                ins = true;
                 int64_t ps_var_genome = pos_variant_genome;
                 int64_t ps_var_read = pos_variant_read;
                 code_result_index += 2;
@@ -454,7 +475,7 @@ int get_read_update_positions(
                 }
 
                 while (ref_genome->data[ps_var_genome] == read[ps_var_read] && ps_var_genome 
-                        && pos_variant_read && pos_variant_read >= read_pos) {
+                        && pos_variant_read) {
                     assert(ps_var_genome && ps_var_read && pos_variant_genome && pos_variant_read);
                     ps_var_genome--;
                     ps_var_read--;
@@ -468,29 +489,21 @@ int get_read_update_positions(
                 // skip first value which should be the equivalent of first element in ref genome
                 pos_variant_read++;
                 /*printf("read_pos %lu pos_variant_read %lu\n", read_pos, pos_variant_read);*/
-                if(!nbIndels)
-                    printf("SW results:\n");
-                while(read_pos < pos_variant_read) {
-                    assert(read_pos < SIZE_READ);
-                    update_genome_position[read_pos++] = curr_pos++;
-                    printf(" ");
-                }
-                /*printf("2 read_pos %lu pos_variant_read %lu\n", read_pos, pos_variant_read);*/
-                assert(read_pos == pos_variant_read);
                 while (pos_variant_read <= ps_var_read) {
-                    update_genome_position[read_pos++] = UINT64_MAX;
-                    pos_variant_read++;
-                    printf("I");
+                    // position should not be updated yet
+                    if(update_genome_position[pos_variant_read] != 0) {
+                        printf("Warning: duplicate update (Insertion) at position %lu. Current %lu\n", 
+                                pos_variant_read, update_genome_position[pos_variant_read]);
+                        fflush(stdout);
+                        return -1;
+                    }
+                    /*assert(update_genome_position[pos_variant_read] == 0);*/
+                    update_genome_position[pos_variant_read++] = UINT64_MAX;
                 }
                 /*printf("Insertion pos %lu\n", pos_variant_read);*/
                 ++nbIndels;
             }
             else if (code_result == CODE_DEL) {
-                if(nbIndels) {
-                    // for the moment support only one indel otherwise we have some issue FIXME
-                    printf("Z");
-                    break;
-                }
 
                 int64_t ps_var_genome = pos_variant_genome;
                 int64_t ps_var_read = pos_variant_read;
@@ -510,18 +523,21 @@ int get_read_update_positions(
                 }
 
                 /*newvar->alt[alt_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];*/
-                if(!nbIndels)
-                    printf("SW results:\n");
 
-                // skip first position which is same as in the read
-                while(read_pos <= pos_variant_read) {
-                    update_genome_position[read_pos++] = curr_pos++;
-                    printf(" ");
+                // on a deletion store the threshold to apply from the current read position
+                assert(ps_var_genome > pos_variant_genome);
+                if(pos_variant_read + 1 < SIZE_READ) {
+                    // position should not be updated yet
+                    if(update_genome_position[pos_variant_read+1] != 0) {
+                        printf("Warning: duplicate update (Deletion) at position %lu. Current %lu\n", 
+                                pos_variant_read+1, update_genome_position[pos_variant_read+1]);
+                        fflush(stdout);
+                        return -1;
+                    }
+                    /*assert(update_genome_position[pos_variant_read+1] == 0);*/
+                    update_genome_position[pos_variant_read + 1] = ps_var_genome - pos_variant_genome;
                 }
-                pos_variant_genome++;
                 while (pos_variant_genome <= ps_var_genome) {
-                    curr_pos++;
-                    printf("D");
                     pos_variant_genome++;
                     ref_pos++;
                 }
@@ -531,10 +547,31 @@ int get_read_update_positions(
             else
                 assert(0);
         }
-        while(read_pos < SIZE_READ)
-            update_genome_position[read_pos++] = curr_pos++;
+        if(nbIndels && debug)
+            printf("SW algorithm (nbIndels %d) ins %d:\n", nbIndels, ins);
+        int64_t curr_pos = genome_pos;
+        for(int read_pos = 0; read_pos < SIZE_READ; ++read_pos) {
+            switch(update_genome_position[read_pos]) {
+                case 0:
+                    update_genome_position[read_pos] = curr_pos++;
+                    if(nbIndels && debug)
+                        printf(" ");
+                    break;
+                case UINT64_MAX:
+                    if(nbIndels && debug)
+                        printf("I");
+                    break;
+                default:
+                    if(nbIndels && debug) {
+                        for(uint64_t print_index = 0; print_index < update_genome_position[read_pos]; ++print_index)
+                            printf("D");
+                    }
+                    curr_pos += update_genome_position[read_pos];
+                    update_genome_position[read_pos] = curr_pos++;
+            }
+        }
 
-        if(nbIndels) {
+        if(nbIndels && debug) {
             printf("\n");
             fflush(stdout);
         }
@@ -580,8 +617,8 @@ bool update_frequency_table(
     flag_dbg = false;
     pthread_mutex_lock(&freq_table_mutex);
     int nbIndels = get_read_update_positions(update_genome_position, result_tab, pos,
-            ref_genome, genome_pos, read, size_neighbour_in_symbols, &flag_dbg, &substCnt);
-    bool hasIndel = nbIndels;
+            ref_genome, genome_pos, read, size_neighbour_in_symbols, &flag_dbg, debug, &substCnt);
+    bool hasIndel = nbIndels > 0;
 
     if(hasIndel && debug) {
 
@@ -652,7 +689,7 @@ bool update_frequency_table(
 
     /*pthread_mutex_lock(&freq_table_mutex);*/
     // for the moment support only one indel otherwise we have some issue FIXME
-    if(substCnt <= MAX_SUBSTITUTION && (hasIndel || result_tab[pos].coord.nodp) && nbIndels < 2) {
+    if(substCnt <= MAX_SUBSTITUTION && (hasIndel || result_tab[pos].coord.nodp) && nbIndels >= 0) {
         for(uint64_t k = 0; k < SIZE_READ; ++k) {
             uint64_t update_genome_pos = update_genome_position[k];
             if(update_genome_pos < genome_get()->fasta_file_size) {
@@ -763,6 +800,7 @@ static void do_process_read(process_read_arg_t *arg)
     FILE *fpe1 = arg->fpe1;
     FILE *fpe2 = arg->fpe2;
     unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
+    printf("size_neighbour_in_symbols : %u", size_neighbour_in_symbols);
 
     /*
      * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
