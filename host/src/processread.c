@@ -43,30 +43,32 @@ typedef struct {
 
 static int min(int a, int b) { return a < b ? a : b; }
 
-static void DPD_compute(
-    int s1, int s2, int *Dij, int Dijm, int Dimj, int Dimjm, int *Pij, int Pijm, int *Qij, int Qimj, int *path)
+static void DPD_compute(int s1, int s2, int *Dij, int Dijm, int Dimj, int Dimjm, int *Pij, int Pijm, int *Qij, int Qimj, int *xij)
 {
     int min_QP, d;
 
     *Pij = min(Dijm + COST_GAPO, Pijm + COST_GAPE);
     *Qij = min(Dimj + COST_GAPO, Qimj + COST_GAPE);
+    *xij = 0;
 
+    int x;
     if (*Pij < *Qij) {
         min_QP = *Pij;
-        *path = PATH_INSERTION;
+        x = 2;
     } else {
         min_QP = *Qij;
-        *path = PATH_DELETION;
+        x = 3;
     }
     d = Dimjm;
     if ((s1 & 3) != (s2 & 3)) {
         d += COST_SUB;
+        *xij = 1;
     }
     if (d < min_QP) {
         *Dij = d;
-        *path = PATH_SUBSTITUTION;
     } else {
         *Dij = min_QP;
+        *xij = x;
     }
 }
 
@@ -77,7 +79,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
     int D[matrix_size][matrix_size];
     int P[matrix_size][matrix_size];
     int Q[matrix_size][matrix_size];
-    int path[matrix_size][matrix_size];
+    int X[matrix_size][matrix_size];
     int min_score = PQD_INIT_VAL;
     int min_score_i_idx = 0;
     int min_score_j_idx = 0;
@@ -100,7 +102,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
     for (int i = 1; i < diagonal; i++) {
         for (int j = 1; j < i + diagonal; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
-                &Q[i][j], Q[i - 1][j], &path[i][j]);
+                &Q[i][j], Q[i - 1][j], &X[i][j]);
         }
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
@@ -110,7 +112,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[i][i - diagonal] = PQD_INIT_VAL;
         for (int j = i - diagonal + 1; j < i + diagonal; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
-                &Q[i][j], Q[i - 1][j], &path[i][j]);
+                &Q[i][j], Q[i - 1][j], &X[i][j]);
         }
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
@@ -121,7 +123,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[i][i - diagonal] = PQD_INIT_VAL;
         for (int j = i - diagonal + 1; j < matrix_size; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
-                &Q[i][j], Q[i - 1][j], &path[i][j]);
+                &Q[i][j], Q[i - 1][j], &X[i][j]);
         }
         if (D[i][matrix_size - 1] < min_score) {
             min_score = D[i][matrix_size - 1];
@@ -140,45 +142,33 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
     {
         int i = min_score_i_idx;
         int j = min_score_j_idx;
-
-        /* Delete the INDELS at the ends */
-        while (path[i][j] != PATH_SUBSTITUTION) {
-            if (path[i][j] == PATH_INSERTION) {
-                j--;
-            } else if (path[i][j] == PATH_DELETION) {
-                i--;
-            } else {
-                return -1;
-            }
-        }
-
-        /* i>1 && j>1 conditions erased the INDELS at the beginning */
         backtrack[0].type = CODE_END;
-        while ((i > 1) && (j > 1)) {
-            if (path[i][j] == PATH_SUBSTITUTION) {
+        while ((i > 0) && (j > 0)) {
+            if (X[i][j] == 0) {
                 i--;
                 j--;
-                if (D[i][j] != D[i - 1][j - 1]) {
+            } else {
+                if (X[i][j] == 1) {
+                    i--;
+                    j--;
                     backtrack[align_distance].type = CODE_SUB;
                     backtrack[align_distance].ix = i;
                     backtrack[align_distance].jx = j;
                     align_distance++;
-                }
-            } else {
-                if (path[i][j] == PATH_INSERTION) {
-                    j--;
-                    backtrack[align_distance].type = CODE_INS;
-                    backtrack[align_distance].ix = i;
-                    backtrack[align_distance].jx = j;
-                    align_distance++;
-                } else if (path[i][j] == PATH_DELETION) {
-                    i--;
-                    backtrack[align_distance].type = CODE_DEL;
-                    backtrack[align_distance].ix = i;
-                    backtrack[align_distance].jx = j;
-                    align_distance++;
                 } else {
-                    ERROR_EXIT(ERR_PROCESSREAD_DPD_FAILED, "Error during DPD compute");
+                    if (X[i][j] == 2) {
+                        j--;
+                        backtrack[align_distance].type = CODE_INS;
+                        backtrack[align_distance].ix = i;
+                        backtrack[align_distance].jx = j;
+                        align_distance++;
+                    } else {
+                        i--;
+                        backtrack[align_distance].type = CODE_DEL;
+                        backtrack[align_distance].ix = i;
+                        backtrack[align_distance].jx = j;
+                        align_distance++;
+                    }
                 }
             }
         }
@@ -233,7 +223,7 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
         return code_idx;
 
     /* Otherwise, re-compute the matrix (only some diagonals) and put in backtrack the path */
-    backtrack_idx = DPD(&gen[SIZE_SEED], &read[SIZE_SEED], backtrak, size_neighbour_in_symbols);
+    backtrack_idx = DPD(gen, read, backtrak, size_neighbour_in_symbols + SIZE_SEED);
     if (backtrack_idx == -1) {
         code[0] = CODE_ERR;
         return 1;
@@ -244,28 +234,28 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
     while (backtrack_idx > 0) {
         if (backtrak[backtrack_idx].type == CODE_SUB) {
             code[code_idx++] = CODE_SUB;
-            code[code_idx++] = backtrak[backtrack_idx].jx + SIZE_SEED - 1;
-            code[code_idx++] = read[backtrak[backtrack_idx].jx + SIZE_SEED - 1];
+            code[code_idx++] = backtrak[backtrack_idx].jx - 1;
+            code[code_idx++] = read[backtrak[backtrack_idx].jx - 1];
             backtrack_idx--;
         } else {
             if (backtrak[backtrack_idx].type == CODE_DEL) {
                 int backtrack_jx = backtrak[backtrack_idx].jx;
                 code[code_idx++] = CODE_DEL;
-                code[code_idx++] = backtrak[backtrack_idx].ix + SIZE_SEED;
-                code[code_idx++] = gen[backtrak[backtrack_idx].ix + SIZE_SEED] & 3;
+                code[code_idx++] = backtrak[backtrack_idx].ix;
+                code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
                 backtrack_idx--;
                 while ((backtrak[backtrack_idx].type == CODE_DEL) && (backtrack_jx == backtrak[backtrack_idx].jx)) {
-                    code[code_idx++] = gen[backtrak[backtrack_idx].ix + SIZE_SEED] & 3;
+                    code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
                     backtrack_idx--;
                 }
             } else {
                 int backtrack_ix = backtrak[backtrack_idx].ix;
                 code[code_idx++] = CODE_INS;
-                code[code_idx++] = backtrak[backtrack_idx].jx + SIZE_SEED - 1;
-                code[code_idx++] = read[backtrak[backtrack_idx].jx + SIZE_SEED];
+                code[code_idx++] = backtrak[backtrack_idx].jx - 1;
+                code[code_idx++] = read[backtrak[backtrack_idx].jx];
                 backtrack_idx--;
                 while ((backtrak[backtrack_idx].type == CODE_INS) && (backtrack_ix == backtrak[backtrack_idx].ix)) {
-                    code[code_idx++] = read[backtrak[backtrack_idx].jx + SIZE_SEED];
+                    code[code_idx++] = read[backtrak[backtrack_idx].jx];
                     backtrack_idx--;
                 }
             }
