@@ -115,7 +115,11 @@ void genome_free()
     free(genome.mapping_coverage);
 }
 
-//TODO free function
+/**
+ * Frequency table
+ * 5 entries (A, C, T, G, -)
+ * Each entry is a table of the size of the reference genome
+ **/
 static struct frequency_info* frequency_table[5];
 static bool init_frequency_table = false;
 

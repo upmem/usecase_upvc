@@ -163,6 +163,7 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
     uint32_t cov = ref_genome->mapping_coverage[genome_pos];
     uint32_t depth = var->depth;
     uint32_t score = var->score / depth;
+    // Note: commenting out the old version of variant calling, now using the frequency table
     //uint32_t percentage = 100;
     //if (cov != 0) {
     //    percentage = depth * 100 / cov;
@@ -208,14 +209,12 @@ print:
     return true;
 }
 
-/*
-great that you have implemented the quality score weights in the frequency table. I think using D=1 is not advisable since the number of false positives becomes extremely high, also with D=2 we need to be very careful. Thus, I would recommend to test the accuracy using Q-scores with our previously used parameters first (e.g. D>=3 and 20%, and the ones I have suggested in (1) (i, ii, and iii) and compare them to our old results. 
-
-(i) D=3: 25%, D=4: 20%, D=5: 15%; D>=6: 10%
-(ii) D=2: 30%, D=3: 25%, D=4: 20%, D=5: 15%; D>=6: 10%
-(iii) D=3: 20%, D=4: 15%, D>=5: 10%;
- *
- * */
+/**
+  Few configurations suggested by Bertil
+  (i) D=3: 25%, D=4: 20%, D=5: 15%; D>=6: 10%
+  (ii) D=2: 30%, D=3: 25%, D=4: 20%, D=5: 15%; D>=6: 10%
+  (iii) D=3: 20%, D=4: 15%, D>=5: 10%;
+ **/
 
 __attribute__((unused)) uint32_t depth_filter1(float freq) {
   if(freq < 10.0f)
@@ -295,21 +294,21 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
   for(int i = 0; i < 5; ++i) {
     float freq = frequency_table[i][genome_pos].freq;
     uint32_t score = frequency_table[i][genome_pos].score;
-    if(i == ref_genome->data[genome_pos]) continue; // not a variant if the same nucleotide as in reference genome
-    /*if((freq / total > FREQUENCY_THRESHOLD) */
-   if(score >= depth_filter(freq * 100.0 / total)) { // if frequency and depth pass the threshold, consider it a variant
+    if(i == ref_genome->data[genome_pos]) 
+        continue; // not a variant if the same nucleotide as in reference genome
 
-       /*printf("variant depth %u freq %f threshold %u\n", score, freq,*/
-               /*depth_filter(freq * 100.0 / total));*/
-      // this is a substitution, create variant
-      variant_t *var = (variant_t *)malloc(sizeof(variant_t));
-      var->score = frequency_table[i][genome_pos].score;
-      var->depth = frequency_table[i][genome_pos].score;
-      var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
-      var->ref[1] = '\0';
-      var->alt[0] = nucleotide[i];
-      var->alt[1] = '\0';
-      results[i] = var;
+    // if frequency and depth pass the threshold, consider it a variant
+    if(score >= depth_filter(freq * 100.0 / total)) {
+
+        // this is a substitution, create variant
+        variant_t *var = (variant_t *)malloc(sizeof(variant_t));
+        var->score = frequency_table[i][genome_pos].score;
+        var->depth = frequency_table[i][genome_pos].score;
+        var->ref[0] = nucleotide[ref_genome->data[genome_pos]];
+        var->ref[1] = '\0';
+        var->alt[0] = nucleotide[i];
+        var->alt[1] = '\0';
+        results[i] = var;
     }
   }
   //printf("get_most_frequent_variant: genome_pos %lu, nucleotide max freq %d %f %c\n", genome_pos, nucId, max, nucId >= 0 ? nucleotide[nucId] : '-');
@@ -357,6 +356,9 @@ void create_vcf()
     struct frequency_info **frequency_table = get_frequency_table();
     uint32_t nb_pos_multiple_var = 0;
 
+    /**
+     * Dump debugging information: frequency table for a given set of positions
+     **/
     dbg_file = fopen("freq_debug.txt", "w");
     sub_file = fopen("subst.txt", "r");
     assert(sub_file);

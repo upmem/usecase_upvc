@@ -75,11 +75,9 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, float *read_qu
     if (fgets(sequence_buffer, MAX_SEQ_SIZE, f) == NULL) { /* Line with sequence quality information */
         return -1;
     }
-    //TODO: store quality information
+    // store quality information
     for (i = 0; i < SIZE_READ - offset; i++) {
       int Q = sequence_buffer[i];
-      /*printf("index %d SIZE_READ %d\n", i, SIZE_READ);*/
-      /*fflush(stdout);*/
       read_quality_factor[i] = quality_lookup_table[Q-33];
     }
     for (; i < SIZE_READ; i++) {
@@ -115,8 +113,6 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
     }
 
     while (nb_read < MAX_READS_BUFFER) {
-      /*assert(nb_read/2  + 1 < MAX_READS_BUFFER/2);*/
-      /*printf("nb_read %d MAX_READS_BUFFER %d\n", nb_read, MAX_READS_BUFFER);*/
         if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * SIZE_READ], &reads_buffer[(nb_read + 1) * SIZE_READ], 
                 &reads_quality_buffer[nb_read/2 * SIZE_READ]) <= 0)
             || (get_seq_fast_AQ(fpe2, &reads_buffer[(nb_read + 2) * SIZE_READ], &reads_buffer[(nb_read + 3) * SIZE_READ], 
