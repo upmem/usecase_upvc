@@ -359,6 +359,7 @@ void create_vcf()
     /**
      * Dump debugging information: frequency table for a given set of positions
      **/
+#if 0
     dbg_file = fopen("freq_debug.txt", "w");
     sub_file = fopen("subst.txt", "r");
     assert(sub_file);
@@ -395,6 +396,7 @@ void create_vcf()
     }
     fclose(dbg_file);
     fclose(sub_file);
+#endif
 
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {

@@ -439,11 +439,13 @@ int get_read_update_positions(
         while (code_result_tab[code_result_index] != CODE_END) {
             int code_result = code_result_tab[code_result_index];
             int64_t pos_variant_read = code_result_tab[code_result_index + 1];
-            int64_t pos_variant_genome = genome_pos + pos_variant_read + ref_pos;
+            /*printf("pos variant: %lu\n", pos_variant_read);*/
+            int64_t pos_variant_genome = genome_pos + pos_variant_read;
             if (code_result == CODE_SUB) {
                 // do nothing for substitution
                 code_result_index += 3;
                 (*substCnt)++;
+                ref_pos++;
             }
             else if (code_result == CODE_INS) {
                 ins = true;
@@ -454,7 +456,6 @@ int get_read_update_positions(
                 while (code_result_tab[code_result_index] < 4) {
                     ps_var_read++;
                     code_result_index++;
-                    ref_pos--;
                 }
 
                 while (ref_genome->data[ps_var_genome] == read[ps_var_read] && ps_var_genome 
@@ -465,6 +466,9 @@ int get_read_update_positions(
                     pos_variant_genome--;
                     pos_variant_read--;
                 }
+
+                /*newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];*/
+                ref_pos++;
 
                 // skip first value which should be the equivalent of first element in ref genome
                 pos_variant_read++;
@@ -489,7 +493,6 @@ int get_read_update_positions(
                 while (code_result_tab[code_result_index] < 4) {
                     ps_var_genome++;
                     code_result_index++;
-                    ref_pos++;
                 }
 
                 while (ref_genome->data[ps_var_genome] == read[ps_var_read] && pos_variant_genome && ps_var_read) {
@@ -513,11 +516,11 @@ int get_read_update_positions(
                     /*assert(update_genome_position[pos_variant_read+1] == 0);*/
                     update_genome_position[pos_variant_read + 1] = ps_var_genome - pos_variant_genome;
                 }
-                //while (pos_variant_genome <= ps_var_genome) {
-                //    pos_variant_genome++;
-                //    ref_pos++;
-                //}
-                //pos_variant_genome -= ref_pos;
+                while (pos_variant_genome <= ps_var_genome) {
+                    pos_variant_genome++;
+                    ref_pos++;
+                }
+                pos_variant_genome -= ref_pos;
                 ++nbIndels;
             }
             else
@@ -588,7 +591,7 @@ bool update_frequency_table(
 
 #ifdef USE_INDEL
 
-    static bool debug = true; 
+    static bool debug = false; 
     static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     uint64_t update_genome_position[SIZE_READ];
     uint32_t substCnt = 0;
