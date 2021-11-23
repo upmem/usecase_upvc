@@ -11,20 +11,18 @@
 
 #include "accumulateread.h"
 #include "common.h"
+#include "debug.h"
 #include "genome.h"
 #include "getread.h"
 #include "processread.h"
+#include "sam.h"
 #include "upvc.h"
 #include "vartree.h"
 
+#define DEBUG_READ_MAPPING true
+
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
-
-#define CODE_SUB 10
-#define CODE_DEL 11
-#define CODE_INS 12
-#define CODE_END 13
-#define CODE_ERR 14
 
 #define CODE_A 0 /* ('A'>>1)&3   41H  0100 0001 */
 #define CODE_C 1 /* ('C'>>1)&3   43H  0100 0011 */
@@ -246,25 +244,29 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
             backtrack_idx--;
         } else {
             if (backtrak[backtrack_idx].type == CODE_DEL) {
-                int backtrack_jx = backtrak[backtrack_idx].jx;
+                //int backtrack_jx = backtrak[backtrack_idx].jx;
                 code[code_idx++] = CODE_DEL;
                 code[code_idx++] = backtrak[backtrack_idx].ix;
                 code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
                 backtrack_idx--;
+                /*
                 while ((backtrak[backtrack_idx].type == CODE_DEL) && (backtrack_jx == backtrak[backtrack_idx].jx)) {
                     code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
                     backtrack_idx--;
                 }
+                */
             } else {
-                int backtrack_ix = backtrak[backtrack_idx].ix;
+                //int backtrack_ix = backtrak[backtrack_idx].ix;
                 code[code_idx++] = CODE_INS;
                 code[code_idx++] = backtrak[backtrack_idx].jx - 1;
                 code[code_idx++] = read[backtrak[backtrack_idx].jx];
                 backtrack_idx--;
+                /*
                 while ((backtrak[backtrack_idx].type == CODE_INS) && (backtrack_ix == backtrak[backtrack_idx].ix)) {
                     code[code_idx++] = read[backtrak[backtrack_idx].jx];
                     backtrack_idx--;
                 }
+                */
             }
         }
     }
@@ -283,6 +285,7 @@ static void set_variant(
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     uint64_t genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
     int size_read = SIZE_READ;
+    //LOG_TRACE("set_variant called\n");
 
     /* Get the differences betweend the read and the sequence of the reference genome that match */
     read = &reads_buffer[result_match.num * size_read];
@@ -295,9 +298,15 @@ static void set_variant(
         ref_genome->mapping_coverage[genome_pos + i] += 1;
     }
 
+#if DEBUG_READ_MAPPING
+    // TODO: check genome_pos is the expected value
+    write_read_mapping(genome_pos, code_result_tab);
+#endif
+
     code_result_idx = 0;
     while (code_result_tab[code_result_idx] != CODE_END) {
         int code_result = code_result_tab[code_result_idx];
+        //LOG_DEBUG("code_result=%d\n", code_result);
         int64_t pos_variant_read = code_result_tab[code_result_idx + 1];
         int64_t pos_variant_genome = genome_pos + pos_variant_read;
         int ref_pos = 0;
@@ -364,6 +373,7 @@ static void set_variant(
                 newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
                 if (ref_pos >= MAX_SIZE_ALLELE - 1) {
                     free(newvar);
+                    //LOG_TRACE("set_variant early return\n");
                     return;
                 }
                 pos_variant_genome++;
@@ -375,6 +385,7 @@ static void set_variant(
         variant_tree_insert(
             newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
     }
+    //LOG_TRACE("set_variant return\n");
 }
 #endif
 
@@ -1046,6 +1057,9 @@ static void *process_read_thread_fct(void *arg)
 
 void process_read_init()
 {
+#if DEBUG_READ_MAPPING
+    open_sam_file();
+#endif
     genome_t *ref_genome = genome_get();
     args.ref_genome = ref_genome;
 
@@ -1061,6 +1075,9 @@ void process_read_init()
 
 void process_read_free()
 {
+#if DEBUG_READ_MAPPING
+    close_sam_file();
+#endif
     stop_threads = true;
     pthread_barrier_wait(&barrier);
 

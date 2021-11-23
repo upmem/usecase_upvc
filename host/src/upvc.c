@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "accumulateread.h"
+#include "debug.h"
 #include "dispatch.h"
 #include "dpu_backend.h"
 #include "genome.h"

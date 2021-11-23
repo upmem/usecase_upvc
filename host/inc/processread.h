@@ -7,6 +7,12 @@
 
 #include <stdio.h>
 
+#define CODE_SUB 10
+#define CODE_DEL 11
+#define CODE_INS 12
+#define CODE_END 13
+#define CODE_ERR 14
+
 void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id);
 
 void process_read_init();
