@@ -55,7 +55,11 @@ __host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
 /**
  * @brief Maximum score allowed.
  */
-#define MAX_SCORE (40)
+#if SIZE_READ>120
+#define MAX_SCORE 340
+#else
+#define MAX_SCORE 225
+#endif
 
 /**
  * @brief Number of reference read to be fetch per mram read

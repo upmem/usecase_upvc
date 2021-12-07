@@ -15,7 +15,7 @@
 #include "genome.h"
 #include "getread.h"
 #include "processread.h"
-#include "sam.h"
+#include "mapping_file.h"
 #include "upvc.h"
 #include "vartree.h"
 
@@ -31,7 +31,11 @@
 
 #define PQD_INIT_VAL (99)
 
-#define MAX_SUBSTITUTION (4)
+#if SIZE_READ>120
+#define MAX_SUBSTITUTION 31
+#else
+#define MAX_SUBSTITUTION 20
+#endif
 
 static bool flag_dbg = false;
 
@@ -244,29 +248,25 @@ static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, u
             backtrack_idx--;
         } else {
             if (backtrak[backtrack_idx].type == CODE_DEL) {
-                //int backtrack_jx = backtrak[backtrack_idx].jx;
+                int backtrack_jx = backtrak[backtrack_idx].jx;
                 code[code_idx++] = CODE_DEL;
                 code[code_idx++] = backtrak[backtrack_idx].ix;
                 code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
                 backtrack_idx--;
-                /*
                 while ((backtrak[backtrack_idx].type == CODE_DEL) && (backtrack_jx == backtrak[backtrack_idx].jx)) {
                     code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
                     backtrack_idx--;
                 }
-                */
             } else {
-                //int backtrack_ix = backtrak[backtrack_idx].ix;
+                int backtrack_ix = backtrak[backtrack_idx].ix;
                 code[code_idx++] = CODE_INS;
                 code[code_idx++] = backtrak[backtrack_idx].jx - 1;
                 code[code_idx++] = read[backtrak[backtrack_idx].jx];
                 backtrack_idx--;
-                /*
                 while ((backtrak[backtrack_idx].type == CODE_INS) && (backtrack_ix == backtrak[backtrack_idx].ix)) {
                     code[code_idx++] = read[backtrak[backtrack_idx].jx];
                     backtrack_idx--;
                 }
-                */
             }
         }
     }
@@ -429,11 +429,13 @@ int get_read_update_positions(
         __attribute__((unused))int size_neighbour_in_symbols,
         bool * flag,
         bool debug,
-        uint32_t * substCnt) {
+        uint32_t * substCnt,
+        char * chromosome_name) {
 
     // run smith and waterman algorithm to find indels
     uint8_t code_result_tab[256];
     code_alignment(code_result_tab, result_tab[pos].score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols, flag);
+    write_read_mapping(chromosome_name, result_tab[pos].coord.seed_nr, code_result_tab);
     for(int read_pos = 0; read_pos < SIZE_READ; ++read_pos) {
         update_genome_position[read_pos] = 0;
     }
@@ -486,7 +488,7 @@ int get_read_update_positions(
                 while (pos_variant_read <= ps_var_read) {
                     // position should not be updated yet
                     if(update_genome_position[pos_variant_read] != 0) {
-                        printf("Warning: duplicate update (Insertion) at position %lu. Current %lu\n", 
+                        LOG_WARN("duplicate update (Insertion) at position %lu. Current %lu\n", 
                                 pos_variant_read, update_genome_position[pos_variant_read]);
                         fflush(stdout);
                         return -1;
@@ -519,7 +521,7 @@ int get_read_update_positions(
                 if(pos_variant_read + 1 < SIZE_READ) {
                     // position should not be updated yet
                     if(update_genome_position[pos_variant_read+1] != 0) {
-                        printf("Warning: duplicate update (Deletion) at position %lu. Current %lu\n", 
+                        LOG_WARN("duplicate update (Deletion) at position %lu. Current %lu\n", 
                                 pos_variant_read+1, update_genome_position[pos_variant_read+1]);
                         fflush(stdout);
                         return -1;
@@ -613,7 +615,7 @@ bool update_frequency_table(
     
     pthread_mutex_lock(&freq_table_mutex);
     int nbIndels = get_read_update_positions(update_genome_position, result_tab, pos,
-            ref_genome, genome_pos, read, size_neighbour_in_symbols, &flag_dbg, debug, &substCnt);
+            ref_genome, genome_pos, read, size_neighbour_in_symbols, &flag_dbg, debug, &substCnt, ref_genome->seq_name[result_tab[pos].coord.seq_nr]);
     bool hasIndel = nbIndels > 0;
 
     // debug prints
@@ -668,7 +670,7 @@ bool update_frequency_table(
     }
     else if(debug) {
         if(!result_tab[pos].coord.nodp) {
-            printf("\nWarning: odpd result with no indels detected (flag = %d, subst cnt %u)):\n", flag_dbg, substCnt);
+            LOG_WARN("odpd result with no indels detected (flag = %d, subst cnt %u)):\n", flag_dbg, substCnt);
             printf("Read:\n");
             for(int k = 0; k < SIZE_READ; ++k) {
                 printf("%c", nucleotide[read[k]]);
@@ -693,7 +695,7 @@ bool update_frequency_table(
                 frequency_table[read[k]][update_genome_pos].score++;
             }
             else if (update_genome_pos != UINT64_MAX)
-                printf("WARNING: genome update position computed is wrong %lu\n", update_genome_pos);
+                LOG_WARN("genome update position computed is wrong %lu\n", update_genome_pos);
         }
     }
     /*fflush(stdout);*/
@@ -708,7 +710,7 @@ bool update_frequency_table(
             frequency_table[read[j]][genome_pos+j].score++;
         }
         else
-            printf("WARNING: reads matched at position that exceeds genome size\n");
+            LOG_WARN("reads matched at position that exceeds genome size\n");
     }
     pthread_mutex_unlock(&freq_table_mutex);
     return false;
@@ -867,7 +869,7 @@ static void do_process_read(process_read_arg_t *arg)
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) 
             + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
           if(delta_corrected < 0) {
-            printf("WARNING: negative delta for square root %d\n", delta_corrected);
+            LOG_WARN("negative delta for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_PAIR_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
@@ -885,7 +887,7 @@ static void do_process_read(process_read_arg_t *arg)
 #ifdef USE_MAPQ_SCORE
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
           if(delta_corrected < 0) {
-            printf("WARNING: negative delta (np == 1) for square root %d\n", delta_corrected);
+            LOG_WARN("negative delta (np == 1) for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_PAIR_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
@@ -927,7 +929,7 @@ static void do_process_read(process_read_arg_t *arg)
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
-            printf("WARNING: negative delta (np1 == 2) for square root %d\n", delta_corrected);
+            LOG_WARN("negative delta (np1 == 2) for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
@@ -946,7 +948,7 @@ static void do_process_read(process_read_arg_t *arg)
           int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
-            printf("WARNING: negative delta (np1 == 1) for square root %d\n", delta_corrected);
+            LOG_WARN("negative delta (np1 == 1) for square root %d\n", delta_corrected);
           }
           else if(delta > DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
@@ -967,7 +969,7 @@ static void do_process_read(process_read_arg_t *arg)
           int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
-            printf("WARNING: negative delta (np2 == 2) for square root %d, %d %d %d %d\n", 
+            LOG_WARN("negative delta (np2 == 2) for square root %d, %d %d %d %d\n", 
                 delta_corrected, MISMATCH_COUNT(result_tab[P2[0]]), MISMATCH_COUNT(result_tab[P2[1]]), MAX_SUBSTITUTION + 1, delta);
           }
           else if(delta > DIST_SINGLE_THRESHOLD) {
@@ -988,7 +990,7 @@ static void do_process_read(process_read_arg_t *arg)
           int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
 
           if(delta_corrected < 0) {
-            printf("WARNING: negative delta (np2 == 1) for square root %d\n", delta_corrected);
+            LOG_WARN("negative delta (np2 == 1) for square root %d\n", delta_corrected);
           }
           else if (delta > DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
@@ -1058,7 +1060,7 @@ static void *process_read_thread_fct(void *arg)
 void process_read_init()
 {
 #if DEBUG_READ_MAPPING
-    open_sam_file();
+    open_mapping_file();
 #endif
     genome_t *ref_genome = genome_get();
     args.ref_genome = ref_genome;
@@ -1076,7 +1078,7 @@ void process_read_init()
 void process_read_free()
 {
 #if DEBUG_READ_MAPPING
-    close_sam_file();
+    close_mapping_file();
 #endif
     stop_threads = true;
     pthread_barrier_wait(&barrier);

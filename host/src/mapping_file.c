@@ -6,15 +6,15 @@
 #include <errno.h>
 
 #include "index.h"
-#include "sam.h"
+#include "mapping_file.h"
 #include "genome.h"
 #include "common.h"
 #include "parse_args.h"
 #include "processread.h"
 #include "debug.h"
 
-#define SAM_FILENAME "read_alignments.sam"
-#define SAM_VERSION "1.6"
+#define MAP_FILENAME "read_alignments.map"
+#define MAP_VERSION "1.6"
 #define PROGRAM_NAME "upvc"
 #define MAX_CIGAR_LENGTH (3*SIZE_READ)
 #define MAX_PATCH_LENGTH (3*SIZE_READ)
@@ -24,38 +24,37 @@
 #define CIGAR_INSERT 'I'
 #define CIGAR_DELETE 'D'
 
-FILE *sam_file;
+FILE *mapping_file;
 
-static char *get_sam_filename()
+static char *get_mapping_filename()
 {
     static char filename[FILENAME_MAX];
-    sprintf(filename, "%s", SAM_FILENAME);
-    LOG_TRACE("sam filename : \"%s\"\n", filename);
+    sprintf(filename, "%s", MAP_FILENAME);
+    LOG_TRACE("mapping filename : \"%s\"\n", filename);
     return filename;
 }
 
-void open_sam_file()
+void open_mapping_file()
 {
-    LOG_DEBUG("opening sam file\n");
+    LOG_DEBUG("opening mapping file\n");
     // TODO: check for memory leaks here
-    char *filename = get_sam_filename();
-    sam_file = fopen(filename, "w");
-    if (sam_file == NULL)
+    char *filename = get_mapping_filename();
+    mapping_file = fopen(filename, "w");
+    if (mapping_file == NULL)
     {
-        LOG_FATAL("couldn't open sam file; errno : %u\n", errno);
+        LOG_FATAL("couldn't open mapping file; errno : %u\n", errno);
     }
-    LOG_DEBUG("openned sam file : %p\n", sam_file);
+    LOG_DEBUG("openned mapping file : %p\n", mapping_file);
     // TODO: complete header
-    LOG_TRACE("writing sam header\n");
-    LOG_DEBUG("written test line in sam file\n");
-    fprintf(sam_file, "@HD VN:" SAM_VERSION " SO:unknown\n");
-    fprintf(sam_file, "@PG ID:1 PN:" PROGRAM_NAME "\n");
-    LOG_DEBUG("sam header written\n");
+    LOG_TRACE("writing mapping header\n");
+    //fprintf(mapping_file, "@HD VN:" MAP_VERSION " SO:unknown\n");
+    //fprintf(mapping_file, "@PG ID:1 PN:" PROGRAM_NAME "\n");
+    //LOG_DEBUG("mapping header written\n");
 }
 
 /*
  * TODO: Either reuse this code or delete it
-void write_sam_read(uint64_t genome_pos, uint8_t *code, int8_t *read)
+void write_mapping_read(uint64_t genome_pos, uint8_t *code, int8_t *read)
 {
     const unsigned int flag = 0x0;
     const uint8_t mapping_quality = 255;// unknown quality; TODO: set quality
@@ -131,22 +130,33 @@ void write_sam_read(uint64_t genome_pos, uint8_t *code, int8_t *read)
     sequence[SIZE_READ] = 0;
 
     //TODO: set read quality correctly (last string)
-    fprintf(sam_file, "*\t%u\t*\t%lu\t%u\t%s\t*\t0\t%d\t%s\t*\n", flag, genome_pos+1, mapping_quality, cigar, tlen, sequence);
+    fprintf(mapping_file, "*\t%u\t*\t%lu\t%u\t%s\t*\t0\t%d\t%s\t*\n", flag, genome_pos+1, mapping_quality, cigar, tlen, sequence);
 }
 */
 
-void write_read_mapping(uint64_t genome_pos, uint8_t *code) {
+void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *code) {
     char patch[MAX_PATCH_LENGTH];
     int patch_idx=0;
 
     int nucleotides_read=0;
     uint32_t code_idx;
     char nucleotide[4]= {'A', 'C', 'T', 'G'};
+    uint8_t last_action = CODE_INS;
     for (code_idx=0; code[code_idx] < CODE_END;)
     {
         uint8_t action = code[code_idx++];
-        uint8_t position = code[code_idx++];
-        uint8_t letter = code[code_idx++] && 0x3;
+        uint8_t position = nucleotides_read;
+        uint8_t letter='E';
+        if (action>3) 
+        {
+            position = code[code_idx++];
+            if (code[code_idx] < 5)
+            {
+                letter = nucleotide[code[code_idx++]];
+            } else {
+                letter = nucleotide[(code[code_idx++] && 0x6)>>1];
+            }
+        }
         for (;nucleotides_read<position; nucleotides_read++)
         {
             patch[patch_idx++] = '=';
@@ -154,16 +164,38 @@ void write_read_mapping(uint64_t genome_pos, uint8_t *code) {
         switch (action)
         {
             case CODE_SUB:
-                patch[patch_idx++] = nucleotide[letter]|0x20;//lowercase
+                patch[patch_idx++] = letter|0x20;//lowercase
                 nucleotides_read++;
                 break;
             case CODE_DEL:
                 patch[patch_idx++] = '/';
                 break;
             case CODE_INS:
-                patch[patch_idx++] = nucleotide[letter];
+                patch[patch_idx++] = letter;
                 nucleotides_read++;
                 break;
+            default:
+                //Consider the code read is not an action but a letter associated with the previous action
+                if (action < 5)
+                {
+                    letter = nucleotide[action];
+                } else {
+                    letter = nucleotide[(action && 0x6) >> 1];
+                }
+                switch (last_action)
+                {
+                    case CODE_SUB:
+                        patch[patch_idx++] = letter|0x20;//lowercase
+                        nucleotides_read++;
+                        break;
+                    case CODE_DEL:
+                        patch[patch_idx++] = '/';
+                        break;
+                    case CODE_INS:
+                        patch[patch_idx++] = letter;
+                        nucleotides_read++;
+                        break;
+                }
         }
     }
     if (code[code_idx] == CODE_ERR)
@@ -183,11 +215,11 @@ void write_read_mapping(uint64_t genome_pos, uint8_t *code) {
         patch[patch_idx++] = '=';
     }
     patch[patch_idx++] = 0&&code;
-    fprintf(sam_file, "%lu\t%s\n", genome_pos, patch);
+    fprintf(mapping_file, "%s\t%lu\t%s\n", chromosome_name, genome_pos, patch);
 }
 
-void close_sam_file()
+void close_mapping_file()
 {
-    LOG_TRACE("closing sam file\n");
-    fclose(sam_file);
+    LOG_TRACE("closing mapping file\n");
+    fclose(mapping_file);
 }
