@@ -161,9 +161,9 @@ void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *cod
         {
             if (read[read_idx]<5)
             {
-                patch[patch_idx++] = nucleotide[read[read_idx++]];
+                patch[patch_idx++] = nucleotide[read[read_idx++]]|0x20;//lowercase
             } else {
-                patch[patch_idx++] = nucleotide[(read[read_idx++] && 0x6)>>1];
+                patch[patch_idx++] = nucleotide[(read[read_idx++] && 0x6)>>1]|0x20;//lowercase
             }
             // patch[patch_idx++] = '=';
         }
@@ -220,9 +220,9 @@ void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *cod
     {
         if (read[read_idx]<5)
         {
-            patch[patch_idx++] = nucleotide[read[read_idx++]];
+            patch[patch_idx++] = nucleotide[read[read_idx++]]|0x20;//lowercase
         } else {
-            patch[patch_idx++] = nucleotide[(read[read_idx++] && 0x6)>>1];
+            patch[patch_idx++] = nucleotide[(read[read_idx++] && 0x6)>>1]|0x20;//lowercase
         }
         // patch[patch_idx++] = '=';
     }
