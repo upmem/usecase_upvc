@@ -134,18 +134,18 @@ void write_mapping_read(uint64_t genome_pos, uint8_t *code, int8_t *read)
 }
 */
 
-void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *code) {
+void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *code, uint8_t *read) {
     char patch[MAX_PATCH_LENGTH];
     int patch_idx=0;
+    int read_idx=0;
 
-    int nucleotides_read=0;
     uint32_t code_idx;
     char nucleotide[4]= {'A', 'C', 'T', 'G'};
     uint8_t last_action = CODE_INS;
     for (code_idx=0; code[code_idx] < CODE_END;)
     {
         uint8_t action = code[code_idx++];
-        uint8_t position = nucleotides_read;
+        uint8_t position = read_idx;
         uint8_t letter='E';
         if (action>3) 
         {
@@ -157,22 +157,28 @@ void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *cod
                 letter = nucleotide[(code[code_idx++] && 0x6)>>1];
             }
         }
-        for (;nucleotides_read<position; nucleotides_read++)
+        for (;read_idx<position;)
         {
-            patch[patch_idx++] = '=';
+            if (read[read_idx]<5)
+            {
+                patch[patch_idx++] = nucleotide[read[read_idx++]];
+            } else {
+                patch[patch_idx++] = nucleotide[(read[read_idx++] && 0x6)>>1];
+            }
+            // patch[patch_idx++] = '=';
         }
         switch (action)
         {
             case CODE_SUB:
                 patch[patch_idx++] = letter|0x20;//lowercase
-                nucleotides_read++;
+                read_idx++;
                 break;
             case CODE_DEL:
                 patch[patch_idx++] = '/';
                 break;
             case CODE_INS:
                 patch[patch_idx++] = letter;
-                nucleotides_read++;
+                read_idx++;
                 break;
             default:
                 //Consider the code read is not an action but a letter associated with the previous action
@@ -186,14 +192,14 @@ void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *cod
                 {
                     case CODE_SUB:
                         patch[patch_idx++] = letter|0x20;//lowercase
-                        nucleotides_read++;
+                        read_idx++;
                         break;
                     case CODE_DEL:
                         patch[patch_idx++] = '/';
                         break;
                     case CODE_INS:
                         patch[patch_idx++] = letter;
-                        nucleotides_read++;
+                        read_idx++;
                         break;
                 }
         }
@@ -210,9 +216,15 @@ void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *cod
             LOG_TRACE("code[%u]=%u\n", i, code[i]);
         }
     }
-    for (;nucleotides_read<SIZE_READ; nucleotides_read++)
+    for (;read_idx<SIZE_READ;)
     {
-        patch[patch_idx++] = '=';
+        if (read[read_idx]<5)
+        {
+            patch[patch_idx++] = nucleotide[read[read_idx++]];
+        } else {
+            patch[patch_idx++] = nucleotide[(read[read_idx++] && 0x6)>>1];
+        }
+        // patch[patch_idx++] = '=';
     }
     patch[patch_idx++] = 0&&code;
     fprintf(mapping_file, "%s\t%lu\t%s\n", chromosome_name, genome_pos, patch);

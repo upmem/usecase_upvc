@@ -435,7 +435,7 @@ int get_read_update_positions(
     // run smith and waterman algorithm to find indels
     uint8_t code_result_tab[256];
     code_alignment(code_result_tab, result_tab[pos].score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols, flag);
-    write_read_mapping(chromosome_name, result_tab[pos].coord.seed_nr, code_result_tab);
+    write_read_mapping(chromosome_name, result_tab[pos].coord.seed_nr, code_result_tab, (uint8_t*) read);
     for(int read_pos = 0; read_pos < SIZE_READ; ++read_pos) {
         update_genome_position[read_pos] = 0;
     }
