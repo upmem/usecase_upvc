@@ -52,13 +52,33 @@ static int min(int a, int b) { return a < b ? a : b; }
 static void DPD_compute(
     int s1, int s2, int *Dij, int Dijm, int Dimj, int Dimjm, int *Pij, int Pijm, int *Qij, int Qimj, int *xij)
 {
+    /* Compute values for D,P,Q and x at (i,j) from values at (i-1,j), (i,j-1), (i-1,j-1).
+     * i represents relative index in reference genome (starting from where the read is mapped).
+     * j represents index in read.
+     * Dij is the minimum cost to align the first i nucleotides from genome with the first j nucleotides from read.
+     * Pij is the same minimum cost but assuming the last operation was an insertion.
+     * Qij is the same minimum cost but assuming the last operation was a deletion.
+     * xij is the chosen operation to reach the cost in Dij :
+     *      0 means read and reference genome match
+     *      1 is for a substitution
+     *      2 is for an insertion
+     *      3 is for a deletion
+     */
     int min_QP, d;
 
+    // Compute cost in case of insertion :
+    // D_i_j-1 + COST_GAPO in case of first insertion
+    // D_i_j-1 + COST_GAPE in case insertion directly follows another insertion (In this case, D_i_j-1 = P_i_j-1)
     *Pij = min(Dijm + COST_GAPO, Pijm + COST_GAPE);
+    // Similar for deletion :
     *Qij = min(Dimj + COST_GAPO, Qimj + COST_GAPE);
+
+    //x_i_j is the backtracking
     *xij = 0;
 
     int x;
+    // Get minimum between Pij (which assumes insertion) and Qij (which assumes deletion)
+    // and store the associated operation in x (2 for insertion and 3 for deletion).
     if (*Pij < *Qij) {
         min_QP = *Pij;
         x = 2;
@@ -66,11 +86,18 @@ static void DPD_compute(
         min_QP = *Qij;
         x = 3;
     }
+
+    // Compute the diagonal score in d :
+    // Dimjm (D[i-1][j-1]) if genome and read match (genome[read_map_address+SIZE_SEED+i]==read[j]) 
+    // Dimjm + COST_SUB if genome and read do not match (genome[read_map_address+SIZE_SEED+i]!=read[j])
     d = Dimjm;
     if ((s1 & 3) != (s2 & 3)) {
         d += COST_SUB;
         *xij = 1;
     }
+
+    // If diagonal score is best, store it in Dij (in this case, xij has already been set to the correct value)
+    // Otherwise, set Dij to the best score between insertion and deletion (and set xij correspondingly).
     if (d < min_QP) {
         *Dij = d;
     } else {
@@ -81,22 +108,36 @@ static void DPD_compute(
 
 int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_symbols)
 {
+    // Matrices are only computed for neighbours (ie: nucleotides not in the seed).
     int matrix_size = size_neighbour_in_symbols + 1;
+    // Only NB_DIAG (odd) diagonals are computed for each matrix. Values outside this diagonal aren't considered.
+    // ie: we only consider indices where j-diagonal < i < j+diagonal
     int diagonal = (NB_DIAG / 2) + 1;
+    // D is the matrix of scores.
+    // P is the matrix of scores assuming last operation is an insertion.
+    // Q is the matrix of scores assuming last operation is a deletion.
+    // X is the matrix of actual operations used for backtracking.
     int D[matrix_size][matrix_size];
     int P[matrix_size][matrix_size];
     int Q[matrix_size][matrix_size];
-    int X[matrix_size][matrix_size];				
+    int X[matrix_size][matrix_size];
     int min_score = PQD_INIT_VAL;
     int min_score_i_idx = 0;
     int min_score_j_idx = 0;
     int align_distance = 1;
 
+    // Set D matrix to 0
+    // FIXME : I'm pretty sure this is completely useless as those 0s should be written over before being read.
     for (int i = 0; i < matrix_size; i++) {
         for (int j = 0; j < matrix_size; j++) {
             D[i][j] = 0;
         }
     }
+
+    // Set first row and column of P and Q to high values
+    // Set first row and column of D to correct values
+    // FIXME : It would probably make more sense to set D[i][0] and D[0][i] to i*COST_GAPO
+    //         but this should also be changed accordingly in DPU then.
     for (int i = 0; i <= diagonal; i++) {
         P[i][0] = PQD_INIT_VAL;
         P[0][i] = PQD_INIT_VAL;
@@ -106,6 +147,21 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[0][i] = i * COST_SUB;
     }
 
+    /* D matrix at this point : (assuming COST_SUB=1 and diagonal = 3 ie: NB_DIAG=5)
+     * (0,0) in bottom left
+     * 
+     *  |
+     *  |
+     *  |3
+     * ^|2
+     * ||1
+     * j|0 1 2 3
+     *  +--------------
+     *   i->
+     */
+    
+
+    // Compute first triangle (bottom left part)
     for (int i = 1; i < diagonal; i++) {
         for (int j = 1; j < i + diagonal; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
@@ -114,6 +170,25 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
     }
+
+    /* D matrix at this point : (assuming COST_SUB=1 and diagonal = 3 ie: NB_DIAG=5)
+     * (0,0) in bottom left
+     * An x corresponds to a value that has been computed.
+     * A M corresponds to PQD_INIT_VAL
+     * 
+     *  |
+     *  |
+     *  |    M
+     *  |  M x
+     *  |3 x x
+     * ^|2 x x
+     * ||1 x x
+     * j|0 1 2 3
+     *  +--------------
+     *   i->
+     */
+
+    // Compute most of the diagonal
     for (int i = diagonal; i < matrix_size - diagonal; i++) {
         P[i][i - diagonal] = PQD_INIT_VAL;
         D[i][i - diagonal] = PQD_INIT_VAL;
@@ -125,6 +200,29 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[i][i + diagonal] = PQD_INIT_VAL;
     }
 
+    /* D matrix at this point : (assuming COST_SUB=1, diagonal = 3 ie: NB_DIAG=5, and matrix_size=12)
+     * (0,0) in bottom left
+     * An x corresponds to a value that has been computed.
+     *  
+     *  +-----------------------+
+     *  |                M      |
+     *  |              M x      |
+     *  |            M x x      |
+     *  |          M x x x      |
+     *  |        M x x x x      |
+     *  |      M x x x x x      |
+     *  |    M x x x x x M      |
+     *  |  M x x x x x M        |
+     *  |3 x x x x x M          |
+     * ^|2 x x x x M            |
+     * ||1 x x x M              |
+     * j|0 1 2 M                |
+     *  +-----------------------+
+     *   i->
+     */
+
+    // Compute last triangle (top right part)
+    // (And check for best score in top-most row of D matrix)
     for (int i = matrix_size - diagonal; i < matrix_size; i++) {
         P[i][i - diagonal] = PQD_INIT_VAL;
         D[i][i - diagonal] = PQD_INIT_VAL;
@@ -138,6 +236,29 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
             min_score_j_idx = matrix_size - 1;
         }
     }
+
+    /* D matrix at this point : (assuming COST_SUB=1, diagonal = 3 ie: NB_DIAG=5, and matrix_size=12)
+     * (0,0) in bottom left
+     * An x corresponds to a value that has been computed.
+     *  
+     *  +-----------------------+
+     *  |                M x x x|
+     *  |              M x x x x|
+     *  |            M x x x x x|
+     *  |          M x x x x x M|
+     *  |        M x x x x x M  |
+     *  |      M x x x x x M    |
+     *  |    M x x x x x M      |
+     *  |  M x x x x x M        |
+     *  |3 x x x x x M          |
+     * ^|2 x x x x M            |
+     * ||1 x x x M              |
+     * j|0 1 2 M                |
+     *  +-----------------------+
+     *   i->
+     */
+
+    // Find the best score in right-most column of D matrix (if it is better than the best from the top row)
     for (int j = matrix_size - diagonal; j < matrix_size; j++) {
         if (D[matrix_size - 1][j] < min_score) {
             min_score = D[matrix_size - 1][j];
@@ -146,6 +267,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         }
     }
 
+    // backtrack step
     {
         int i = min_score_i_idx;
         int j = min_score_j_idx;
