@@ -37,6 +37,8 @@
 #define MAX_SUBSTITUTION 20
 #endif
 
+#define MAX_SCORE_DIFFERENCE_WITH_BEST 40
+
 static bool flag_dbg = false;
 
 typedef struct {
@@ -826,6 +828,14 @@ static void do_process_read(process_read_arg_t *arg)
       }
       release_curr_match(j);
 
+      unsigned int best_individual_scores[4] = {UINT32_MAX};
+      for (unsigned int x=i; x<j; x++)
+      {
+          unsigned int t = result_tab[x].num % 4;
+          if (best_individual_scores[t] > result_tab[x].score)
+              best_individual_scores[t] = result_tab[x].score;
+      }
+
       // i = start index in result_tab
       // j = stop index in result_tab
       // select best couples of paired reads
@@ -838,14 +848,17 @@ static void do_process_read(process_read_arg_t *arg)
       for (unsigned int x1 = i; x1 < j; x1++) {
         t1 = result_tab[x1].num % 4;
         pos1 = result_tab[x1].coord.seed_nr;
-        for (unsigned int x2 = i + 1; x2 < j; x2++) {
-          pos2 = result_tab[x2].coord.seed_nr;
-          t2 = result_tab[x2].num % 4;
-          if (t1 + t2 == 3) // select significant pair
-          {
-            if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
-              // update if this is one of the two best scores
-              keep_best_2_scores(result_tab[x1].score + result_tab[x2].score, P1, P2, x1, x2, best_score);
+        if (result_tab[x1].score < best_individual_scores[t1] + MAX_SCORE_DIFFERENCE_WITH_BEST)
+        {
+          for (unsigned int x2 = i + 1; x2 < j; x2++) {
+            pos2 = result_tab[x2].coord.seed_nr;
+            t2 = result_tab[x2].num % 4;
+            if (t1 + t2 == 3) // select significant pair
+            {
+              if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
+                // update if this is one of the two best scores
+                keep_best_2_scores(result_tab[x1].score + result_tab[x2].score, P1, P2, x1, x2, best_score);
+              }
             }
           }
         }

@@ -260,6 +260,16 @@ __attribute__((unused)) uint32_t depth_filter_a(float freq) {
     return UINT_MAX;
 }
 
+__attribute__((unused)) uint32_t depth_filter_permissive(float freq) {
+    if (freq< 10.0f) {
+        return 3;
+    }
+    if (freq<20.0f) {
+        return 2;
+    }
+    return 1;
+}
+
 __attribute__((unused)) uint32_t depth_filter_fixed_3(float freq) {
 
   if(freq < 20.0f)
