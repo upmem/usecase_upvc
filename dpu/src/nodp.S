@@ -12,10 +12,9 @@
 #define SCORE r0
 #define S2 r1
 #define S1 r4
-#define S1_ACC_H r5
-#define S1_ACC_L r6
-#define S2_ACC_H r7
-#define S2_ACC_L r8
+#define S1_WORD r5
+#define S2_WORD r6
+// r7 and r8 unused for no reason other than historical
 #define I r9
 #define SIZE_NEIGHBOUR_IN_BYTES_MINUS_4 r10
 #define S_XOR r11
@@ -49,59 +48,39 @@ nodp:
     move S1, S1_ARG
     move SCORE, 0
     move I, 0
-    add SIZE_NEIGHBOUR_IN_BYTES_MINUS_4, SIZE_NEIGHBOUR_IN_BYTES, -4
-    lw S1_ACC_H, S1, 0
-    lw S2_ACC_H, S2, 0
 .Lfor_i:
-    move S1_ACC_L, S1_ACC_H
-    move S2_ACC_L, S2_ACC_H
+    // (9 to 29 instructions per cycle depending on xor result)
+    lw S1_WORD, S1, 0
+    lw S2_WORD, S2, 0
     add S1, S1, 4
     add S2, S2, 4
-    lw S1_ACC_H, S1, 0
-    lw S2_ACC_H, S2, 0
-    xor S_XOR, S1_ACC_L, S2_ACC_L
+    xor S_XOR, S1_WORD, S2_WORD, z, .Lloopskip // skip k loop if xor is 0 as score doesn't need to be updated
+
 .Lfor_k:
+    // only run when S_XOR!=0 (8 instructions per cycle)
     and S_TRANSLATED, S_XOR, 0xff
     lbu S_TRANSLATED, S_TRANSLATED, translation_table
     add SCORE, SCORE, S_TRANSLATED
-    jleu S_TRANSLATED, COST_SUB, .Lupdate_score
 
-    jgeu I, SIZE_NEIGHBOUR_IN_BYTES_MINUS_4, .Lupdate_score
-
-    and TMP2, I, 0x3
-    add TMP2, TMP2, 1
-    lsl TMP2, TMP2, 3
-
-    lsrx TMP1, S1_ACC_H, TMP2, sh32, .LS1_J32
-    lsr V1, S1_ACC_L, TMP2
-    add V1, V1, TMP1, true, .LS1
-.LS1_J32:
-    move V1, S1_ACC_H
-.LS1:
-    lsrx TMP1, S2_ACC_H, TMP2, sh32, .LS2_J32
-    lsr V2, S2_ACC_L, TMP2
-    add V2, V2, TMP1, true, .LS2
-.LS2_J32:
-    move V2, S2_ACC_H
-.LS2:
-
-    CMP_PAIR V1, V2, 2
-    CMP_PAIR V1, V2, 4
-    CMP_PAIR V1, V2, 6
-    CMP_PAIR V1, V2, 8
-
-.Lupdate_score:
     jgtu SCORE, MAX_SCORE, .Lend
 
     // loop
+.Lloop_conditions:
     add I, I, 1
     jgeu I, SIZE_NEIGHBOUR_IN_BYTES, .Lend
-    and zero, I, 0x3, z, .Lfor_i
-    lsr S_XOR, S_XOR, 8, true, .Lfor_k
+    and zero, I, 0x3, z, .Lfor_i           // if (I%4==0) jump .Lfor_i
+    lsr S_XOR, S_XOR, 8, nz, .Lfor_k       // S_XOR >>= 8; if (S_XOR!=0) jump .Lfor_k; //continue updating score only if necessary
+                                           // otherwise, run loopskip
 
-.Lreturn_UINT_MAX:
-    move SCORE, 0xffffffff
+.Lloopskip:
+    // k loop but without updating score (4 instructions total)
+    and I, I, 0xfffc
+    add I, I, 4
+    jgeu I, SIZE_NEIGHBOUR_IN_BYTES, .Lend
+    jump .Lfor_i
+
 .Lend:
+    // TODO: process the last nucleotides when number of nucleotides is not a multiple of 4
     ld d14, r22, 0
     jump r23
 
