@@ -62,7 +62,7 @@ nodp:
     lbu S_TRANSLATED, S_TRANSLATED, translation_table
     add SCORE, SCORE, S_TRANSLATED
 
-    jgtu SCORE, MAX_SCORE, .Lend
+    jgtu SCORE, MAX_SCORE, .Lcheckoffset
 
     // loop
 .Lloop_conditions:
@@ -79,8 +79,28 @@ nodp:
     jgeu I, SIZE_NEIGHBOUR_IN_BYTES, .Lend
     jump .Lfor_i
 
+
+.Lcheckoffset:
+    // first find the end
+    sub TMP1, SIZE_NEIGHBOUR_IN_BYTES, I
+    lsr TMP1, TMP1, 2
+    add S1, S1, TMP1
+    add S2, S2, TMP1
+    // load the last words
+    lw S1_WORD, S1, 0
+    lw S2_WORD, S2, 0
+    CMP_PAIR S1_WORD, S2_WORD, 2
+    CMP_PAIR S1_WORD, S2_WORD, 4
+    CMP_PAIR S1_WORD, S2_WORD, 6
+    CMP_PAIR S1_WORD, S2_WORD, 8
+    jump .Lend
+
+.Lreturn_UINT_MAX:
+    move SCORE, 0xffffffff
+
 .Lend:
     // TODO: process the last nucleotides when number of nucleotides is not a multiple of 4
+    
     ld d14, r22, 0
     jump r23
 

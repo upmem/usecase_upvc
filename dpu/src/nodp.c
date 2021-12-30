@@ -19,7 +19,16 @@ const uint8_t translation_table[256] = { 0, 10, 10, 10, 10, 20, 20, 20, 10, 20, 
     20, 30, 30, 30, 30, 40, 40, 40, 30, 40, 40, 40, 30, 40, 40, 40, 20, 30, 30, 30, 30, 40, 40, 40, 30, 40, 40, 40, 30, 40, 40,
     40, 20, 30, 30, 30, 30, 40, 40, 40, 30, 40, 40, 40, 30, 40, 40, 40 };
 
+#define CMP(a, b, shift) {                                                      \\
+	if (a>>shift == (b & (0xffffffff>>shift))) {                            \\
+		return UINT_MAX;                                                \\
+	}
+
+#define CMP_PAIR(a,b,shift) {                                                   \\
+	CMP(a,b,shift)                                                          \\
+	CMP(b,a,shift)
 #if 0
+
 
 uint32_t nodp(uint8_t *s1, uint8_t *s2, uint32_t max_score, uint32_t size_neighbour_in_bytes)
 {
@@ -35,6 +44,14 @@ uint32_t nodp(uint8_t *s1, uint8_t *s2, uint32_t max_score, uint32_t size_neighb
             uint32_t s_translated = translation_table[s_xor & 0xFF];
             s_xor >>= CHAR_BIT;
         }
+    }
+    if (score>MAX_SCORE) {
+	    uint32_t last_word1 = s1[0];
+	    uint32_t last_word2 = s2[0];
+	    CMP_PAIR(last_word1, last_word2, 2)
+	    CMP_PAIR(last_word1, last_word2, 4)
+	    CMP_PAIR(last_word1, last_word2, 6)
+	    CMP_PAIR(last_word1, last_word2, 8)
     }
     return score;
 }
