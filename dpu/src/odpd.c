@@ -10,6 +10,7 @@
 #define COST_SUB 10
 #define COST_GAPO 11
 #define COST_GAPE 1
+#define MAX_BEST_SCORE 99
 
 static inline int min(int a, int b)
 {
@@ -70,17 +71,18 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
     int i, j, d, lp, pp, QP, min_score;
 
     for (j = 0; j <= NB_DIAGS / 2 + 1; j++) {
-        P(0, j) = 99;
-        Q(0, j) = 99;
+        P(0, j) = MAX_BEST_SCORE;
+        Q(0, j) = MAX_BEST_SCORE;
+	// FIXME : what about P(j,0) and Q(j,0)
     }
-    P(1, 0) = 99;
-    Q(1, 0) = 99;
+    P(1, 0) = MAX_BEST_SCORE;
+    Q(1, 0) = MAX_BEST_SCORE;
     for (j = 0; j <= NB_DIAGS / 2 + 1; j++) {
         D(0, j) = j * COST_SUB;
     }
 
     for (i = 1; i < NB_DIAGS / 2 + 1; i++) {
-        min_score = 99;
+        min_score = MAX_BEST_SCORE;
         pp = i & 1; /* i % 2 */
         lp = pp ^ 1; /* (i - 1) % 2 */
         D(pp, 0) = i * COST_SUB;
@@ -97,19 +99,19 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
                 min_score = D(pp, j);
             }
         }
-        Q(pp, j) = 99;
-        D(pp, j) = 99;
+        Q(pp, j) = MAX_BEST_SCORE;
+        D(pp, j) = MAX_BEST_SCORE;
         if (min_score > max_score) {
             return min_score;
         }
     }
     for (i = NB_DIAGS / 2 + 1; i < nbr_sym_len - NB_DIAGS / 2; i++) {
-        min_score = 99;
+        min_score = MAX_BEST_SCORE;
         pp = i & 1; /* i % 2 */
         lp = pp ^ 1; /* (i - 1) % 2 */
         j = i - NB_DIAGS / 2 - 1;
-        P(pp, j) = 99;
-        D(pp, j) = 99;
+        P(pp, j) = MAX_BEST_SCORE;
+        D(pp, j) = MAX_BEST_SCORE;
         for (j = i - NB_DIAGS / 2; j <= i + NB_DIAGS / 2; j++) {
             P(pp, j) = min(D(pp, j - 1) + COST_GAPO, P(pp, j - 1) + COST_GAPE);
             Q(pp, j) = min(D(lp, j) + COST_GAPO, Q(lp, j) + COST_GAPE);
@@ -123,20 +125,20 @@ int odpd(const uint8_t *s1, const uint8_t *s2, int max_score, unsigned int nbr_s
                 min_score = D(pp, j);
             }
         }
-        Q(pp, j) = 99;
-        D(pp, j) = 99;
+        Q(pp, j) = MAX_BEST_SCORE;
+        D(pp, j) = MAX_BEST_SCORE;
         if (min_score > max_score) {
             return min_score;
         }
     }
-    min_score = 99;
+    min_score = MAX_BEST_SCORE;
 
     for (i = nbr_sym_len - NB_DIAGS / 2; i < nbr_sym_len + 1; i++) {
         pp = i & 1; /* i % 2 */
         lp = pp ^ 1; /* (i - 1) % 2 */
         j = i - NB_DIAGS / 2 - 1;
-        P(pp, j) = 99;
-        D(pp, j) = 99;
+        P(pp, j) = MAX_BEST_SCORE;
+        D(pp, j) = MAX_BEST_SCORE;
         for (j = i - NB_DIAGS / 2; j < nbr_sym_len + 1; j++) {
             P(pp, j) = min(D(pp, j - 1) + COST_GAPO, P(pp, j - 1) + COST_GAPE);
             Q(pp, j) = min(D(lp, j) + COST_GAPO, Q(lp, j) + COST_GAPE);

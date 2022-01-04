@@ -93,6 +93,7 @@ nodp:
     CMP_PAIR S1_WORD, S2_WORD, 4
     CMP_PAIR S1_WORD, S2_WORD, 6
     CMP_PAIR S1_WORD, S2_WORD, 8
+    CMP_PAIR S1_WORD, S2_WORD, 10
     jump .Lend
 
 .Lreturn_UINT_MAX:
