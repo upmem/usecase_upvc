@@ -82,8 +82,11 @@ nodp:
 
 .Lcheckoffset:
     // first find the end
-    add S1, S1_ARG, SIZE_NEIGHBOUR_IN_BYTES_MINUS_4
-    add S2, S2_ARG, SIZE_NEIGHBOUR_IN_BYTES_MINUS_4
+    and I, I, 0xfffffffc
+    sub TMP1, SIZE_NEIGHBOUR_IN_BYTES_MINUS_4, I
+    add S1, S1, TMP1
+    add S2, S2, TMP1
+    // Make sure an entire word can be loaded (go back into the read a little if needed)
     and S1, S1, 0xfffffffc
     and S2, S2, 0xfffffffc
     // load the last words
