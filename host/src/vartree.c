@@ -408,12 +408,42 @@ void create_vcf()
     fclose(sub_file);
 #endif
 
+    unsigned int uncovered_nucleotides = 0;
+    unsigned int badly_covered_nucleotides = 0;
+    unsigned int well_covered_nucleotides = 0;
+    unsigned int overly_covered_nucleotides = 0;
+    unsigned int max_coverage = 0;
+    unsigned int position_most_coverage = 0;
+    unsigned int chromosome_most_coverage = 99999;
+    unsigned int total_coverage = 0;
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
         /* for each position in the sequence */
         for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
             
             variant_t ** results = get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position);
+        unsigned int total_score = 0;
+        total_score += frequency_table[0][ref_genome->pt_seq[seq_number] + seq_position].score;
+        total_score += frequency_table[1][ref_genome->pt_seq[seq_number] + seq_position].score;
+        total_score += frequency_table[2][ref_genome->pt_seq[seq_number] + seq_position].score;
+        total_score += frequency_table[3][ref_genome->pt_seq[seq_number] + seq_position].score;
+        total_coverage += total_score;
+        //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
+	    if (total_score == 0) {
+		    uncovered_nucleotides++;
+	    } else if (total_score < 3) {
+		    badly_covered_nucleotides++;
+	    } else {
+		    well_covered_nucleotides++;
+                    if (total_score > 50) {
+                        overly_covered_nucleotides++;
+                    }
+                    if (total_score > max_coverage) {
+                        max_coverage = total_score;
+                        chromosome_most_coverage = seq_number;
+                        position_most_coverage = seq_position;
+                    }
+	    }
             int nb_var = 0;
             for(int i = 0; i < 5; ++i) {
               variant_t * var = results[i];
@@ -432,6 +462,26 @@ void create_vcf()
     free_frequency_table();
     fclose(vcf_file);
 
+    unsigned int total_nucleotides = well_covered_nucleotides+badly_covered_nucleotides+uncovered_nucleotides;
+    printf("\tuncovered nucleotides: %u (%u.%u%%)\n",
+		    uncovered_nucleotides,
+		    uncovered_nucleotides*100/total_nucleotides,
+		    uncovered_nucleotides*10000/total_nucleotides%100);
+    printf("\tbadly covered nucleotides (less than 3 reads): %u (%u.%u%%)\n",
+		    badly_covered_nucleotides,
+		    badly_covered_nucleotides*100/total_nucleotides,
+		    badly_covered_nucleotides*10000/total_nucleotides%100);
+    printf("\twell covered nucleotides (3 reads or more): %u (%u.%u%%)\n",
+		    well_covered_nucleotides,
+		    well_covered_nucleotides*100/total_nucleotides,
+		    well_covered_nucleotides*10000/total_nucleotides%100);
+    printf("\toverly covered nucleotides (more than 50 reads): %u (%u.%u%%)\n",
+		    overly_covered_nucleotides,
+		    overly_covered_nucleotides*100/total_nucleotides,
+		    overly_covered_nucleotides*10000/total_nucleotides%100);
+    printf("\tmax coverage: %u reads\n", max_coverage);
+    printf("\tmax coverage position: chr%u:%u\n", chromosome_most_coverage, position_most_coverage);
+    printf("\ttotal coverage: %u (eq %u reads; or %ux coverage)\n", total_coverage, total_coverage/SIZE_READ, total_coverage/total_nucleotides);
     printf("\tnumber of variants: %d (multiple %d)\n", nb_variant, nb_pos_multiple_var);
     printf("\ttime: %lf s\n", my_clock() - start_time);
 }

@@ -52,87 +52,39 @@ void open_mapping_file()
     //LOG_DEBUG("mapping header written\n");
 }
 
-/*
- * TODO: Either reuse this code or delete it
-void write_mapping_read(uint64_t genome_pos, uint8_t *code, int8_t *read)
+void write_read_mapping_from_backtrack(char *chromosome_name, uint64_t genome_pos, backtrack_t *backtrack_end, int8_t *read)
 {
-    const unsigned int flag = 0x0;
-    const uint8_t mapping_quality = 255;// unknown quality; TODO: set quality
-
-    char cigar[MAX_CIGAR_LENGTH];
-    uint32_t cigar_idx = 0;
-    char last_code = 0;
-    unsigned int code_count = 0;
-    int last_position = -1;
-    int tlen = 0;//TODO: figure out what tlen is supposed to be
-
-    char sequence[SIZE_READ+1];
+    char patch[MAX_PATCH_LENGTH];
+    int patch_idx=MAX_PATCH_LENGTH;
+    patch[--patch_idx] = 0;
+    
     char nucleotide[4] = {'A', 'C', 'T', 'G'};
-
-    for (uint32_t code_idx=0; code[code_idx] != CODE_END;)
-    {
-        char new_code=0;
-        int new_position=last_position+1;
-        switch (code[code_idx++])
-        {
+    
+    uint8_t read_letter;
+    for (;backtrack_end->type != CODE_END; backtrack_end--) {
+        read_letter = read[backtrack_end->jx];
+        if (read_letter < 4) {
+            read_letter = nucleotide[read_letter];
+        } else {
+            read_letter = read_letter & (!0x20);
+        }
+        switch (backtrack_end->type) {
+            case 0:
+                patch[--patch_idx] = '-';
+                break;
             case CODE_SUB:
-                new_code = CIGAR_MISMATCH;
-                new_position = code[code_idx++];
-                code_idx++;
+                patch[--patch_idx] = read_letter | 0x20;
                 break;
             case CODE_INS:
-                new_code = CIGAR_INSERT;
-                new_position = code[code_idx++];
-                code_idx++;
+                patch[--patch_idx] = read_letter;
                 break;
             case CODE_DEL:
-                new_code = CIGAR_DELETE;
-                new_position = code[code_idx++];
-                code_idx++;
+                patch[--patch_idx] = '/';
                 break;
         }
-        if (last_code != new_code)
-        {
-            if (code_count>0) 
-            {
-                cigar_idx += sprintf(cigar+cigar_idx, "%u%c", code_count, last_code);
-            }
-            last_code = new_code;
-            code_count = 0;
-        }
-        if (new_position > last_position+1) 
-        {
-            if (code_count > 0)
-            {
-                cigar_idx += sprintf(cigar+cigar_idx, "%u%c", code_count, last_code);
-                code_count = 0;
-            }
-            cigar_idx += sprintf(cigar+cigar_idx, "%u%c", new_position-last_position-1, CIGAR_MATCH);
-        }
-        code_count++;
-        last_position = new_position;
     }
-    if (code_count > 0)
-    {
-        cigar_idx += sprintf(cigar+cigar_idx, "%u%c", code_count, last_code);
-    }
-    if (SIZE_READ > last_position+1)
-    {
-        cigar_idx += sprintf(cigar+cigar_idx, "%u%c", SIZE_READ-last_position-1, CIGAR_MATCH);
-    }
-    cigar[cigar_idx] = 0;//ensure last string character is 0
-    LOG_TRACE("cigar : \"%s\"\n", cigar);
-
-    for (uint32_t i=0; i<SIZE_READ; i++)
-    {
-        sequence[i] = nucleotide[read[i]];
-    }
-    sequence[SIZE_READ] = 0;
-
-    //TODO: set read quality correctly (last string)
-    fprintf(mapping_file, "*\t%u\t*\t%lu\t%u\t%s\t*\t0\t%d\t%s\t*\n", flag, genome_pos+1, mapping_quality, cigar, tlen, sequence);
+    fprintf(mapping_file, "%s\t%lu\t%s\n", chromosome_name, genome_pos, &patch[patch_idx]);
 }
-*/
 
 void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *code, uint8_t *read) {
     char patch[MAX_PATCH_LENGTH];
@@ -226,7 +178,7 @@ void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *cod
         }
         // patch[patch_idx++] = '=';
     }
-    patch[patch_idx++] = 0&&code;
+    patch[patch_idx++] = 0;
     fprintf(mapping_file, "%s\t%lu\t%s\n", chromosome_name, genome_pos, patch);
 }
 

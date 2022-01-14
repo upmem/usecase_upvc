@@ -7,6 +7,13 @@
 
 #include <stdio.h>
 
+typedef struct {
+    int type;
+    int ix;
+    int jx;
+} backtrack_t;
+
+
 #define CODE_SUB 10
 #define CODE_DEL 11
 #define CODE_INS 12

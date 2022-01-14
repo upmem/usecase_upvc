@@ -6,7 +6,7 @@
 #define V_DEBUG 5
 #define V_TRACE 6
 
-#define VERBOSE V_TRACE
+#define VERBOSE V_INFO
 #define VERBOSE_COLORS true
 #define VERBOSE_LOG_LEVEL true
 

@@ -18,6 +18,8 @@
 #include "mapping_file.h"
 #include "upvc.h"
 #include "vartree.h"
+#include "parse_args.h"
+#include "profiling.h"
 
 #define DEBUG_READ_MAPPING true
 
@@ -29,7 +31,7 @@
 #define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
-#define PQD_INIT_VAL (99)
+#define PQD_INIT_VAL (999)
 
 #if SIZE_READ>120
 #define MAX_SUBSTITUTION 31
@@ -39,15 +41,21 @@
 
 #define MAX_SCORE_DIFFERENCE_WITH_BEST 40
 
-static bool flag_dbg = false;
+/*
+static void log_nucleotides(int8_t *s, int max_len) {
+	char nucleotides[4] = {'A', 'C', 'T', 'G'};
+	for (int i=0; i<max_len; i++) {
+		printf("%c", nucleotides[s[i]]);
+	}
+}
+*/
 
-typedef struct {
-    int type;
-    int ix;
-    int jx;
-} backtrack_t;
 
 static int min(int a, int b) { return a < b ? a : b; }
+
+static unsigned int reads_not_correct_cost = 0;
+static unsigned int reads_correct_cost_sub_only = 0;
+static unsigned int reads_correct_cost_DPD = 0;
 
 static void DPD_compute(
     int s1, int s2, int *Dij, int Dijm, int Dimj, int Dimjm, int *Pij, int Pijm, int *Qij, int Qimj, int *xij)
@@ -106,10 +114,38 @@ static void DPD_compute(
     }
 }
 
-int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_symbols)
+int subOnlyPath(int8_t *s1, int8_t *s2, backtrack_t* backtrack, backtrack_t ** backtrack_end)
 {
+	int score = 0;
+	backtrack[0].type = CODE_END;
+	(*backtrack_end) = &backtrack[1];
+	for (int i=0; i<SIZE_READ; i++) {
+		if (s1[i] != s2[i]) {
+                    (*backtrack_end)->type = CODE_SUB;
+                    (*backtrack_end)->ix = i;
+                    (*backtrack_end)->jx = i;
+                    (*backtrack_end)++;
+                    score += COST_SUB;
+		} else {
+                    (*backtrack_end)->type = 0;
+                    (*backtrack_end)->ix = i;
+                    (*backtrack_end)->jx = i;
+                    (*backtrack_end)++;
+		}
+	}
+	return score;
+}
+
+int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack_end)
+{
+    STAT_RECORD_START(STAT_DPD);
+    /* s1 is a pointer to the genome where the end of the seed was mapped
+     * s2 is a pointer to the end of the seed in the read
+     * backtrack is a data structure that will be populated by this function with a sequence of operations
+     *  (insertions, deletions, substitutions or match) paired with their corresponding indices in genome and read
+     */
     // Matrices are only computed for neighbours (ie: nucleotides not in the seed).
-    int matrix_size = size_neighbour_in_symbols + 1;
+    int matrix_size = SIZE_READ + 1;
     // Only NB_DIAG (odd) diagonals are computed for each matrix. Values outside this diagonal aren't considered.
     // ie: we only consider indices where j-diagonal < i < j+diagonal
     int diagonal = (NB_DIAG / 2) + 1;
@@ -121,10 +157,11 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
     int P[matrix_size][matrix_size];
     int Q[matrix_size][matrix_size];
     int X[matrix_size][matrix_size];
+    // Best score found at the end of computation (upper row/right-most column of D matrix)
     int min_score = PQD_INIT_VAL;
+    // Indices of best score found in the upper-right row/column of D matrix
     int min_score_i_idx = 0;
     int min_score_j_idx = 0;
-    int align_distance = 1;
 
     // Set D matrix to 0
     // FIXME : I'm pretty sure this is completely useless as those 0s should be written over before being read.
@@ -147,6 +184,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         D[0][i] = i * COST_SUB;
     }
 
+    STAT_RECORD_STEP(STAT_DPD, 0);
     /* D matrix at this point : (assuming COST_SUB=1 and diagonal = 3 ie: NB_DIAG=5)
      * (0,0) in bottom left
      * 
@@ -170,11 +208,12 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
     }
+    STAT_RECORD_STEP(STAT_DPD, 1);
 
     /* D matrix at this point : (assuming COST_SUB=1 and diagonal = 3 ie: NB_DIAG=5)
      * (0,0) in bottom left
      * An x corresponds to a value that has been computed.
-     * A M corresponds to PQD_INIT_VAL
+     * An M corresponds to PQD_INIT_VAL
      * 
      *  |
      *  |
@@ -199,10 +238,12 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
         Q[i][i + diagonal] = PQD_INIT_VAL;
         D[i][i + diagonal] = PQD_INIT_VAL;
     }
+    STAT_RECORD_STEP(STAT_DPD, 2);
 
     /* D matrix at this point : (assuming COST_SUB=1, diagonal = 3 ie: NB_DIAG=5, and matrix_size=12)
      * (0,0) in bottom left
      * An x corresponds to a value that has been computed.
+     * An M corresponds to PQD_INIT_VAL
      *  
      *  +-----------------------+
      *  |                M      |
@@ -236,10 +277,12 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
             min_score_j_idx = matrix_size - 1;
         }
     }
+    STAT_RECORD_STEP(STAT_DPD, 3);
 
     /* D matrix at this point : (assuming COST_SUB=1, diagonal = 3 ie: NB_DIAG=5, and matrix_size=12)
      * (0,0) in bottom left
      * An x corresponds to a value that has been computed.
+     * An M corresponds to PQD_INIT_VAL
      *  
      *  +-----------------------+
      *  |                M x x x|
@@ -266,579 +309,155 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, int size_neighbour_in_sy
             min_score_j_idx = j;
         }
     }
+    STAT_RECORD_STEP(STAT_DPD, 4);
 
     // backtrack step
     {
         int i = min_score_i_idx;
         int j = min_score_j_idx;
         backtrack[0].type = CODE_END;
+	(*backtrack_end) = &backtrack[1];
         while ((i > 0) && (j > 0)) {
             if(X[i][j] == 0) {
-                i--;
-                j--;
-            } else {
-                if(X[i][j] == 1) {
-                    i--;
-                    j--;
-                    backtrack[align_distance].type = CODE_SUB;
-                    backtrack[align_distance].ix = i;
-                    backtrack[align_distance].jx = j;
-                    align_distance++;
-                } else {
-                    if(X[i][j] == 2) {
-                        j--;
-                        backtrack[align_distance].type = CODE_INS;
-                        backtrack[align_distance].ix = i;
-                        backtrack[align_distance].jx = j;
-                        align_distance++;
-                    }
-                    else {
-                        i--;
-                        backtrack[align_distance].type = CODE_DEL;
-                        backtrack[align_distance].ix = i;
-                        backtrack[align_distance].jx = j;
-                        align_distance++;
-                    }
-                }
-            }
-        }
+		    // Operation 0 : sequences match and nothing was done : decrease both indices.
+		    i--;
+		    j--;
+		    (*backtrack_end)->type = 0; // FIXME : use CODE_??? instead of 0
+		    (*backtrack_end)->ix = i;
+		    (*backtrack_end)->jx = j;
+		    (*backtrack_end)++;
+	    } else if(X[i][j] == 1) {
+		    // Operation 1 : substitution : decrease both indices and store substitution code.
+		    i--;
+		    j--;
+		    (*backtrack_end)->type = CODE_SUB;
+		    (*backtrack_end)->ix = i;
+		    (*backtrack_end)->jx = j;
+		    (*backtrack_end)++;
+	    } else if(X[i][j] == 2) {
+		    // Operation 2 : insertion : decrease read index but not genome index and store insertion code.
+		    j--;
+		    (*backtrack_end)->type = CODE_INS;
+		    (*backtrack_end)->ix = i;
+		    (*backtrack_end)->jx = j;
+		    (*backtrack_end)++;
+	    } else {
+		    // Operation 3 : deletion : decrease genome index but not read index and store deletion code.
+		    i--;
+		    (*backtrack_end)->type = CODE_DEL;
+		    (*backtrack_end)->ix = i;
+		    (*backtrack_end)->jx = j;
+		    (*backtrack_end)++;
+	    }
+	}
+    backtrack_end--;
     }
 
-    return align_distance;
+    STAT_RECORD_LAST_STEP(STAT_DPD, 5);
+    return min_score;
 }
 
-/*
- * encoding of differences between read and sequence of the reference genome.
- * coding: substitution          CODE_SUB pos x
- *         deletion              CODE_DEL pos x+
- *         insertion             CODE_INS pos x+
- *         end                   CODE_END
- *
- * x  = A | C | G | T
- * x+ = a sequence of at least 1 element (i.e. A, C, G ou T)
- * pos = integer (8 bits) : give the offset of the variant from the start of the read
- *
- * example S 12 A D 56 A T G I 87 T C X ==> substitution (A) position 12, deletion (ATG) position 56, insertion (TC) position 87
- * The code is return in "code" as a table of int8_t
- */
+#define NB_FREQ_TABLE_MUTEXES (1<<14)
+static pthread_mutex_t freq_table_mutexes[NB_FREQ_TABLE_MUTEXES+1];
+//static pthread_mutex_t print_mutex;
 
-#ifdef USE_INDEL
-static int code_alignment(uint8_t *code, int score, int8_t *gen, int8_t *read, unsigned size_neighbour_in_symbols, bool *flag)
-{
-    int code_idx, computed_score, backtrack_idx;
-    int size_read = SIZE_READ;
-    int size_neighbour = size_neighbour_in_symbols;
-    backtrack_t backtrak[size_read];
-
-    *flag = false;
-
-    if (score == 0) {
-        code[0] = CODE_END;
-        return 1;
-    }
-
-    /* First, looking for subsititution only */
-    code_idx = 0;
-    computed_score = 0;
-    for (int i = SIZE_SEED; i < size_neighbour + SIZE_SEED; i++) {
-        if ((gen[i] & 3) != read[i]) {
-            computed_score += COST_SUB;
-            code[code_idx++] = CODE_SUB;
-            code[code_idx++] = i;
-            code[code_idx++] = read[i];
-            if (computed_score > score) {
-                break;
-            }
-        }
-    }
-    code[code_idx++] = CODE_END;
-    if (computed_score == score)
-        return code_idx;
-
-    /* Otherwise, re-compute the matrix (only some diagonals) and put in backtrack the path */
-    backtrack_idx = DPD(gen, read, backtrak, size_neighbour_in_symbols + SIZE_SEED);
-    if (backtrack_idx == -1) {
-        code[0] = CODE_ERR;
-        return 1;
-    }
-
-    backtrack_idx--;
-    code_idx = 0;
-    while (backtrack_idx > 0) {
-        if (backtrak[backtrack_idx].type == CODE_SUB) {
-            code[code_idx++] = CODE_SUB;
-            code[code_idx++] = backtrak[backtrack_idx].jx - 1;
-            code[code_idx++] = read[backtrak[backtrack_idx].jx - 1];
-            backtrack_idx--;
-        } else {
-            if (backtrak[backtrack_idx].type == CODE_DEL) {
-                int backtrack_jx = backtrak[backtrack_idx].jx;
-                code[code_idx++] = CODE_DEL;
-                code[code_idx++] = backtrak[backtrack_idx].ix;
-                code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
-                backtrack_idx--;
-                while ((backtrak[backtrack_idx].type == CODE_DEL) && (backtrack_jx == backtrak[backtrack_idx].jx)) {
-                    code[code_idx++] = gen[backtrak[backtrack_idx].ix] & 3;
-                    backtrack_idx--;
-                }
-            } else {
-                int backtrack_ix = backtrak[backtrack_idx].ix;
-                code[code_idx++] = CODE_INS;
-                code[code_idx++] = backtrak[backtrack_idx].jx - 1;
-                code[code_idx++] = read[backtrak[backtrack_idx].jx];
-                backtrack_idx--;
-                while ((backtrak[backtrack_idx].type == CODE_INS) && (backtrack_ix == backtrak[backtrack_idx].ix)) {
-                    code[code_idx++] = read[backtrak[backtrack_idx].jx];
-                    backtrack_idx--;
-                }
-            }
-        }
-    }
-    code[code_idx++] = CODE_END;
-    return code_idx;
-}
-#endif
-
-#if 0
-static void set_variant(
-    dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer, unsigned int size_neighbour_in_symbols)
-{
-    uint32_t code_result_idx;
-    uint8_t code_result_tab[256];
-    int8_t *read;
-    char nucleotide[4] = { 'A', 'C', 'T', 'G' };
-    uint64_t genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
-    int size_read = SIZE_READ;
-    //LOG_TRACE("set_variant called\n");
-
-    /* Get the differences betweend the read and the sequence of the reference genome that match */
-    read = &reads_buffer[result_match.num * size_read];
-    code_alignment(code_result_tab, result_match.score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols);
-    if (code_result_tab[0] == CODE_ERR)
-        return;
-
-    /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
-    for (int i = 0; i < size_read; i++) {
-        ref_genome->mapping_coverage[genome_pos + i] += 1;
-    }
-
-#if DEBUG_READ_MAPPING
-    // TODO: check genome_pos is the expected value
-    write_read_mapping(genome_pos, code_result_tab);
-#endif
-
-    code_result_idx = 0;
-    while (code_result_tab[code_result_idx] != CODE_END) {
-        int code_result = code_result_tab[code_result_idx];
-        //LOG_DEBUG("code_result=%d\n", code_result);
-        int64_t pos_variant_read = code_result_tab[code_result_idx + 1];
-        int64_t pos_variant_genome = genome_pos + pos_variant_read;
-        int ref_pos = 0;
-        int alt_pos = 0;
-        variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
-        newvar->depth = 1;
-        newvar->score = result_match.score;
-        newvar->next = NULL;
-        if (code_result == CODE_SUB) {
-            /* SNP = 0,1,2,3  (code A,C,T,G) */
-            int snp = code_result_tab[code_result_idx + 2];
-            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-            newvar->alt[alt_pos++] = nucleotide[snp & 3];
-
-            code_result_idx += 3;
-        } else if (code_result == CODE_INS) {
-            int64_t ps_var_genome = pos_variant_genome;
-            int64_t ps_var_read = pos_variant_read;
-            code_result_idx += 2;
-
-            while (code_result_tab[code_result_idx] < 4) {
-                ps_var_read++;
-                code_result_idx++;
-            }
-
-            while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
-                ps_var_genome--;
-                ps_var_read--;
-                pos_variant_genome--;
-                pos_variant_read--;
-            }
-
-            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-
-            while (pos_variant_read <= ps_var_read) {
-                newvar->alt[alt_pos++] = nucleotide[read[pos_variant_read] & 3];
-                if (alt_pos >= MAX_SIZE_ALLELE - 1) {
-                    free(newvar);
-                    return;
-                }
-                pos_variant_read++;
-            }
-
-        } else if (code_result == CODE_DEL) {
-            int64_t ps_var_genome = pos_variant_genome;
-            int64_t ps_var_read = pos_variant_read;
-            code_result_idx += 2;
-
-            while (code_result_tab[code_result_idx] < 4) {
-                ps_var_genome++;
-                code_result_idx++;
-            }
-
-            while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
-                ps_var_read--;
-                ps_var_genome--;
-                pos_variant_genome--;
-                pos_variant_read--;
-            }
-
-            newvar->alt[alt_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-
-            while (pos_variant_genome <= ps_var_genome) {
-                newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-                if (ref_pos >= MAX_SIZE_ALLELE - 1) {
-                    free(newvar);
-                    //LOG_TRACE("set_variant early return\n");
-                    return;
-                }
-                pos_variant_genome++;
-            }
-            pos_variant_genome -= ref_pos;
-        }
-        newvar->ref[ref_pos] = '\0';
-        newvar->alt[alt_pos] = '\0';
-        variant_tree_insert(
-            newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
-    }
-    //LOG_TRACE("set_variant return\n");
-}
-#endif
-
-static pthread_mutex_t non_mapped_mutex;
-static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
-{
-    if (fpe1 == NULL || fpe2 == NULL)
-        return;
-    pthread_mutex_lock(&non_mapped_mutex);
-    char nucleotide[4] = { 'A', 'C', 'T', 'G' };
-    int size_read = SIZE_READ;
-    int8_t *read = &reads_buffer[numread * size_read];
-    fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
-    for (int j = SIZE_SEED; j < size_read; j++) {
-        fprintf(fpe1, "%c", nucleotide[read[j] & 3]);
-    }
-    for (int j = 0; j < SIZE_SEED; j++) {
-        fprintf(fpe1, "A");
-    }
-    fprintf(fpe1, "\n");
-    read = &reads_buffer[(numread + 2) * size_read];
-    fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
-    for (int j = SIZE_SEED; j < size_read; j++) {
-        fprintf(fpe2, "%c", nucleotide[read[j] & 3]);
-    }
-    for (int j = 0; j < SIZE_SEED; j++) {
-        fprintf(fpe2, "A");
-    }
-    fprintf(fpe2, "\n");
-    pthread_mutex_unlock(&non_mapped_mutex);
-}
-
-#ifdef USE_INDEL
-int get_read_update_positions(
-        uint64_t * update_genome_position,
-        dpu_result_out_t *result_tab, 
-        int pos,
-        genome_t *ref_genome,
-        uint64_t genome_pos,
-        int8_t *read,
-        __attribute__((unused))int size_neighbour_in_symbols,
-        bool * flag,
-        bool debug,
-        uint32_t * substCnt,
-        char * chromosome_name) {
-
-    // run smith and waterman algorithm to find indels
-    uint8_t code_result_tab[256];
-    code_alignment(code_result_tab, result_tab[pos].score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols, flag);
-    write_read_mapping(chromosome_name, result_tab[pos].coord.seed_nr, code_result_tab, (uint8_t*) read);
-    for(int read_pos = 0; read_pos < SIZE_READ; ++read_pos) {
-        update_genome_position[read_pos] = 0;
-    }
-    if (code_result_tab[0] != CODE_ERR) {
-
-        // array that contains for each read position, the genome position that it matches with
-        // This is the genome position that will be updated in the frequency table
-        // This genome position takes into account the shift due to possible indels found 
-        // with smith-waterman algorithm
-        int code_result_index = 0;
-        int ref_pos = 0;
-        int nbIndels = 0;
-        bool ins = false;
-        while (code_result_tab[code_result_index] != CODE_END) {
-            int code_result = code_result_tab[code_result_index];
-            int64_t pos_variant_read = code_result_tab[code_result_index + 1];
-            /*printf("pos variant: %lu\n", pos_variant_read);*/
-            int64_t pos_variant_genome = genome_pos + pos_variant_read;
-            if (code_result == CODE_SUB) {
-                // do nothing for substitution
-                code_result_index += 3;
-                (*substCnt)++;
-                ref_pos++;
-            }
-            else if (code_result == CODE_INS) {
-                ins = true;
-                int64_t ps_var_genome = pos_variant_genome;
-                int64_t ps_var_read = pos_variant_read;
-                code_result_index += 2;
-
-                while (code_result_tab[code_result_index] < 4) {
-                    ps_var_read++;
-                    code_result_index++;
-                }
-
-                while (ref_genome->data[ps_var_genome] == read[ps_var_read] && ps_var_genome 
-                        && pos_variant_read) {
-                    assert(ps_var_genome && ps_var_read && pos_variant_genome && pos_variant_read);
-                    ps_var_genome--;
-                    ps_var_read--;
-                    pos_variant_genome--;
-                    pos_variant_read--;
-                }
-
-                /*newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];*/
-                ref_pos++;
-
-                // skip first value which should be the equivalent of first element in ref genome
-                pos_variant_read++;
-                while (pos_variant_read <= ps_var_read) {
-                    // position should not be updated yet
-                    if(update_genome_position[pos_variant_read] != 0) {
-                        LOG_WARN("duplicate update (Insertion) at position %lu. Current %lu\n", 
-                                pos_variant_read, update_genome_position[pos_variant_read]);
-                        fflush(stdout);
-                        return -1;
-                    }
-                    update_genome_position[pos_variant_read++] = UINT64_MAX;
-                }
-                ++nbIndels;
-            }
-            else if (code_result == CODE_DEL) {
-
-                int64_t ps_var_genome = pos_variant_genome;
-                int64_t ps_var_read = pos_variant_read;
-                code_result_index += 2;
-
-                while (code_result_tab[code_result_index] < 4) {
-                    ps_var_genome++;
-                    code_result_index++;
-                }
-
-                while (ref_genome->data[ps_var_genome] == read[ps_var_read] && pos_variant_genome && ps_var_read) {
-                    assert(ps_var_genome && ps_var_read && pos_variant_genome && pos_variant_read);
-                    ps_var_read--;
-                    ps_var_genome--;
-                    pos_variant_genome--;
-                    pos_variant_read--;
-                }
-
-                // on a deletion store the threshold to apply from the current read position
-                assert(ps_var_genome > pos_variant_genome);
-                if(pos_variant_read + 1 < SIZE_READ) {
-                    // position should not be updated yet
-                    if(update_genome_position[pos_variant_read+1] != 0) {
-                        LOG_WARN("duplicate update (Deletion) at position %lu. Current %lu\n", 
-                                pos_variant_read+1, update_genome_position[pos_variant_read+1]);
-                        fflush(stdout);
-                        return -1;
-                    }
-                    /*assert(update_genome_position[pos_variant_read+1] == 0);*/
-                    update_genome_position[pos_variant_read + 1] = ps_var_genome - pos_variant_genome;
-                }
-                while (pos_variant_genome <= ps_var_genome) {
-                    pos_variant_genome++;
-                    ref_pos++;
-                }
-                pos_variant_genome -= ref_pos;
-                ++nbIndels;
-            }
-            else
-                assert(0);
-        }
-
-        // debug prints
-        if(nbIndels && debug)
-            printf("SW algorithm (nbIndels %d) ins %d:\n", nbIndels, ins);
-        int64_t curr_pos = genome_pos;
-        for(int read_pos = 0; read_pos < SIZE_READ; ++read_pos) {
-            switch(update_genome_position[read_pos]) {
-                case 0:
-                    update_genome_position[read_pos] = curr_pos++;
-                    if(nbIndels && debug)
-                        printf(" ");
-                    break;
-                case UINT64_MAX:
-                    if(nbIndels && debug)
-                        printf("I");
-                    break;
-                default:
-                    if(nbIndels && debug) {
-                        for(uint64_t print_index = 0; print_index < update_genome_position[read_pos]; ++print_index)
-                            printf("D");
-                    }
-                    curr_pos += update_genome_position[read_pos];
-                    update_genome_position[read_pos] = curr_pos++;
-            }
-        }
-
-        if(nbIndels && debug) {
-            printf("\n");
-            fflush(stdout);
-        }
-        return nbIndels;
-    }
-    else
-        assert(0);
-
-    return false;
-}
-#endif
-
-
-static pthread_mutex_t freq_table_mutex;
-
-/**
- * function to update frequency table used for variant calling
- **/
 bool update_frequency_table(
-        genome_t *ref_genome, 
-        dpu_result_out_t *result_tab, 
-        int8_t *reads_buffer, 
-        float *reads_quality_buffer, 
-        int pos,
-        float mapq,
-        __attribute__((unused))int size_neighbour_in_symbols) {
+		genome_t *ref_genome,
+		dpu_result_out_t *result_tab,
+		int8_t *reads_buffer,
+		float *reads_quality_buffer,
+		int pos,
+		float mapq
+		)
+{
+	struct frequency_info ** frequency_table = get_frequency_table();
+	uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr;
+	int num = result_tab[pos].num;
+	int8_t *read = reads_buffer + (num * SIZE_READ);
+	float *read_quality = reads_quality_buffer + (num>>1)*SIZE_READ;
+	bool invert_read = num & 1;
 
-    struct frequency_info **frequency_table = get_frequency_table();
-    uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr; 
-    int num = result_tab[pos].num;
-    int8_t *read = reads_buffer + (num * SIZE_READ);
-    float *read_quality = reads_quality_buffer + (num/2 * SIZE_READ);
-    //TODO: read the quality in the correct order (inverted or not)
-    bool inv = num & 1;
-    //TODO: assume no offset here
+	backtrack_t backtrack[SIZE_READ<<1];
+	backtrack_t * backtrack_end = backtrack;
 
-#ifdef USE_INDEL
+	/* First, try substitutions only */
+	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
+    bool used_dpd = false;
 
-    static bool debug = false; 
-    static char nucleotide[4] = { 'A', 'C', 'T', 'G' };
-    uint64_t update_genome_position[SIZE_READ];
-    uint32_t substCnt = 0;
-    flag_dbg = false;
-
-    // for simplicity put all this in a critical section protected by a mutex
-    // since the frequency table is shared (but inefficient)
-    
-    pthread_mutex_lock(&freq_table_mutex);
-    int nbIndels = get_read_update_positions(update_genome_position, result_tab, pos,
-            ref_genome, genome_pos, read, size_neighbour_in_symbols, &flag_dbg, debug, &substCnt, ref_genome->seq_name[result_tab[pos].coord.seq_nr]);
-    bool hasIndel = nbIndels > 0;
-
-    // debug prints
-    if(hasIndel && debug) {
-
-        printf("Read:\n");
-        for(int k = 0; k < SIZE_READ; ++k) {
-            printf("%c", nucleotide[read[k]]);
-        }
-        printf("\ngenome (pos %u:%u):\n", result_tab[pos].coord.seed_nr, result_tab[pos].coord.seed_nr+SIZE_READ);
-        for(uint64_t k = genome_pos; k < genome_pos + SIZE_READ; ++k) {
-            printf("%c", nucleotide[ref_genome->data[k]]);
-        }
-        printf("\nupdate pos:\n");
-        uint64_t lastpos = 0;
-        for(uint64_t k = 0; k < SIZE_READ; ++k) {
-            if(k && update_genome_position[k] != lastpos+1) {
-                if(update_genome_position[k] == UINT64_MAX)
-                    printf("X");
-                /*printf("No update at position %lu\n", k);*/
-                else if(lastpos == UINT64_MAX)
-                    /*printf("New start at pos %lu = %lu / %c\n", k, update_genome_position[k], nucleotide[ref_genome->data[update_genome_position[k]]]);*/
-                    printf("%c", nucleotide[ref_genome->data[update_genome_position[k]]]);
-                else
-                    /*printf("Change at pos %lu, diff %ld, %c\n", k, update_genome_position[k] - lastpos, nucleotide[ref_genome->data[update_genome_position[k]]]);*/
-                    printf("%c", nucleotide[ref_genome->data[update_genome_position[k]]]);
+	if (computed_score > result_tab[pos].score) {
+            /*
+            if (result_tab[pos].coord.nodp) {
+                LOG_ERROR("dpu result found with nodp but score not matched with sub only (DPU:%u, host:%d)\n", result_tab[pos].score, computed_score);
             }
-            /*else if(nucleotide[ref_genome->data[update_genome_position[k]]] != nucleotide[read[k]]) {*/
-            /*printf(RED "%c" RESET, nucleotide[ref_genome->data[update_genome_position[k]]]);*/
-            /*}*/
-            else
-                printf("%c", nucleotide[ref_genome->data[update_genome_position[k]]]);
-            lastpos = update_genome_position[k];
-        }
-
-        printf("\nsubst:\n");
-        for(uint64_t k = 0; k < SIZE_READ; ++k) {
-            if(update_genome_position[k] == UINT64_MAX) {
-                printf(" ");
-                continue;
+            */
+            computed_score = DPD(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
+            used_dpd = true;
+            if (computed_score == result_tab[pos].score) {
+                reads_correct_cost_DPD++;
+            } else {
+                reads_not_correct_cost++;
             }
-            else if(nucleotide[ref_genome->data[update_genome_position[k]]] != nucleotide[read[k]]) {
-                printf("U");
-                substCnt++;
+            /*
+            if (computed_score > result_tab[pos].score) {
+                pthread_mutex_lock(&print_mutex);
+                LOG_WARN("found a computed score of %d where DPU found score of %u\n", computed_score, result_tab[pos].score);
+                printf("ref:  ");
+                log_nucleotides(&(ref_genome->data[genome_pos]), 130);
+                printf("\nread: ");
+                log_nucleotides(read, 120);
+                printf("\n");
+                pthread_mutex_unlock(&print_mutex);
             }
-            else
-                printf(" ");
-        }
-        printf("\n\n");
-        fflush(stdout);
-        assert(!result_tab[pos].coord.nodp);
-    }
-    else if(debug) {
-        if(!result_tab[pos].coord.nodp) {
-            LOG_WARN("odpd result with no indels detected (flag = %d, subst cnt %u)):\n", flag_dbg, substCnt);
-            printf("Read:\n");
-            for(int k = 0; k < SIZE_READ; ++k) {
-                printf("%c", nucleotide[read[k]]);
-            }
-            printf("\ngenome (pos %u:%u):\n", result_tab[pos].coord.seed_nr, result_tab[pos].coord.seed_nr+SIZE_READ);
-            for(uint64_t k = genome_pos; k < genome_pos + SIZE_READ; ++k) {
-                printf("%c", nucleotide[ref_genome->data[k]]);
-            }
-            printf("\n\n");
-            fflush(stdout);
-        }
+            */
+	} else {
+        reads_correct_cost_sub_only++;
     }
 
-    /*pthread_mutex_lock(&freq_table_mutex);*/
-    // for the moment support only one indel otherwise we have some issue FIXME
-    if(substCnt <= MAX_SUBSTITUTION && (hasIndel || result_tab[pos].coord.nodp) && nbIndels >= 0) {
-        for(uint64_t k = 0; k < SIZE_READ; ++k) {
-            uint64_t update_genome_pos = update_genome_position[k];
-            if(update_genome_pos < genome_get()->fasta_file_size) {
-                frequency_table[read[k]][update_genome_pos].freq += mapq * read_quality[inv ? SIZE_READ - k - 1 : k];
-                /*frequency_table[read[j]][genome_pos+j].score += result_tab[pos].score;*/
-                frequency_table[read[k]][update_genome_pos].score++;
-            }
-            else if (update_genome_pos != UINT64_MAX)
-                LOG_WARN("genome update position computed is wrong %lu\n", update_genome_pos);
-        }
-    }
-    /*fflush(stdout);*/
-    pthread_mutex_unlock(&freq_table_mutex);
-    return hasIndel;
+    write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], genome_pos, backtrack_end, read);
 
-#else
-    pthread_mutex_lock(&freq_table_mutex);
-    for(int j = 0; j < SIZE_READ; ++j) {
-        if(genome_pos + j < genome_get()->fasta_file_size) {
-            frequency_table[read[j]][genome_pos+j].freq += mapq * read_quality[inv ? SIZE_READ - j - 1 : j];
-            frequency_table[read[j]][genome_pos+j].score++;
+	// /!\ Pointer arithmetics
+	unsigned int mutex_index = (genome_pos*NB_FREQ_TABLE_MUTEXES)/ref_genome->fasta_file_size;
+	unsigned int end_mutex_index = ((genome_pos+backtrack_end->ix)*NB_FREQ_TABLE_MUTEXES)/ref_genome->fasta_file_size;
+	pthread_mutex_lock(&freq_table_mutexes[mutex_index]);
+	if (end_mutex_index != mutex_index) {
+        if (end_mutex_index>=NB_FREQ_TABLE_MUTEXES) {
+                printf("end_mutex_index=%u\n", end_mutex_index);
+                if(used_dpd) {
+                        printf("used dpd\n");
+                }
+                fflush(stdout);
         }
-        else
-            LOG_WARN("reads matched at position that exceeds genome size\n");
+		pthread_mutex_lock(&freq_table_mutexes[end_mutex_index]);
+	}
+	bool has_indel = false;
+        uint8_t read_letter;
+        //printf("genome_pos=%lu\n", genome_pos);
+	for (; backtrack_end > backtrack; backtrack_end--) {
+            unsigned int current_position = genome_pos+backtrack_end->ix;
+            //printf("backtrack_end->ix=%u; current_position=%u\n", backtrack_end->ix, current_position);
+            if (current_position > ref_genome->fasta_file_size) {
+                    continue;
+            }
+            switch (backtrack_end->type) {
+                    case 0:
+                    case CODE_SUB:
+                            read_letter = read[backtrack_end->jx];
+                            frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
+                            frequency_table[read_letter][current_position].score++;
+                            break;
+                    case CODE_INS:
+                    case CODE_DEL:
+                            has_indel = true;
+                            // TODO: handle indels
+                            break;
+                            // TODO: handle errors even if they should never happen
+            }
     }
-    pthread_mutex_unlock(&freq_table_mutex);
-    return false;
-#endif
+	pthread_mutex_unlock(&freq_table_mutexes[mutex_index]);
+	if (end_mutex_index != mutex_index) {
+		pthread_mutex_unlock(&freq_table_mutexes[end_mutex_index]);
+	}
+	return has_indel;
 }
 
 static volatile unsigned int curr_match;
@@ -875,7 +494,7 @@ static uint64_t nr_reads_with_indels = 0ULL;
 static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define MISMATCH_COUNT(X) (X.score / 10) 
-#define INVALID_SCORE 1000
+#define INVALID_SCORE 10000
 
 static void keep_best_2_scores(unsigned score, unsigned* P1, unsigned *P2, unsigned x1, unsigned x2, unsigned* best_score) {
 
@@ -909,9 +528,43 @@ static unsigned get_nb_scores(unsigned int * best_score) {
     return np;
 }
 
+static pthread_mutex_t non_mapped_mutex;
+static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
+{
+    STAT_RECORD_START(STAT_ADD_TO_NON_MAPPED_READ);
+    if (fpe1 == NULL || fpe2 == NULL)
+        return;
+    pthread_mutex_lock(&non_mapped_mutex);
+    STAT_RECORD_STEP(STAT_ADD_TO_NON_MAPPED_READ, 0);
+    char nucleotide[4] = { 'A', 'C', 'T', 'G' };
+    int size_read = SIZE_READ;
+    int8_t *read = &reads_buffer[numread * size_read];
+    fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
+    for (int j = SIZE_SEED; j < size_read; j++) {
+        fprintf(fpe1, "%c", nucleotide[read[j] & 3]);
+    }
+    for (int j = 0; j < SIZE_SEED; j++) {
+        fprintf(fpe1, "A");
+    }
+    fprintf(fpe1, "\n");
+    read = &reads_buffer[(numread + 2) * size_read];
+    fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
+    for (int j = SIZE_SEED; j < size_read; j++) {
+        fprintf(fpe2, "%c", nucleotide[read[j] & 3]);
+    }
+    for (int j = 0; j < SIZE_SEED; j++) {
+        fprintf(fpe2, "A");
+    }
+    fprintf(fpe2, "\n");
+    STAT_RECORD_STEP(STAT_ADD_TO_NON_MAPPED_READ, 1);
+    pthread_mutex_unlock(&non_mapped_mutex);
+    STAT_RECORD_LAST_STEP(STAT_ADD_TO_NON_MAPPED_READ, 2);
+}
+
 /*#define USE_MAPQ_SCORE*/
 static void do_process_read(process_read_arg_t *arg)
 {
+    STAT_RECORD_START(STAT_DO_PROCESS_READ);
     const unsigned int nb_match = arg->nb_match;
     dpu_result_out_t *result_tab = arg->result_tab;
     int round = arg->round;
@@ -920,8 +573,6 @@ static void do_process_read(process_read_arg_t *arg)
     genome_t *ref_genome = arg->ref_genome;
     FILE *fpe1 = arg->fpe1;
     FILE *fpe2 = arg->fpe2;
-    unsigned int size_neighbour_in_symbols = (SIZE_NEIGHBOUR_IN_BYTES - DELTA_NEIGHBOUR(round)) * 4;
-    /*printf("size_neighbour_in_symbols : %u", size_neighbour_in_symbols);*/
 
     /*
      * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -938,19 +589,26 @@ static void do_process_read(process_read_arg_t *arg)
      */
 
     while (true) {
+      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 0);
       unsigned int i;
       if ((i = acquire_curr_match()) >= nb_match) {
         release_curr_match(i);
+        STAT_RECORD_LAST_STEP(STAT_DO_PROCESS_READ, 6);
         return;
       }
       int numpair = result_tab[i].num / 4;
       unsigned int j = i;
       while ((j < nb_match) && (numpair == result_tab[j].num / 4)) {
-        j++;
+          if (ref_genome->pt_seq[result_tab[j].coord.seq_nr] + result_tab[j].coord.seed_nr == 39317815) {
+              printf("found 39317815 mapping at index %u during round %d\n", j, round);
+          }
+          j++;
       }
       release_curr_match(j);
+      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 1);
 
-      unsigned int best_individual_scores[4] = {UINT32_MAX};
+      // find best mapping scores for each of the four reads considered
+      unsigned int best_individual_scores[4] = {UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX};
       for (unsigned int x=i; x<j; x++)
       {
           unsigned int t = result_tab[x].num % 4;
@@ -961,10 +619,48 @@ static void do_process_read(process_read_arg_t *arg)
       // i = start index in result_tab
       // j = stop index in result_tab
       // select best couples of paired reads
-      unsigned int P1[2];
-      unsigned int P2[2];
+      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 2);
+      unsigned int P1[2] = {i,i};
+      unsigned int P2[2] = {j-1,j-1};
       unsigned int pos1, pos2, t1, t2;
-      unsigned int best_score[2] = { 1000, 1000 };
+      unsigned int best_score[2] = { INVALID_SCORE, INVALID_SCORE };
+      /*
+      unsigned int nb_considered_mappings[4] = {0,0,0,0};//for debugging purposes only
+      const unsigned int max_considered_mappings = get_nb_dpu()<<1;
+      unsigned int considered_mappings[4][max_considered_mappings];
+      for (unsigned int x1 = i; x1 < j; x1++) {
+        t1 = result_tab[x1].num % 4;
+        pos1 = result_tab[x1].coord.seed_nr;
+        if (result_tab[x1].score < best_individual_scores[t1] +  MAX_SCORE_DIFFERENCE_WITH_BEST) {
+            for (unsigned int y = 0; y < nb_considered_mappings[3-t1]; y++) {
+                unsigned int x2 = considered_mappings[3-t1][y];
+                pos2 = result_tab[x2].coord.seed_nr;
+                if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
+                  // update if this is one of the two best scores
+                  keep_best_2_scores(result_tab[x1].score + result_tab[x2].score, P1, P2, x1, x2, best_score);
+                }
+            }
+            if (nb_considered_mappings[t1] < max_considered_mappings) {
+                considered_mappings[t1][nb_considered_mappings[t1]++] = x1;
+            } else {
+                LOG_ERROR("too many mappings to consider: ignoring some\n");
+            }
+        }
+      }
+      if (j-i>4900) {
+          LOG_WARN("found %d mappings for 4 reads; of which [%u, %u, %u, %u] were considered with best scores : [%u, %u, %u, %u].\n",
+                  j-i,
+                  nb_considered_mappings[0],
+                  nb_considered_mappings[1],
+                  nb_considered_mappings[2],
+                  nb_considered_mappings[3],
+                  best_individual_scores[0],
+                  best_individual_scores[1],
+                  best_individual_scores[2],
+                  best_individual_scores[3]
+                  );
+      }
+      */
       /*unsigned int best_score_all = 1000;*/
       // test all significant pairs of reads (0,3) & (1,2)
       for (unsigned int x1 = i; x1 < j; x1++) {
@@ -972,7 +668,7 @@ static void do_process_read(process_read_arg_t *arg)
         pos1 = result_tab[x1].coord.seed_nr;
         if (result_tab[x1].score < best_individual_scores[t1] + MAX_SCORE_DIFFERENCE_WITH_BEST)
         {
-          for (unsigned int x2 = i + 1; x2 < j; x2++) {
+          for (unsigned int x2 = x1 + 1; x2 < j; x2++) {
             pos2 = result_tab[x2].coord.seed_nr;
             t2 = result_tab[x2].num % 4;
             if (t1 + t2 == 3) // select significant pair
@@ -985,12 +681,14 @@ static void do_process_read(process_read_arg_t *arg)
           }
         }
       }
+      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 3);
 
       bool update = false;
       bool hasIndel = false;
 
       unsigned np = get_nb_scores(best_score);
       if (np > 0) {
+	LOG_DEBUG("found at least a pair (%u)\n", np);
 
         if(np == 2) {
 
@@ -1011,8 +709,8 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta > DIST_PAIR_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, size_neighbour_in_symbols);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, size_neighbour_in_symbols);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
@@ -1029,17 +727,18 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta > DIST_PAIR_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, size_neighbour_in_symbols);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, size_neighbour_in_symbols);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
-      }
-      if(true) {
+      } 
+      if (true) {
 
         // check mapping of R1 and R2 independently
-        unsigned int best_score_R1[2] = { 1000, 1000 };
-        unsigned int best_score_R2[2] = { 1000, 1000 };
+        unsigned int best_score_R1[2] = { INVALID_SCORE, INVALID_SCORE };
+        unsigned int best_score_R2[2] = { INVALID_SCORE, INVALID_SCORE };
+        unsigned int throwaway[2];
         P1[0] = 0;
         P2[0] = 0;
         P1[1] = 0;
@@ -1047,10 +746,10 @@ static void do_process_read(process_read_arg_t *arg)
         for (unsigned int read = i; read < j; read++) {
           unsigned t1 = result_tab[read].num % 4;
           if(t1 < 2) { // PE1 or RPE1
-            keep_best_2_scores(result_tab[read].score, P1, P2, read, 0, best_score_R1);
+            keep_best_2_scores(result_tab[read].score, P1, throwaway, read, 0, best_score_R1);
           }
           else { // PE2 or RPE2
-            keep_best_2_scores(result_tab[read].score, P1, P2, 0, read, best_score_R2);
+            keep_best_2_scores(result_tab[read].score, throwaway, P2, 0, read, best_score_R2);
           }
         }
 
@@ -1071,7 +770,7 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta > DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, size_neighbour_in_symbols);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             update = true;
           }
         }
@@ -1090,7 +789,7 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta > DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, size_neighbour_in_symbols);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             update = true;
           }
         }
@@ -1113,7 +812,7 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta > DIST_SINGLE_THRESHOLD) {
 #endif
 
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, size_neighbour_in_symbols);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
@@ -1132,10 +831,11 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if (delta > DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, size_neighbour_in_symbols);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
           }
         }
+      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 4);
         if(!update) {
             pthread_mutex_lock(&nr_reads_mutex);
             nr_reads_non_mapped++;
@@ -1149,6 +849,7 @@ static void do_process_read(process_read_arg_t *arg)
         pthread_mutex_unlock(&nr_reads_mutex);
       }
     }
+    STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 5);
 }
 
 #define PROCESS_READ_THREAD (8)
@@ -1159,11 +860,13 @@ static bool stop_threads = false;
 
 void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 {
+    STAT_RECORD_START(STAT_PROCESS_READ);
+    if (pass_id>10)
+        return;
     int8_t *reads_buffer = get_reads_buffer(pass_id);
     float *reads_quality_buffer = get_reads_quality_buffer(pass_id);
     acc_results_t acc_res = accumulate_get_result(pass_id);
     nr_reads_total += get_reads_in_buffer(pass_id) / 4;
-
     curr_match = 0;
 
     args.nb_match = acc_res.nb_res;
@@ -1174,11 +877,16 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
     args.fpe1 = fpe1;
     args.fpe2 = fpe2;
 
+    STAT_RECORD_STEP(STAT_PROCESS_READ, 0);
     pthread_barrier_wait(&barrier);
+    STAT_RECORD_STEP(STAT_PROCESS_READ, 1);
     do_process_read(&args);
+    STAT_RECORD_STEP(STAT_PROCESS_READ, 2);
     pthread_barrier_wait(&barrier);
+    STAT_RECORD_STEP(STAT_PROCESS_READ, 3);
 
     free(acc_res.results);
+    STAT_RECORD_LAST_STEP(STAT_PROCESS_READ, 4);
 }
 
 static void *process_read_thread_fct(void *arg)
@@ -1202,7 +910,9 @@ void process_read_init()
 
     assert(pthread_mutex_init(&curr_match_mutex, NULL) == 0);
     assert(pthread_mutex_init(&non_mapped_mutex, NULL) == 0);
-    assert(pthread_mutex_init(&freq_table_mutex, NULL) == 0);
+    for (int i=0; i<NB_FREQ_TABLE_MUTEXES+1; i++) {
+        assert(pthread_mutex_init(&freq_table_mutexes[i], NULL) == 0);
+    }
     assert(pthread_barrier_init(&barrier, NULL, PROCESS_READ_THREAD) == 0);
 
     for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD_SLAVE; each_thread++) {
@@ -1225,10 +935,15 @@ void process_read_free()
     assert(pthread_barrier_destroy(&barrier) == 0);
     assert(pthread_mutex_destroy(&curr_match_mutex) == 0);
     assert(pthread_mutex_destroy(&non_mapped_mutex) == 0);
-    assert(pthread_mutex_destroy(&freq_table_mutex) == 0);
+    for (int i=0; i<NB_FREQ_TABLE_MUTEXES+1; i++) {
+        assert(pthread_mutex_init(&freq_table_mutexes[i], NULL) == 0);
+    }
+    printf("reads for which score not correctly computed: %u\n", reads_not_correct_cost);
+    printf("reads for which score was correctly computed with DPD: %u\n", reads_correct_cost_DPD);
+    printf("reads for which score was correctly computed with sub only: %u\n", reads_correct_cost_sub_only);
     fflush(stdout);
     fprintf(stderr, "%% reads non mapped: %f%%\n", (float)nr_reads_non_mapped * 100.0 / (float)nr_reads_total_from_dpus);
     fprintf(stderr, "%% reads with indels: %f%%\n", (float)nr_reads_with_indels * 100.0 / (float)(nr_reads_total_from_dpus - nr_reads_non_mapped));
-    fprintf(stderr, "%% Total reads from dpus: %ld%%\n", nr_reads_total_from_dpus);
-    fprintf(stderr, "%% Total reads: %ld%%\n", nr_reads_total);
+    fprintf(stderr, "%% Total reads from dpus: %ld\n", nr_reads_total_from_dpus);
+    fprintf(stderr, "%% Total reads: %ld\n", nr_reads_total);
 }
