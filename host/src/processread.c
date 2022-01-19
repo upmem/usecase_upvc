@@ -350,7 +350,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
 		    (*backtrack_end)++;
 	    }
 	}
-    backtrack_end--;
+    (*backtrack_end)--;
     }
 
     STAT_RECORD_LAST_STEP(STAT_DPD, 5);
