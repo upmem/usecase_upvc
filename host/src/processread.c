@@ -116,6 +116,7 @@ static void DPD_compute(
 
 int subOnlyPath(int8_t *s1, int8_t *s2, backtrack_t* backtrack, backtrack_t ** backtrack_end)
 {
+    STAT_RECORD_START(STAT_SUB_ONLY_PATH);
 	int score = 0;
 	backtrack[0].type = CODE_END;
 	(*backtrack_end) = &backtrack[1];
@@ -133,6 +134,8 @@ int subOnlyPath(int8_t *s1, int8_t *s2, backtrack_t* backtrack, backtrack_t ** b
                     (*backtrack_end)++;
 		}
 	}
+    (*backtrack_end)--;
+    STAT_RECORD_LAST_STEP(STAT_SUB_ONLY_PATH, 0);
 	return score;
 }
 
@@ -317,7 +320,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
         int j = min_score_j_idx;
         backtrack[0].type = CODE_END;
 	(*backtrack_end) = &backtrack[1];
-        while ((i > 0) && (j > 0)) {
+        while ((i > 0) || (j > 0)) {
             if(X[i][j] == 0) {
 		    // Operation 0 : sequences match and nothing was done : decrease both indices.
 		    i--;
@@ -370,6 +373,7 @@ bool update_frequency_table(
 		float mapq
 		)
 {
+    STAT_RECORD_START(STAT_UPDATE_FREQUENCY_TABLE);
 	struct frequency_info ** frequency_table = get_frequency_table();
 	uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr;
 	int num = result_tab[pos].num;
@@ -383,6 +387,7 @@ bool update_frequency_table(
 	/* First, try substitutions only */
 	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
     bool used_dpd = false;
+    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 0);
 
 	if (computed_score > result_tab[pos].score) {
             /*
@@ -412,8 +417,11 @@ bool update_frequency_table(
 	} else {
         reads_correct_cost_sub_only++;
     }
+    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 1);
 
-    write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], genome_pos, backtrack_end, read);
+    write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], genome_pos, backtrack_end, read, num);
+
+    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 2);
 
 	// /!\ Pointer arithmetics
 	unsigned int mutex_index = (genome_pos*NB_FREQ_TABLE_MUTEXES)/ref_genome->fasta_file_size;
@@ -429,6 +437,7 @@ bool update_frequency_table(
         }
 		pthread_mutex_lock(&freq_table_mutexes[end_mutex_index]);
 	}
+    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 3);
 	bool has_indel = false;
         uint8_t read_letter;
         //printf("genome_pos=%lu\n", genome_pos);
@@ -448,15 +457,18 @@ bool update_frequency_table(
                     case CODE_INS:
                     case CODE_DEL:
                             has_indel = true;
+                            //LOG_WARN("unhandled indel\n");
                             // TODO: handle indels
                             break;
                             // TODO: handle errors even if they should never happen
             }
     }
+    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 4);
 	pthread_mutex_unlock(&freq_table_mutexes[mutex_index]);
 	if (end_mutex_index != mutex_index) {
 		pthread_mutex_unlock(&freq_table_mutexes[end_mutex_index]);
 	}
+    STAT_RECORD_LAST_STEP(STAT_UPDATE_FREQUENCY_TABLE, 5);
 	return has_indel;
 }
 
@@ -599,9 +611,6 @@ static void do_process_read(process_read_arg_t *arg)
       int numpair = result_tab[i].num / 4;
       unsigned int j = i;
       while ((j < nb_match) && (numpair == result_tab[j].num / 4)) {
-          if (ref_genome->pt_seq[result_tab[j].coord.seq_nr] + result_tab[j].coord.seed_nr == 39317815) {
-              printf("found 39317815 mapping at index %u during round %d\n", j, round);
-          }
           j++;
       }
       release_curr_match(j);
@@ -666,7 +675,7 @@ static void do_process_read(process_read_arg_t *arg)
       for (unsigned int x1 = i; x1 < j; x1++) {
         t1 = result_tab[x1].num % 4;
         pos1 = result_tab[x1].coord.seed_nr;
-        if (result_tab[x1].score < best_individual_scores[t1] + MAX_SCORE_DIFFERENCE_WITH_BEST)
+        if (result_tab[x1].score <= best_individual_scores[t1] + MAX_SCORE_DIFFERENCE_WITH_BEST)
         {
           for (unsigned int x2 = x1 + 1; x2 < j; x2++) {
             pos2 = result_tab[x2].coord.seed_nr;
@@ -704,14 +713,16 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta_corrected < 0) {
             LOG_WARN("negative delta for square root %d\n", delta_corrected);
           }
-          else if(delta > DIST_PAIR_THRESHOLD) {
+          else if(delta >= DIST_PAIR_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
 #else
-          if(delta > DIST_PAIR_THRESHOLD) {
+          if(delta >= DIST_PAIR_THRESHOLD) {
 #endif
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
+          } else {
+            LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
           }
         }
         else if(np) { // only one result, take it
@@ -722,18 +733,22 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta_corrected < 0) {
             LOG_WARN("negative delta (np == 1) for square root %d\n", delta_corrected);
           }
-          else if(delta > DIST_PAIR_THRESHOLD) {
+          else if(delta >= DIST_PAIR_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
 #else
-          if(delta > DIST_PAIR_THRESHOLD) {
+          if(delta >= DIST_PAIR_THRESHOLD) {
 #endif
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
+          } else {
+            LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
           }
         }
-      } 
-      if (true) {
+      } else {
+        LOG_WARN("could not pair (%u)\n", result_tab[i].num/4);
+      }
+      if (false) {
 
         // check mapping of R1 and R2 independently
         unsigned int best_score_R1[2] = { INVALID_SCORE, INVALID_SCORE };
@@ -765,10 +780,10 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta_corrected < 0) {
             LOG_WARN("negative delta (np1 == 2) for square root %d\n", delta_corrected);
           }
-          else if(delta > DIST_SINGLE_THRESHOLD) {
+          else if(delta >= DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
 #else
-          if(delta > DIST_SINGLE_THRESHOLD) {
+          if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             update = true;
@@ -784,10 +799,10 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta_corrected < 0) {
             LOG_WARN("negative delta (np1 == 1) for square root %d\n", delta_corrected);
           }
-          else if(delta > DIST_SINGLE_THRESHOLD) {
+          else if(delta >= DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
 #else
-          if(delta > DIST_SINGLE_THRESHOLD) {
+          if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             update = true;
@@ -806,10 +821,10 @@ static void do_process_read(process_read_arg_t *arg)
             LOG_WARN("negative delta (np2 == 2) for square root %d, %d %d %d %d\n", 
                 delta_corrected, MISMATCH_COUNT(result_tab[P2[0]]), MISMATCH_COUNT(result_tab[P2[1]]), MAX_SUBSTITUTION + 1, delta);
           }
-          else if(delta > DIST_SINGLE_THRESHOLD) {
+          else if(delta >= DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
 #else
-          if(delta > DIST_SINGLE_THRESHOLD) {
+          if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
 
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
@@ -826,10 +841,10 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta_corrected < 0) {
             LOG_WARN("negative delta (np2 == 1) for square root %d\n", delta_corrected);
           }
-          else if (delta > DIST_SINGLE_THRESHOLD) {
+          else if (delta >= DIST_SINGLE_THRESHOLD) {
             mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
 #else
-          if (delta > DIST_SINGLE_THRESHOLD) {
+          if (delta >= DIST_SINGLE_THRESHOLD) {
 #endif
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;

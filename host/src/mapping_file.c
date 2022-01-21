@@ -52,7 +52,7 @@ void open_mapping_file()
     //LOG_DEBUG("mapping header written\n");
 }
 
-void write_read_mapping_from_backtrack(char *chromosome_name, uint64_t genome_pos, backtrack_t *backtrack_end, int8_t *read)
+void write_read_mapping_from_backtrack(char *chromosome_name, uint64_t genome_pos, backtrack_t *backtrack_end, int8_t *read, int read_id)
 {
     char patch[MAX_PATCH_LENGTH];
     int patch_idx=MAX_PATCH_LENGTH;
@@ -83,7 +83,7 @@ void write_read_mapping_from_backtrack(char *chromosome_name, uint64_t genome_po
                 break;
         }
     }
-    fprintf(mapping_file, "%s\t%lu\t%s\n", chromosome_name, genome_pos, &patch[patch_idx]);
+    fprintf(mapping_file, "%s\t%lu\t%s\t%d\n", chromosome_name, genome_pos, &patch[patch_idx], read_id);
 }
 
 void write_read_mapping(char *chromosome_name, uint64_t genome_pos, uint8_t *code, uint8_t *read) {

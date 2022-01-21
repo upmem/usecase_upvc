@@ -11,22 +11,23 @@ struct time_stat_t {
     clock_t substep_total_times[STAT_MAX_SUBSTEPS];
 };
 
-struct time_stat_t profiling[14];
+struct time_stat_t profiling[15];
 
-#define STAT_DPD                       0
-#define STAT_CODE_ALIGNMENT            1
-#define STAT_ADD_TO_NON_MAPPED_READ    2
-#define STAT_GET_READ_UPDATE_POSITIONS 3
-#define STAT_UPDATE_FREQUENCY_TABLE    4
-#define STAT_DO_PROCESS_READ           5
-#define STAT_PROCESS_READ              6
-#define STAT_EXEC_ROUND                7
-#define STAT_EXEC_DPUS                 8
-#define STAT_THREAD_GET_READS          9
-#define STAT_THREAD_DISPATCH           10
-#define STAT_THREAD_ACC                11
-#define STAT_THREAD_PROCESS            12
-#define STAT_DO_MAPPING                13
+#define STAT_SUB_ONLY_PATH             0
+#define STAT_DPD                       1
+#define STAT_CODE_ALIGNMENT            2
+#define STAT_ADD_TO_NON_MAPPED_READ    3
+#define STAT_GET_READ_UPDATE_POSITIONS 4
+#define STAT_UPDATE_FREQUENCY_TABLE    5
+#define STAT_DO_PROCESS_READ           6
+#define STAT_PROCESS_READ              7
+#define STAT_EXEC_ROUND                8
+#define STAT_EXEC_DPUS                 9
+#define STAT_THREAD_GET_READS          10
+#define STAT_THREAD_DISPATCH           11
+#define STAT_THREAD_ACC                12
+#define STAT_THREAD_PROCESS            13
+#define STAT_DO_MAPPING                14
 
 #define STAT_RECORD_START(FUNCTION)                        \
     clock_t profiling_step_time, profiling_last_step_time; \
