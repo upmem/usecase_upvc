@@ -134,6 +134,6 @@ typedef struct {
 #define MAPQ_SCALING_FACTOR 2
 #define READ_DIST_LOWER_BOUND 50
 #define READ_DIST_UPPER_BOUND 2000
-#define depth_filter depth_filter_permissive
+#define depth_filter depth_filter3
 
 #endif /* __COMMON_H__ */

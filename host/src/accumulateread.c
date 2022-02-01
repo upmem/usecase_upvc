@@ -158,7 +158,7 @@ static void merge_bucket_and_acc_list(
     }
 }
 
-acc_results_t accumulate_get_result(unsigned int pass_id)
+acc_results_t accumulate_get_result(unsigned int pass_id, bool free_results)
 {
     if (result_file[pass_id] == NULL) {
         static const dpu_result_out_t dummy_res = { .num = -1 };
@@ -180,6 +180,10 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
     size_t size_read = fread(results, size, 1, result_file[pass_id]);
     assert(size_read == 1);
 
+    if (free_results) {
+        fclose(result_file[pass_id]);
+        result_file[pass_id] = NULL;
+    }
     return (acc_results_t) { .nb_res = (size / sizeof(dpu_result_out_t)) - 1, .results = results };
 }
 
@@ -232,7 +236,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     }
 
     // Get data from FILE *
-    acc_results_t acc_res_from_file = accumulate_get_result(pass_id);
+    acc_results_t acc_res_from_file = accumulate_get_result(pass_id, false);
     unsigned int nb_read = acc_res_from_file.nb_res + total_nb_res;
     size_t size = sizeof(dpu_result_out_t) * (nb_read + 1);
 

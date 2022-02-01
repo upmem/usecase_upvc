@@ -853,7 +853,7 @@ void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
     STAT_RECORD_START(STAT_PROCESS_READ);
     int8_t *reads_buffer = get_reads_buffer(pass_id);
     float *reads_quality_buffer = get_reads_quality_buffer(pass_id);
-    acc_results_t acc_res = accumulate_get_result(pass_id);
+    acc_results_t acc_res = accumulate_get_result(pass_id, true);
     nr_reads_total += get_reads_in_buffer(pass_id) / 4;
     curr_match = 0;
 
