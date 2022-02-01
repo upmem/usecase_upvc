@@ -31,7 +31,7 @@
 #define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
-#define PQD_INIT_VAL (999)
+#define PQD_INIT_VAL (99)
 
 #if SIZE_READ>120
 #define MAX_SUBSTITUTION 31
@@ -40,6 +40,7 @@
 #endif
 
 #define MAX_SCORE_DIFFERENCE_WITH_BEST 40
+#define MAX_CONSIDERED_MAPPINGS 1000
 
 /*
 static void log_nucleotides(int8_t *s, int max_len) {
@@ -360,7 +361,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
     return min_score;
 }
 
-#define NB_FREQ_TABLE_MUTEXES (1<<14)
+#define NB_FREQ_TABLE_MUTEXES (1<<10)
 static pthread_mutex_t freq_table_mutexes[NB_FREQ_TABLE_MUTEXES+1];
 //static pthread_mutex_t print_mutex;
 
@@ -386,7 +387,7 @@ bool update_frequency_table(
 
 	/* First, try substitutions only */
 	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
-    bool used_dpd = false;
+    //bool used_dpd = false;
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 0);
 
 	if (computed_score > result_tab[pos].score) {
@@ -396,7 +397,7 @@ bool update_frequency_table(
             }
             */
             computed_score = DPD(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
-            used_dpd = true;
+            //used_dpd = true;
             if (computed_score == result_tab[pos].score) {
                 reads_correct_cost_DPD++;
             } else {
@@ -428,13 +429,6 @@ bool update_frequency_table(
 	unsigned int end_mutex_index = ((genome_pos+backtrack_end->ix)*NB_FREQ_TABLE_MUTEXES)/ref_genome->fasta_file_size;
 	pthread_mutex_lock(&freq_table_mutexes[mutex_index]);
 	if (end_mutex_index != mutex_index) {
-        if (end_mutex_index>=NB_FREQ_TABLE_MUTEXES) {
-                printf("end_mutex_index=%u\n", end_mutex_index);
-                if(used_dpd) {
-                        printf("used dpd\n");
-                }
-                fflush(stdout);
-        }
 		pthread_mutex_lock(&freq_table_mutexes[end_mutex_index]);
 	}
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 3);
@@ -451,6 +445,9 @@ bool update_frequency_table(
                     case 0:
                     case CODE_SUB:
                             read_letter = read[backtrack_end->jx];
+                            if (read_letter > 3) {
+                                read_letter = read_letter>>1 & 0x3;
+                            }
                             frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
                             frequency_table[read_letter][current_position].score++;
                             break;
@@ -506,7 +503,7 @@ static uint64_t nr_reads_with_indels = 0ULL;
 static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define MISMATCH_COUNT(X) (X.score / 10) 
-#define INVALID_SCORE 10000
+#define INVALID_SCORE 1000
 
 static void keep_best_2_scores(unsigned score, unsigned* P1, unsigned *P2, unsigned x1, unsigned x2, unsigned* best_score) {
 
@@ -625,68 +622,47 @@ static void do_process_read(process_read_arg_t *arg)
               best_individual_scores[t] = result_tab[x].score;
       }
 
+      unsigned int nb_considered_mappings[4] = {0,0,0,0};
+      unsigned int considered_mappings[4][MAX_CONSIDERED_MAPPINGS];
+      for (unsigned int x=i; x<j; x++)
+      {
+          int t = result_tab[x].num % 4;
+          if (best_individual_scores[t] + MAX_SCORE_DIFFERENCE_WITH_BEST > result_tab[x].score && nb_considered_mappings[t]<MAX_CONSIDERED_MAPPINGS)
+          {
+              considered_mappings[t][nb_considered_mappings[t]++] = x;
+          }
+      }
+
       // i = start index in result_tab
       // j = stop index in result_tab
       // select best couples of paired reads
       STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 2);
       unsigned int P1[2] = {i,i};
       unsigned int P2[2] = {j-1,j-1};
-      unsigned int pos1, pos2, t1, t2;
+      unsigned int pos1, pos2;
       unsigned int best_score[2] = { INVALID_SCORE, INVALID_SCORE };
-      /*
-      unsigned int nb_considered_mappings[4] = {0,0,0,0};//for debugging purposes only
-      const unsigned int max_considered_mappings = get_nb_dpu()<<1;
-      unsigned int considered_mappings[4][max_considered_mappings];
-      for (unsigned int x1 = i; x1 < j; x1++) {
-        t1 = result_tab[x1].num % 4;
-        pos1 = result_tab[x1].coord.seed_nr;
-        if (result_tab[x1].score < best_individual_scores[t1] +  MAX_SCORE_DIFFERENCE_WITH_BEST) {
-            for (unsigned int y = 0; y < nb_considered_mappings[3-t1]; y++) {
-                unsigned int x2 = considered_mappings[3-t1][y];
-                pos2 = result_tab[x2].coord.seed_nr;
-                if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
-                  // update if this is one of the two best scores
-                  keep_best_2_scores(result_tab[x1].score + result_tab[x2].score, P1, P2, x1, x2, best_score);
-                }
-            }
-            if (nb_considered_mappings[t1] < max_considered_mappings) {
-                considered_mappings[t1][nb_considered_mappings[t1]++] = x1;
-            } else {
-                LOG_ERROR("too many mappings to consider: ignoring some\n");
-            }
+
+      for (unsigned int x1 = 0; x1 < nb_considered_mappings[0]; x1++) {
+        pos1 = result_tab[considered_mappings[0][x1]].coord.seed_nr;
+        int score1 = result_tab[considered_mappings[0][x1]].score;
+        for (unsigned int x2 = 0; x2 < nb_considered_mappings[3]; x2++) {
+          pos2 = result_tab[considered_mappings[3][x2]].coord.seed_nr;
+          int score2 = result_tab[considered_mappings[3][x2]].score;
+          if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
+            // update if this is one of the two best scores
+            keep_best_2_scores(score1 + score2, P1, P2, considered_mappings[0][x1], considered_mappings[3][x2], best_score);
+          }
         }
       }
-      if (j-i>4900) {
-          LOG_WARN("found %d mappings for 4 reads; of which [%u, %u, %u, %u] were considered with best scores : [%u, %u, %u, %u].\n",
-                  j-i,
-                  nb_considered_mappings[0],
-                  nb_considered_mappings[1],
-                  nb_considered_mappings[2],
-                  nb_considered_mappings[3],
-                  best_individual_scores[0],
-                  best_individual_scores[1],
-                  best_individual_scores[2],
-                  best_individual_scores[3]
-                  );
-      }
-      */
-      /*unsigned int best_score_all = 1000;*/
-      // test all significant pairs of reads (0,3) & (1,2)
-      for (unsigned int x1 = i; x1 < j; x1++) {
-        t1 = result_tab[x1].num % 4;
-        pos1 = result_tab[x1].coord.seed_nr;
-        if (result_tab[x1].score <= best_individual_scores[t1] + MAX_SCORE_DIFFERENCE_WITH_BEST)
-        {
-          for (unsigned int x2 = x1 + 1; x2 < j; x2++) {
-            pos2 = result_tab[x2].coord.seed_nr;
-            t2 = result_tab[x2].num % 4;
-            if (t1 + t2 == 3) // select significant pair
-            {
-              if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
-                // update if this is one of the two best scores
-                keep_best_2_scores(result_tab[x1].score + result_tab[x2].score, P1, P2, x1, x2, best_score);
-              }
-            }
+      for (unsigned int x1 = 0; x1 < nb_considered_mappings[1]; x1++) {
+        pos1 = result_tab[considered_mappings[1][x1]].coord.seed_nr;
+        int score1 = result_tab[considered_mappings[1][x1]].score;
+        for (unsigned int x2 = 0; x2 < nb_considered_mappings[2]; x2++) {
+          pos2 = result_tab[considered_mappings[2][x2]].coord.seed_nr;
+          int score2 = result_tab[considered_mappings[2][x2]].score;
+          if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
+            // update if this is one of the two best scores
+            keep_best_2_scores(score1 + score2, P1, P2, considered_mappings[1][x1], considered_mappings[2][x2], best_score);
           }
         }
       }
@@ -721,9 +697,9 @@ static void do_process_read(process_read_arg_t *arg)
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
-          } else {
+          }/* else {
             LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
-          }
+          }*/
         }
         else if(np) { // only one result, take it
           int delta = abs((int)(MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) - (2 * (MAX_SUBSTITUTION + 1)));
@@ -741,14 +717,12 @@ static void do_process_read(process_read_arg_t *arg)
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
             hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
             update = true;
-          } else {
+          }/* else {
             LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
-          }
+          }*/
         }
-      } else {
-        LOG_WARN("could not pair (%u)\n", result_tab[i].num/4);
       }
-      if (false) {
+      if (true) {
 
         // check mapping of R1 and R2 independently
         unsigned int best_score_R1[2] = { INVALID_SCORE, INVALID_SCORE };
@@ -852,9 +826,9 @@ static void do_process_read(process_read_arg_t *arg)
         }
       STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 4);
         if(!update) {
-            pthread_mutex_lock(&nr_reads_mutex);
+            //pthread_mutex_lock(&nr_reads_mutex);
             nr_reads_non_mapped++;
-            pthread_mutex_unlock(&nr_reads_mutex);
+            //pthread_mutex_unlock(&nr_reads_mutex);
             add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
         }
         if(hasIndel)
@@ -863,8 +837,9 @@ static void do_process_read(process_read_arg_t *arg)
         nr_reads_total_from_dpus++;
         pthread_mutex_unlock(&nr_reads_mutex);
       }
+      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 5);
     }
-    STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 5);
+    STAT_RECORD_LAST_STEP(STAT_DO_PROCESS_READ, 6);
 }
 
 #define PROCESS_READ_THREAD (8)
@@ -876,8 +851,6 @@ static bool stop_threads = false;
 void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
 {
     STAT_RECORD_START(STAT_PROCESS_READ);
-    if (pass_id>10)
-        return;
     int8_t *reads_buffer = get_reads_buffer(pass_id);
     float *reads_quality_buffer = get_reads_quality_buffer(pass_id);
     acc_results_t acc_res = accumulate_get_result(pass_id);

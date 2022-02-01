@@ -70,7 +70,11 @@ void exec_dpus()
     {
         backends_functions.load_mram(dpu_offset, 0);
 
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 0);
+
         sem_wait(&dispatch_to_exec_sem);
+
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 1);
 
         FOREACH_PASS(each_pass)
         {
@@ -78,11 +82,15 @@ void exec_dpus()
                 dpu_offset, each_pass, &exec_to_dispatch_sem, &acc_to_exec_sem, &exec_to_acc_sem, &dispatch_to_exec_sem);
         }
 
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 2);
+
         backends_functions.wait_dpu();
+
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 3);
 
         sem_post(&exec_to_acc_sem);
     }
-    STAT_RECORD_LAST_STEP(STAT_EXEC_DPUS, 0);
+    STAT_RECORD_LAST_STEP(STAT_EXEC_DPUS, 4);
 }
 
 void *thread_dispatch(__attribute__((unused)) void *arg)
@@ -343,6 +351,8 @@ int main(int argc, char *argv[])
 
     printf("%s\n", VERSION);
     print_time();
+    for (int i=0; i<15; i++)
+            profiling[i] = (struct time_stat_t){0};
 
     printf("Information:\n");
     printf("\tread size: %d\n", SIZE_READ);

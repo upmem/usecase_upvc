@@ -46,10 +46,10 @@ struct time_stat_t profiling[15];
 
 
 #define PRINT_MICROSECONDS(t)                         \
-    if (t<1000000) {                                  \
-        printf("%ld.%ldms", t/1000, t%1000);          \
+    if (t<CLOCKS_PER_SEC) {                           \
+        printf("%fms", (float)t/CLOCKS_PER_SEC*1000); \
     } else {                                          \
-        printf("%ld.%lds", t/1000000, (t/1000)%1000); \
+        printf("%fs", (float)t/CLOCKS_PER_SEC);       \
     }
 
 #define PRINT_FUNCTION_STAT(FUNCTION)                                      \
@@ -61,7 +61,7 @@ struct time_stat_t profiling[15];
     for (int i=0; i<STAT_MAX_SUBSTEPS; i++)                                \
     {                                                                      \
         if (profiling[FUNCTION].substep_total_times[i] > 0) {              \
-            printf("\t\t");                                                \
+            printf("\t\t%d:\t", i);                                         \
             PRINT_MICROSECONDS(profiling[FUNCTION].substep_total_times[i]) \
             printf("\n");                                                  \
         }                                                                  \
