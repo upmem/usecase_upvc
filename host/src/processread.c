@@ -31,7 +31,7 @@
 #define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
-#define PQD_INIT_VAL (99)
+#define PQD_INIT_VAL (999)
 
 #if SIZE_READ>120
 #define MAX_SUBSTITUTION 31

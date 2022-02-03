@@ -34,7 +34,7 @@ static unsigned int pass_id_shared;
 
 static int min(int a, int b) { return a < b ? a : b; }
 
-#define PQD_INIT_VAL (99)
+#define PQD_INIT_VAL (999)
 static void ODPD_compute(
     int i, int j, int8_t *s1, int8_t *s2, int *Pppj, int Pppjm, int *Qppj, int Qlpj, int *Dppj, int Dppjm, int Dlpj, int Dlpjm)
 {

@@ -431,7 +431,7 @@ void create_vcf()
         //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
 	    if (total_score == 0) {
 		    uncovered_nucleotides++;
-	    } else if (total_score < 3) {
+	    } else if (total_score < 10) {
 		    badly_covered_nucleotides++;
 	    } else {
 		    well_covered_nucleotides++;
@@ -462,26 +462,26 @@ void create_vcf()
     free_frequency_table();
     fclose(vcf_file);
 
-    unsigned int total_nucleotides = well_covered_nucleotides+badly_covered_nucleotides+uncovered_nucleotides;
-    printf("\tuncovered nucleotides: %u (%u.%u%%)\n",
-		    uncovered_nucleotides,
-		    uncovered_nucleotides*100/total_nucleotides,
-		    uncovered_nucleotides*10000/total_nucleotides%100);
-    printf("\tbadly covered nucleotides (less than 3 reads): %u (%u.%u%%)\n",
-		    badly_covered_nucleotides,
-		    badly_covered_nucleotides*100/total_nucleotides,
-		    badly_covered_nucleotides*10000/total_nucleotides%100);
-    printf("\twell covered nucleotides (3 reads or more): %u (%u.%u%%)\n",
-		    well_covered_nucleotides,
-		    well_covered_nucleotides*100/total_nucleotides,
-		    well_covered_nucleotides*10000/total_nucleotides%100);
-    printf("\toverly covered nucleotides (more than 50 reads): %u (%u.%u%%)\n",
-		    overly_covered_nucleotides,
-		    overly_covered_nucleotides*100/total_nucleotides,
-		    overly_covered_nucleotides*10000/total_nucleotides%100);
+    unsigned long total_nucleotides = overly_covered_nucleotides+well_covered_nucleotides+badly_covered_nucleotides+uncovered_nucleotides;
+    printf("\tuncovered nucleotides: %lu (%lu.%lu%%)\n",
+		    (long)uncovered_nucleotides,
+		    (long)uncovered_nucleotides*100/total_nucleotides,
+		    (long)uncovered_nucleotides*10000/total_nucleotides%100);
+    printf("\tbadly covered nucleotides (less than 10 reads): %lu (%lu.%lu%%)\n",
+		    (long)badly_covered_nucleotides,
+		    (long)badly_covered_nucleotides*100/total_nucleotides,
+		    (long)badly_covered_nucleotides*10000/total_nucleotides%100);
+    printf("\twell covered nucleotides (10 reads or more): %lu (%lu.%lu%%)\n",
+		    (long)well_covered_nucleotides,
+		    (long)well_covered_nucleotides*100/total_nucleotides,
+		    (long)well_covered_nucleotides*10000/total_nucleotides%100);
+    printf("\toverly covered nucleotides (more than 50 reads): %lu (%lu.%lu%%)\n",
+		    (long)overly_covered_nucleotides,
+		    (long)overly_covered_nucleotides*100/total_nucleotides,
+		    (long)overly_covered_nucleotides*10000/total_nucleotides%100);
     printf("\tmax coverage: %u reads\n", max_coverage);
     printf("\tmax coverage position: chr%u:%u\n", chromosome_most_coverage, position_most_coverage);
-    printf("\ttotal coverage: %u (eq %u reads; or %ux coverage)\n", total_coverage, total_coverage/SIZE_READ, total_coverage/total_nucleotides);
+    printf("\ttotal coverage: %u (eq %lu reads; or %lux coverage)\n", total_coverage, (long)total_coverage/SIZE_READ, (long)total_coverage/total_nucleotides);
     printf("\tnumber of variants: %d (multiple %d)\n", nb_variant, nb_pos_multiple_var);
     printf("\ttime: %lf s\n", my_clock() - start_time);
 }

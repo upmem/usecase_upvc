@@ -6,7 +6,7 @@
 #define COST_SUB    10
 #define COST_GAPO   11
 #define COST_GAPE   1
-#define COST_INIT   99
+#define COST_INIT   999
 
 #define LINE_SIZE   (  6*4 )
 #define d0off       (  0*4 )
