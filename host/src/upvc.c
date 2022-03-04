@@ -174,7 +174,7 @@ void *thread_process(__attribute__((unused)) void *arg)
         process_read(fope1, fope2, round, each_pass);
         clock_gettime(CLOCK_MONOTONIC_RAW, &current_time);
         int spent = current_time.tv_sec-start_time.tv_sec;
-        printf("time spent: %02dh%02dm%02ds (%ds)\n", spent/3600, spent/60%60, spent%60, spent);
+        printf("time spent: %02dh%02dm%02ds (%ds), id:%d\n", spent/3600, spent/60%60, spent%60, spent, each_pass);
         sem_post(&accprocess_to_getreads_sem);
         sem_wait(&acc_to_process_sem);
     }

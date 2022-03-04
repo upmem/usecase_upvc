@@ -21,7 +21,7 @@
 #include "parse_args.h"
 #include "profiling.h"
 
-#define DEBUG_READ_MAPPING true
+#define DEBUG_READ_MAPPING false
 
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
@@ -420,7 +420,9 @@ bool update_frequency_table(
     }
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 1);
 
+    #if DEBUG_READ_MAPPING
     write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], genome_pos, backtrack_end, read, num);
+    #endif
 
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 2);
 

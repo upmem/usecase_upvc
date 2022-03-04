@@ -284,6 +284,13 @@ __attribute__((unused)) uint32_t depth_filter_fixed_3_f15(float freq) {
   return 3;
 }
 
+#define AFFINE_B 1.12795388963028
+#define AFFINE_A 0.090970032203921
+
+float reverse_filter(uint32_t score) {
+    return AFFINE_A*(float)score + AFFINE_B;
+}
+
 FILE * dbg_file = NULL;
 FILE * sub_file = NULL;
 
@@ -296,19 +303,19 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
   variant_t** results = calloc(5, sizeof(variant_t*));
   float total = 0;
   for(int i = 0; i < 5; ++i) {
-    total += frequency_table[i][genome_pos].freq; 
+    total += frequency_table[i][genome_pos].score; 
   }
   if(total == 0) 
     return results;
 
   for(int i = 0; i < 5; ++i) {
-    float freq = frequency_table[i][genome_pos].freq;
+    //float freq = frequency_table[i][genome_pos].freq;
     uint32_t score = frequency_table[i][genome_pos].score;
     if(i == ref_genome->data[genome_pos]) 
         continue; // not a variant if the same nucleotide as in reference genome
 
     // if frequency and depth pass the threshold, consider it a variant
-    if(score >= depth_filter(freq * 100.0 / total)) {
+    if(score > reverse_filter(total)) {
 
         // this is a substitution, create variant
         variant_t *var = (variant_t *)malloc(sizeof(variant_t));
