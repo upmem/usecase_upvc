@@ -1,4 +1,4 @@
-/**
+        /**
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
@@ -14,6 +14,79 @@
 #include "parse_args.h"
 #include "upvc.h"
 #include "vartree.h"
+#include "debug.h"
+
+
+#define DUMP_FREQUENCY_TABLE false
+#define FREQ_TABLE_DUMP_FILE_NAME "frequency_table.bin"
+#if DUMP_FREQUENCY_TABLE
+FILE *freq_table_dump_file;
+
+void open_freq_table()
+{
+    static char filename[FILENAME_MAX];
+    sprintf(filename, "%s", FREQ_TABLE_DUMP_FILE_NAME);
+    freq_table_dump_file = fopen(filename, "w");
+    if (freq_table_dump_file == NULL) {
+        LOG_FATAL("couldn't open frequency table dumping file; errno: %u\n", errno);
+    }
+}
+
+void close_freq_table()
+{
+    fclose(freq_table_dump_file);
+}
+
+//The pragma pack shouldn't have any effect here as of now but it might have an effect if struct content is modified
+//In which case it should probably be kept.
+#pragma pack(push,1)
+struct freq_table_dump_entry_t{
+    float freqs[5];
+    uint16_t  scores[5];
+};
+#pragma pack(pop)
+
+// freq_table_dump format:
+//  0:            uint8_t                                 number of sequences = {n}
+//  1 - n*4:      uint16_t[n]                             sequence start addresses
+//  n*4+1 - end:  struct freq_table_dump_entry_t[...]     table entries
+void write_freq_table_header(genome_t *ref_genome)
+{
+    uint8_t number_sequences = ref_genome->nb_seq;
+    uint64_t sequence_offsets[256];
+    uint64_t header_size = 1 + sizeof(uint64_t)* (uint64_t) number_sequences;
+    uint64_t total_seq_length=0;
+    for(uint8_t seq_number=0; seq_number<ref_genome->nb_seq; seq_number++) {
+        sequence_offsets[seq_number] = header_size + total_seq_length*sizeof(struct freq_table_dump_entry_t);
+        total_seq_length += ref_genome->len_seq[seq_number];
+    }
+    fwrite(&number_sequences, 1, 1, freq_table_dump_file);
+    fwrite(sequence_offsets, sizeof(uint64_t), number_sequences, freq_table_dump_file);
+}
+
+void dump_freq_table_entry(int address, struct frequency_info **frequency_table)
+{
+    struct freq_table_dump_entry_t entry;
+    for (int i=0; i<5; i++) {
+        entry.freqs[i] = frequency_table[i][address].freq;
+        entry.scores[i] = frequency_table[i][address].score;
+    }
+    fwrite(&entry, sizeof(struct freq_table_dump_entry_t), 1, freq_table_dump_file);
+}
+
+void dump_freq_table(genome_t *ref_genome, struct frequency_info **frequency_table)
+{
+    open_freq_table();
+    write_freq_table_header(ref_genome);
+    for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+        for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
+            dump_freq_table_entry(ref_genome->pt_seq[seq_number] + seq_position, frequency_table);
+        }
+    }
+    close_freq_table();
+}
+
+#endif
 
 static variant_t **variant_list[MAX_SEQ_GEN] = { NULL };
 static pthread_mutex_t mutex;
@@ -415,6 +488,10 @@ void create_vcf()
     fclose(sub_file);
 #endif
 
+    printf("dumping frequency table...\n");
+    dump_freq_table(ref_genome, frequency_table);
+    printf("table done dumping; starting variant calling...\n");
+
     unsigned int uncovered_nucleotides = 0;
     unsigned int badly_covered_nucleotides = 0;
     unsigned int well_covered_nucleotides = 0;
@@ -429,28 +506,28 @@ void create_vcf()
         for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
             
             variant_t ** results = get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position);
-        unsigned int total_score = 0;
-        total_score += frequency_table[0][ref_genome->pt_seq[seq_number] + seq_position].score;
-        total_score += frequency_table[1][ref_genome->pt_seq[seq_number] + seq_position].score;
-        total_score += frequency_table[2][ref_genome->pt_seq[seq_number] + seq_position].score;
-        total_score += frequency_table[3][ref_genome->pt_seq[seq_number] + seq_position].score;
-        total_coverage += total_score;
-        //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
-	    if (total_score == 0) {
-		    uncovered_nucleotides++;
-	    } else if (total_score < 10) {
-		    badly_covered_nucleotides++;
-	    } else {
-		    well_covered_nucleotides++;
+            unsigned int total_score = 0;
+            total_score += frequency_table[0][ref_genome->pt_seq[seq_number] + seq_position].score;
+            total_score += frequency_table[1][ref_genome->pt_seq[seq_number] + seq_position].score;
+            total_score += frequency_table[2][ref_genome->pt_seq[seq_number] + seq_position].score;
+            total_score += frequency_table[3][ref_genome->pt_seq[seq_number] + seq_position].score;
+            total_coverage += total_score;
+            //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
+            if (total_score == 0) {
+                    uncovered_nucleotides++;
+            } else if (total_score < 10) {
+                    badly_covered_nucleotides++;
+            } else {
+                    well_covered_nucleotides++;
                     if (total_score > 50) {
-                        overly_covered_nucleotides++;
+                            overly_covered_nucleotides++;
                     }
                     if (total_score > max_coverage) {
-                        max_coverage = total_score;
-                        chromosome_most_coverage = seq_number;
-                        position_most_coverage = seq_position;
+                            max_coverage = total_score;
+                            chromosome_most_coverage = seq_number;
+                            position_most_coverage = seq_position;
                     }
-	    }
+            }
             int nb_var = 0;
             for(int i = 0; i < 5; ++i) {
               variant_t * var = results[i];
