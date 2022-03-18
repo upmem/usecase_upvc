@@ -21,7 +21,7 @@
 #include "parse_args.h"
 #include "profiling.h"
 
-#define DEBUG_READ_MAPPING false
+#define DEBUG_READ_MAPPING true
 
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
@@ -34,7 +34,7 @@
 #define PQD_INIT_VAL (999)
 
 #if SIZE_READ>120
-#define MAX_SUBSTITUTION 31
+#define MAX_SUBSTITUTION 20
 #else
 #define MAX_SUBSTITUTION 20
 #endif
@@ -371,7 +371,8 @@ bool update_frequency_table(
 		int8_t *reads_buffer,
 		float *reads_quality_buffer,
 		int pos,
-		float mapq
+		float mapq,
+        bool unsure
 		)
 {
     STAT_RECORD_START(STAT_UPDATE_FREQUENCY_TABLE);
@@ -452,6 +453,9 @@ bool update_frequency_table(
                             }
                             frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
                             frequency_table[read_letter][current_position].score++;
+                            if (unsure) {
+                                frequency_table[read_letter][current_position].unsure_score++;
+                            }
                             break;
                     case CODE_INS:
                     case CODE_DEL:
@@ -677,7 +681,7 @@ static void do_process_read(process_read_arg_t *arg)
       if (np > 0) {
 	LOG_DEBUG("found at least a pair (%u)\n", np);
 
-        if(np == 2) {
+        if(np == 2) {//if(false) {
 
           // found at least 2 matching pairs of positions. Check the delta between the two pairs to 
           // decide whether we should keep the best pair
@@ -696,12 +700,16 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_PAIR_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
             update = true;
-          }/* else {
-            LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
-          }*/
+          } else {
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, true);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, true);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[1], mapq, true);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[1], mapq, true);
+            // LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
+          }
         }
         else if(np) { // only one result, take it
           int delta = abs((int)(MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) - (2 * (MAX_SUBSTITUTION + 1)));
@@ -716,8 +724,8 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_PAIR_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
             update = true;
           }/* else {
             LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
@@ -761,7 +769,7 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
             update = true;
           }
         }
@@ -780,7 +788,7 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
             update = true;
           }
         }
@@ -803,7 +811,7 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
 
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
             update = true;
           }
         }
@@ -822,7 +830,7 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if (delta >= DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq);
+            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
             update = true;
           }
         }

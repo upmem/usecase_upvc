@@ -488,9 +488,11 @@ void create_vcf()
     fclose(sub_file);
 #endif
 
+#if DUMP_FREQUENCY_TABLE
     printf("dumping frequency table...\n");
     dump_freq_table(ref_genome, frequency_table);
     printf("table done dumping; starting variant calling...\n");
+#endif
 
     unsigned int uncovered_nucleotides = 0;
     unsigned int badly_covered_nucleotides = 0;

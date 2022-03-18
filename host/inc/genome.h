@@ -34,6 +34,7 @@ struct frequency_info {
 
   float freq;
   unsigned int score;
+  unsigned int unsure_score;
 };
 struct frequency_info** get_frequency_table(); 
 void free_frequency_table();
