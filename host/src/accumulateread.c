@@ -6,6 +6,8 @@
 #include "common.h"
 #include "index.h"
 #include "upvc.h"
+#include "profiling.h"
+#include "debug.h"
 
 #include <assert.h>
 #include <dpu_backend.h>
@@ -190,6 +192,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id, bool free_results)
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
     printf("DPU_OFFSET: %u - PASS_ID: %u\n", dpu_offset, pass_id);
+    PRINT_ALL_FUNCTION_STAT();
     nb_dpus_used_current_run = MIN(index_get_nb_dpu() - dpu_offset, nb_dpus_per_run);
     acc_res = RESULTS_BUFFERS(pass_id);
 
@@ -241,6 +244,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     size_t size = sizeof(dpu_result_out_t) * (nb_read + 1);
 
     // Alloc the merged and sorted tab of result for this pass
+    LOG_INFO("allocating %lu for dpu results\n", size);
     dpu_result_out_t *merged_result_tab = malloc(size);
     assert(merged_result_tab != NULL);
 

@@ -40,7 +40,7 @@
 #endif
 
 #define MAX_SCORE_DIFFERENCE_WITH_BEST 40
-#define MAX_CONSIDERED_MAPPINGS 1000
+#define MAX_CONSIDERED_MAPPINGS 4000
 
 /*
 static void log_nucleotides(int8_t *s, int max_len) {
@@ -364,6 +364,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
 #define NB_FREQ_TABLE_MUTEXES (1<<10)
 static pthread_mutex_t freq_table_mutexes[NB_FREQ_TABLE_MUTEXES+1];
 //static pthread_mutex_t print_mutex;
+static pthread_mutex_t codependence_list_mutex;
 
 bool update_frequency_table(
 		genome_t *ref_genome,
@@ -377,6 +378,7 @@ bool update_frequency_table(
 {
     STAT_RECORD_START(STAT_UPDATE_FREQUENCY_TABLE);
 	struct frequency_info ** frequency_table = get_frequency_table();
+    struct variants_codependence_info_list** codependence_table = get_codependence_table(&codependence_list_mutex);
 	uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr;
 	int num = result_tab[pos].num;
 	int8_t *read = reads_buffer + (num * SIZE_READ);
@@ -438,6 +440,9 @@ bool update_frequency_table(
 	bool has_indel = false;
         uint8_t read_letter;
         //printf("genome_pos=%lu\n", genome_pos);
+    unsigned int variants_found = 0;
+    unsigned int variants_found_positions[SIZE_READ];
+    uint8_t variants_found_letters[SIZE_READ];
 	for (; backtrack_end > backtrack; backtrack_end--) {
             unsigned int current_position = genome_pos+backtrack_end->ix;
             //printf("backtrack_end->ix=%u; current_position=%u\n", backtrack_end->ix, current_position);
@@ -445,25 +450,51 @@ bool update_frequency_table(
                     continue;
             }
             switch (backtrack_end->type) {
-                    case 0:
                     case CODE_SUB:
-                            read_letter = read[backtrack_end->jx];
-                            if (read_letter > 3) {
-                                read_letter = read_letter>>1 & 0x3;
-                            }
-                            frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
-                            frequency_table[read_letter][current_position].score++;
-                            if (unsure) {
-                                frequency_table[read_letter][current_position].unsure_score++;
-                            }
-                            break;
+                        read_letter = read[backtrack_end->jx];
+                        if (read_letter > 3) {
+                            read_letter = read_letter>>1 & 0x3;
+                        }
+
+                        // update codependence info
+                        for (unsigned int i=0; i<variants_found; i++) {
+                            //pthread_mutex_lock(&codependence_list_mutex);
+                            add_codependence_info(&codependence_table[current_position], (int16_t) (variants_found_positions[i]-current_position), read_letter, variants_found_letters[i], ref_genome->fasta_file_size, &codependence_list_mutex);
+                            add_codependence_info(&codependence_table[variants_found_positions[i]], (int16_t) (current_position-variants_found_positions[i]), variants_found_letters[i], read_letter, ref_genome->fasta_file_size, &codependence_list_mutex);
+                            //pthread_mutex_unlock(&codependence_list_mutex);
+                        }
+                        variants_found_positions[variants_found] = current_position;
+                        variants_found_letters[variants_found] = read_letter;
+                        variants_found++;
+
+                        frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
+                        frequency_table[read_letter][current_position].score++;
+
+
+                        if (unsure) {
+                            frequency_table[read_letter][current_position].unsure_score++;
+                        }
+                        break;
+                    case 0:
+                        read_letter = read[backtrack_end->jx];
+                        if (read_letter > 3) {
+                            read_letter = read_letter>>1 & 0x3;
+                        }
+                        frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
+                        frequency_table[read_letter][current_position].score++;
+
+
+                        if (unsure) {
+                            frequency_table[read_letter][current_position].unsure_score++;
+                        }
+                        break;
                     case CODE_INS:
                     case CODE_DEL:
-                            has_indel = true;
-                            //LOG_WARN("unhandled indel\n");
-                            // TODO: handle indels
-                            break;
-                            // TODO: handle errors even if they should never happen
+                        has_indel = true;
+                        //LOG_WARN("unhandled indel\n");
+                        // TODO: handle indels
+                        break;
+                        // TODO: handle errors even if they should never happen
             }
     }
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 4);
@@ -936,6 +967,7 @@ void process_read_free()
     for (int i=0; i<NB_FREQ_TABLE_MUTEXES+1; i++) {
         assert(pthread_mutex_init(&freq_table_mutexes[i], NULL) == 0);
     }
+    assert(pthread_mutex_init(&codependence_list_mutex, NULL) == 0);
     printf("reads for which score not correctly computed: %u\n", reads_not_correct_cost);
     printf("reads for which score was correctly computed with DPD: %u\n", reads_correct_cost_DPD);
     printf("reads for which score was correctly computed with sub only: %u\n", reads_correct_cost_sub_only);

@@ -11,7 +11,7 @@ struct time_stat_t {
     clock_t substep_total_times[STAT_MAX_SUBSTEPS];
 };
 
-struct time_stat_t profiling[15];
+struct time_stat_t profiling[25];
 
 #define STAT_SUB_ONLY_PATH             0
 #define STAT_DPD                       1
@@ -28,6 +28,9 @@ struct time_stat_t profiling[15];
 #define STAT_THREAD_ACC                12
 #define STAT_THREAD_PROCESS            13
 #define STAT_DO_MAPPING                14
+#define STAT_ADD_CODEPENDENCE_INFO     15
+#define STAT_GET_NEW_CODEPENDENCE_INFO 16
+#define STAT_ALLOCATE_NEW_CHUNK        17
 
 #define STAT_RECORD_START(FUNCTION)                        \
     clock_t profiling_step_time, profiling_last_step_time; \
@@ -61,11 +64,32 @@ struct time_stat_t profiling[15];
     for (int i=0; i<STAT_MAX_SUBSTEPS; i++)                                \
     {                                                                      \
         if (profiling[FUNCTION].substep_total_times[i] > 0) {              \
-            printf("\t\t%d:\t", i);                                         \
+            printf("\t\t%d:\t", i);                                        \
             PRINT_MICROSECONDS(profiling[FUNCTION].substep_total_times[i]) \
             printf("\n");                                                  \
         }                                                                  \
     }
+
+#define PRINT_ALL_FUNCTION_STAT()                                       \
+    printf("\nprofiling:\n\n");                                         \
+    PRINT_FUNCTION_STAT(STAT_DO_MAPPING);                               \
+    PRINT_FUNCTION_STAT(STAT_THREAD_PROCESS);                           \
+    PRINT_FUNCTION_STAT(STAT_THREAD_ACC);                               \
+    PRINT_FUNCTION_STAT(STAT_THREAD_DISPATCH);                          \
+    PRINT_FUNCTION_STAT(STAT_THREAD_GET_READS);                         \
+    PRINT_FUNCTION_STAT(STAT_EXEC_DPUS);                                \
+    PRINT_FUNCTION_STAT(STAT_EXEC_ROUND);                               \
+    PRINT_FUNCTION_STAT(STAT_PROCESS_READ);                             \
+    PRINT_FUNCTION_STAT(STAT_DO_PROCESS_READ);                          \
+    PRINT_FUNCTION_STAT(STAT_ADD_TO_NON_MAPPED_READ);                   \
+    PRINT_FUNCTION_STAT(STAT_UPDATE_FREQUENCY_TABLE);                   \
+    PRINT_FUNCTION_STAT(STAT_GET_READ_UPDATE_POSITIONS);                \
+    PRINT_FUNCTION_STAT(STAT_CODE_ALIGNMENT);                           \
+    PRINT_FUNCTION_STAT(STAT_SUB_ONLY_PATH);                            \
+    PRINT_FUNCTION_STAT(STAT_DPD);                                      \
+    PRINT_FUNCTION_STAT(STAT_ADD_CODEPENDENCE_INFO);                    \
+    PRINT_FUNCTION_STAT(STAT_GET_NEW_CODEPENDENCE_INFO);                \
+    PRINT_FUNCTION_STAT(STAT_ALLOCATE_NEW_CHUNK);
     
 
 #endif /* __PROFILING_H__ */

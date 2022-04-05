@@ -6,6 +6,7 @@
 #define __GENOME_H__
 
 #include <stdint.h>
+#include <pthread.h>
 
 #define MAX_SEQ_GEN (24) // max number of chromosomes
 #define MAX_SEQ_NAME_SIZE (8)
@@ -36,7 +37,24 @@ struct frequency_info {
   unsigned int score;
   unsigned int unsure_score;
 };
+
+#pragma pack(push,1)
+struct variants_codependence_info {
+    uint16_t key;
+    uint8_t codependence_count;
+};
+
+#define COD_LIST_SIZE 4
+struct variants_codependence_info_list {
+    struct variants_codependence_info_list* next_list;
+    struct variants_codependence_info content[COD_LIST_SIZE];
+};
+#pragma pack(pop)
+
+void add_codependence_info(struct variants_codependence_info_list** next_variants_info_list, int16_t other_index_delta, uint8_t current_letter, uint8_t other_letter, unsigned int genome_size, pthread_mutex_t* mutex);
+
 struct frequency_info** get_frequency_table(); 
+struct variants_codependence_info_list** get_codependence_table(pthread_mutex_t* mutex);
 void free_frequency_table();
 
 #endif /* __GENOME_H__ */

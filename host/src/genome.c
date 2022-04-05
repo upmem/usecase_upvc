@@ -7,10 +7,13 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "genome.h"
 #include "parse_args.h"
 #include "upvc.h"
+#include "debug.h"
+#include "profiling.h"
 
 #define MAX_BUF_SIZE (1024)
 #define GENOME_BINARY "genome.bin"
@@ -121,18 +124,109 @@ void genome_free()
  * Each entry is a table of the size of the reference genome
  **/
 static struct frequency_info* frequency_table[5];
+static struct variants_codependence_info_list** variant_codependences;
+#define NB_CODEPENDENCE_CHUNK_DIV (1<<10)
+struct codependence_chunk* last_allocated_codependence_chunk[NB_CODEPENDENCE_CHUNK_DIV];
+unsigned int allocated_chunks = 0;//for debug purposes (TODO: remove)
 static bool init_frequency_table = false;
+static bool init_codependence_table = false;
+
+#define ALLOC_CHUNK_SIZE 100
+struct codependence_chunk {
+    struct codependence_chunk* previous_chunk;
+    struct codependence_chunk* next_chunk;
+    unsigned int next_slot_free;
+    struct variants_codependence_info_list codependence_info_lists[ALLOC_CHUNK_SIZE];
+};
+
+static void allocate_new_codependence_chunk(int i) {
+    STAT_RECORD_START(STAT_ALLOCATE_NEW_CHUNK);
+    struct codependence_chunk* new_chunk = calloc(1, sizeof(struct codependence_chunk));
+    new_chunk->previous_chunk = last_allocated_codependence_chunk[i];
+    new_chunk->next_slot_free = 0;
+    last_allocated_codependence_chunk[i] = new_chunk;
+    LOG_INFO("size of pointer: %d\n", (int) sizeof(void*));
+    LOG_INFO("size of co-info: %d\n", (int) sizeof(struct variants_codependence_info));
+    LOG_INFO("size of co-info-list: %d\n", (int) sizeof(struct variants_codependence_info_list));
+    LOG_INFO("size of chunk:   %d\n", (int) sizeof(struct codependence_chunk));
+    LOG_INFO("allocating new codependence chunk (%d)\n", ++allocated_chunks);
+    STAT_RECORD_LAST_STEP(STAT_ALLOCATE_NEW_CHUNK, 0);
+}
+
+static struct variants_codependence_info_list* get_new_codependence_info_list(int i) {
+    STAT_RECORD_START(STAT_GET_NEW_CODEPENDENCE_INFO);
+    if (last_allocated_codependence_chunk[i]->next_slot_free >= ALLOC_CHUNK_SIZE) {
+        allocate_new_codependence_chunk(i);
+    }
+    STAT_RECORD_LAST_STEP(STAT_GET_NEW_CODEPENDENCE_INFO, 0);
+    return &(last_allocated_codependence_chunk[i]->codependence_info_lists[(last_allocated_codependence_chunk[i]->next_slot_free)++]);
+}
+
+void add_codependence_info(struct variants_codependence_info_list** next_variants_info_list, int16_t other_index_delta, uint8_t current_letter, uint8_t other_letter, unsigned int genome_size, pthread_mutex_t* mutex)
+{
+    STAT_RECORD_START(STAT_ADD_CODEPENDENCE_INFO);
+    //struct variants_codependence_info_list** next_variants_info_list = &(freq_info->variants_codependence_list);
+    struct variants_codependence_info_list* last_variants_info_list = NULL;
+    uint16_t key = (uint16_t) ((other_index_delta<<4) | ((other_letter&0x3)<<2) | (current_letter&0x3));
+    for (;*next_variants_info_list != NULL; next_variants_info_list = &((*next_variants_info_list)->next_list)) {
+        for (int i=0; i<COD_LIST_SIZE; i++) {
+            if ((*next_variants_info_list)->content[i].key == key) {
+                if ((*next_variants_info_list)->content[i].codependence_count < UINT8_MAX)
+                        (*next_variants_info_list)->content[i].codependence_count++;
+                STAT_RECORD_LAST_STEP(STAT_ADD_CODEPENDENCE_INFO, 0);
+                return;
+            }
+        }
+        last_variants_info_list = *next_variants_info_list;
+    }
+    if (last_variants_info_list != NULL) {
+        for (int i=0; i<COD_LIST_SIZE; i++) {
+            if (last_variants_info_list->content[i].key == 0) {
+                last_variants_info_list->content[i].key = key;
+                last_variants_info_list->content[i].codependence_count = 1;
+                STAT_RECORD_LAST_STEP(STAT_ADD_CODEPENDENCE_INFO, 1);
+                return;
+            }
+        }
+    }
+    LOG_DEBUG("getting new codependence_info for : ? -> %010d (char:%d)\n", other_index_delta, other_letter);
+    int chunk_div_index = (other_index_delta*NB_CODEPENDENCE_CHUNK_DIV)/genome_size;
+    STAT_RECORD_STEP(STAT_ADD_CODEPENDENCE_INFO, 2);
+    pthread_mutex_lock(mutex);
+    STAT_RECORD_STEP(STAT_ADD_CODEPENDENCE_INFO, 3);
+    struct variants_codependence_info_list* new_info_list = get_new_codependence_info_list(chunk_div_index);
+    pthread_mutex_unlock(mutex);
+    new_info_list->next_list = NULL;
+    new_info_list->content[0].key = key;
+    new_info_list->content[0].codependence_count = 1;
+    *next_variants_info_list = new_info_list;
+    STAT_RECORD_LAST_STEP(STAT_ADD_CODEPENDENCE_INFO, 4);
+}
 
 struct frequency_info** get_frequency_table() { 
 
   if(!init_frequency_table) {
+    init_frequency_table = true;
     // allocate frequency_table on first call
     for(int i = 0; i < 5; ++i) {
       frequency_table[i] = (struct frequency_info*)calloc(genome.fasta_file_size, sizeof(struct frequency_info));
     }
-    init_frequency_table = true;
   }
   return frequency_table; 
+}
+
+struct variants_codependence_info_list** get_codependence_table(pthread_mutex_t* mutex) {
+    if(!init_codependence_table) {
+        pthread_mutex_lock(mutex);
+        init_codependence_table = true;
+        variant_codependences = (struct variants_codependence_info_list**)calloc(genome.fasta_file_size, sizeof(void*));
+        for (int i=0; i<NB_CODEPENDENCE_CHUNK_DIV; i++) {
+                last_allocated_codependence_chunk[i] = NULL;
+                allocate_new_codependence_chunk(i);
+        }
+        pthread_mutex_unlock(mutex);
+    }
+    return variant_codependences;
 }
 
 void free_frequency_table() {
@@ -140,6 +234,13 @@ void free_frequency_table() {
   if(init_frequency_table) {
     for(int i = 0; i < 5; ++i) {
       free(frequency_table[i]);
+    }
+    for (int i=0; i<NB_CODEPENDENCE_CHUNK_DIV; i++) {
+        struct codependence_chunk* to_delete_next = last_allocated_codependence_chunk[i]->previous_chunk;
+        for (;last_allocated_codependence_chunk[i] != NULL; to_delete_next = last_allocated_codependence_chunk[i]->previous_chunk) {
+            free(last_allocated_codependence_chunk[i]);
+            last_allocated_codependence_chunk[i] = to_delete_next;
+        }
     }
     init_frequency_table = false;
   }

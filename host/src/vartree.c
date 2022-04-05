@@ -86,7 +86,7 @@ void dump_freq_table(genome_t *ref_genome, struct frequency_info **frequency_tab
     close_freq_table();
 }
 
-#endif
+#endif // DUMP_FREQUENCY_TABLE
 
 static variant_t **variant_list[MAX_SEQ_GEN] = { NULL };
 static pthread_mutex_t mutex;
@@ -376,19 +376,19 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
   variant_t** results = calloc(5, sizeof(variant_t*));
   float total = 0;
   for(int i = 0; i < 5; ++i) {
-    total += frequency_table[i][genome_pos].score; 
+    total += frequency_table[i][genome_pos].freq; 
   }
   if(total == 0) 
     return results;
 
   for(int i = 0; i < 5; ++i) {
-    //float freq = frequency_table[i][genome_pos].freq;
-    uint32_t score = frequency_table[i][genome_pos].score;
+    float freq = frequency_table[i][genome_pos].freq;
+    //uint32_t score = frequency_table[i][genome_pos].score;
     if(i == ref_genome->data[genome_pos]) 
         continue; // not a variant if the same nucleotide as in reference genome
 
     // if frequency and depth pass the threshold, consider it a variant
-    if(score > reverse_filter(total)) {
+    if(freq > reverse_filter(total)) {
 
         // this is a substitution, create variant
         variant_t *var = (variant_t *)malloc(sizeof(variant_t));
@@ -405,6 +405,22 @@ static variant_t ** get_most_frequent_variant(genome_t * ref_genome, struct freq
 
   return results;
 }
+
+static void add_codependence_to_freq_table(struct frequency_info** frequency_table, struct variants_codependence_info_list* codependence_list, uint64_t position, uint8_t letter, float freq_update) {
+    for (;codependence_list != NULL; codependence_list=codependence_list->next_list) {
+        for (int i = 0; i<COD_LIST_SIZE && codependence_list->content[i].key != 0; i++) {
+            uint8_t current_letter = codependence_list->content[i].key & 0x3;
+            if (current_letter == letter) {
+                uint8_t other_letter = (codependence_list->content[i].key >> 2) & 0x3;
+                uint64_t position_delta = codependence_list->content[i].key >> 4;
+                frequency_table[other_letter][position + position_delta].freq += (codependence_list->content[i].codependence_count) * freq_update;
+            }
+        }
+    }
+}
+
+#define POSITIVE_COD_INFLUENCE 0.02
+#define NEGATIVE_COD_INFLUENCE -0.2
 
 //TODO here read frequency table and write vcf (take max of frequency table to find substitution if any)
 void create_vcf()
@@ -444,6 +460,7 @@ void create_vcf()
     /* ####### END OF HEADER ####### */
 
     struct frequency_info **frequency_table = get_frequency_table();
+    struct variants_codependence_info_list** codependence_table = get_codependence_table(NULL);// giving a NULL pointer should only work if the table is already allocated; which should be the case
     uint32_t nb_pos_multiple_var = 0;
 
     /**
@@ -502,6 +519,25 @@ void create_vcf()
     unsigned int position_most_coverage = 0;
     unsigned int chromosome_most_coverage = 99999;
     unsigned int total_coverage = 0;
+    // First pass on the frequency table to take into account variant codependence
+    LOG_INFO("doing first pass of vc\n");
+    /* for each sequence in the genome */
+    for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+        /* for each position in the sequence */
+        for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
+            variant_t ** results = get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position);
+            for (uint8_t i=0; i<4; i++) {
+                uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
+                if (results[i]) {
+                    add_codependence_to_freq_table(frequency_table, codependence_table[genome_pos], genome_pos, i, POSITIVE_COD_INFLUENCE);
+                } else if (frequency_table[i][genome_pos].score>0) {
+                    add_codependence_to_freq_table(frequency_table, codependence_table[genome_pos], genome_pos, i, NEGATIVE_COD_INFLUENCE);
+                }
+            }
+        }
+    }
+
+    LOG_INFO("doing second and final pass of vc\n");
     /* for each sequence in the genome */
     for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
         /* for each position in the sequence */
