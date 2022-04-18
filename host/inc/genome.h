@@ -40,7 +40,7 @@ struct frequency_info {
 
 #pragma pack(push,1)
 struct variants_codependence_info {
-    uint16_t key;
+    int16_t key;
     uint8_t codependence_count;
 };
 
@@ -56,5 +56,6 @@ void add_codependence_info(struct variants_codependence_info_list** next_variant
 struct frequency_info** get_frequency_table(); 
 struct variants_codependence_info_list** get_codependence_table(pthread_mutex_t* mutex);
 void free_frequency_table();
+void free_codependence_chunks();
 
 #endif /* __GENOME_H__ */

@@ -21,7 +21,7 @@
 #include "parse_args.h"
 #include "profiling.h"
 
-#define DEBUG_READ_MAPPING true
+#define DEBUG_READ_MAPPING false
 
 #define SIZE_INSERT_MEAN (400)
 #define SIZE_INSERT_STD (3 * 50)
@@ -475,7 +475,7 @@ bool update_frequency_table(
                             frequency_table[read_letter][current_position].unsure_score++;
                         }
                         break;
-                    case 0:
+                    case 0: // FIXME : CODE_MATCH
                         read_letter = read[backtrack_end->jx];
                         if (read_letter > 3) {
                             read_letter = read_letter>>1 & 0x3;

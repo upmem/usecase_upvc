@@ -42,6 +42,7 @@ void genome_load()
         && "Wrong header, make sure you have generated your MRAMs with the same version of UPVC that you are using.");
     assert(genome.version == GENOME_VERSION && "Could not load a genome generated with a different version of UPVC.");
 
+    LOG_INFO("allocating genome data (%luMB + %luMB)\n", sizeof(int8_t) * genome.fasta_file_size/1000000, sizeof(int32_t) * genome.fasta_file_size/1000000);
     genome.data = (int8_t *)malloc(sizeof(int8_t) * genome.fasta_file_size);
     genome.mapping_coverage = (int32_t *)calloc(sizeof(int32_t), genome.fasta_file_size);
     assert(genome.data != NULL && genome.mapping_coverage != NULL);
@@ -72,6 +73,7 @@ void genome_create()
     genome.fasta_file_size = ftell(genome_file);
     rewind(genome_file);
 
+    LOG_INFO("allocating genome data (%luMB)\n", sizeof(int8_t) * genome.fasta_file_size/1000000);
     genome.data = (int8_t *)malloc(sizeof(int8_t) * genome.fasta_file_size);
     assert(genome.data != NULL);
     genome.nb_seq = 0;
@@ -141,15 +143,16 @@ struct codependence_chunk {
 
 static void allocate_new_codependence_chunk(int i) {
     STAT_RECORD_START(STAT_ALLOCATE_NEW_CHUNK);
+    // LOG_INFO("size of pointer: %d\n", (int) sizeof(void*));
+    // LOG_INFO("size of co-info: %d\n", (int) sizeof(struct variants_codependence_info));
+    // LOG_INFO("size of co-info-list: %d\n", (int) sizeof(struct variants_codependence_info_list));
+    LOG_INFO("size of chunk:   %d\n", (int) sizeof(struct codependence_chunk));
+    LOG_INFO("allocating new codependence chunk (%d)\n", ++allocated_chunks);
     struct codependence_chunk* new_chunk = calloc(1, sizeof(struct codependence_chunk));
+    assert(new_chunk != NULL);
     new_chunk->previous_chunk = last_allocated_codependence_chunk[i];
     new_chunk->next_slot_free = 0;
     last_allocated_codependence_chunk[i] = new_chunk;
-    LOG_INFO("size of pointer: %d\n", (int) sizeof(void*));
-    LOG_INFO("size of co-info: %d\n", (int) sizeof(struct variants_codependence_info));
-    LOG_INFO("size of co-info-list: %d\n", (int) sizeof(struct variants_codependence_info_list));
-    LOG_INFO("size of chunk:   %d\n", (int) sizeof(struct codependence_chunk));
-    LOG_INFO("allocating new codependence chunk (%d)\n", ++allocated_chunks);
     STAT_RECORD_LAST_STEP(STAT_ALLOCATE_NEW_CHUNK, 0);
 }
 
@@ -167,7 +170,7 @@ void add_codependence_info(struct variants_codependence_info_list** next_variant
     STAT_RECORD_START(STAT_ADD_CODEPENDENCE_INFO);
     //struct variants_codependence_info_list** next_variants_info_list = &(freq_info->variants_codependence_list);
     struct variants_codependence_info_list* last_variants_info_list = NULL;
-    uint16_t key = (uint16_t) ((other_index_delta<<4) | ((other_letter&0x3)<<2) | (current_letter&0x3));
+    int16_t key = (int16_t) ((other_index_delta<<4) | ((other_letter&0x3)<<2) | (current_letter&0x3));
     for (;*next_variants_info_list != NULL; next_variants_info_list = &((*next_variants_info_list)->next_list)) {
         for (int i=0; i<COD_LIST_SIZE; i++) {
             if ((*next_variants_info_list)->content[i].key == key) {
@@ -207,9 +210,11 @@ struct frequency_info** get_frequency_table() {
 
   if(!init_frequency_table) {
     init_frequency_table = true;
+    LOG_INFO("allocating frequency_table (5x%luMB)\n", sizeof(struct frequency_info)*genome.fasta_file_size/1000000);
     // allocate frequency_table on first call
     for(int i = 0; i < 5; ++i) {
       frequency_table[i] = (struct frequency_info*)calloc(genome.fasta_file_size, sizeof(struct frequency_info));
+      assert(frequency_table[i] != NULL);
     }
   }
   return frequency_table; 
@@ -218,11 +223,15 @@ struct frequency_info** get_frequency_table() {
 struct variants_codependence_info_list** get_codependence_table(pthread_mutex_t* mutex) {
     if(!init_codependence_table) {
         pthread_mutex_lock(mutex);
-        init_codependence_table = true;
-        variant_codependences = (struct variants_codependence_info_list**)calloc(genome.fasta_file_size, sizeof(void*));
-        for (int i=0; i<NB_CODEPENDENCE_CHUNK_DIV; i++) {
+        if (!init_codependence_table) {
+            LOG_INFO("allocating variant codependences lists (%luMB)\n", genome.fasta_file_size*sizeof(void*)/1000000);
+            variant_codependences = (struct variants_codependence_info_list**)calloc(genome.fasta_file_size, sizeof(void*));
+            assert(variant_codependences != NULL);
+            for (int i=0; i<NB_CODEPENDENCE_CHUNK_DIV; i++) {
                 last_allocated_codependence_chunk[i] = NULL;
                 allocate_new_codependence_chunk(i);
+            }
+            init_codependence_table = true;
         }
         pthread_mutex_unlock(mutex);
     }
@@ -230,21 +239,26 @@ struct variants_codependence_info_list** get_codependence_table(pthread_mutex_t*
 }
 
 void free_frequency_table() {
-
   if(init_frequency_table) {
     for(int i = 0; i < 5; ++i) {
       free(frequency_table[i]);
-    }
-    for (int i=0; i<NB_CODEPENDENCE_CHUNK_DIV; i++) {
-        struct codependence_chunk* to_delete_next = last_allocated_codependence_chunk[i]->previous_chunk;
-        for (;last_allocated_codependence_chunk[i] != NULL; to_delete_next = last_allocated_codependence_chunk[i]->previous_chunk) {
-            free(last_allocated_codependence_chunk[i]);
-            last_allocated_codependence_chunk[i] = to_delete_next;
-        }
     }
     init_frequency_table = false;
   }
 }
 
-
+void free_codependence_chunks() {
+  // !!! This function does not remove pointers which are now pointing to unallocated regions
+  LOG_INFO("deallocating codependence chunks\n");
+  if(init_codependence_table) {
+    for (int i=0; i<NB_CODEPENDENCE_CHUNK_DIV; i++) {
+        struct codependence_chunk* to_delete_next = last_allocated_codependence_chunk[i];
+        for (;last_allocated_codependence_chunk[i] != NULL; last_allocated_codependence_chunk[i] = to_delete_next) {
+            to_delete_next = last_allocated_codependence_chunk[i]->previous_chunk;
+            free(last_allocated_codependence_chunk[i]);
+        }
+    }
+    init_codependence_table = false;
+  }
+}
 
