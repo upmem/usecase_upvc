@@ -358,8 +358,8 @@ __attribute__((unused)) uint32_t depth_filter_fixed_3_f15(float freq) {
   return 3;
 }
 
-#define AFFINE_B 1.12795388963028
-#define AFFINE_A 0.090970032203921
+#define AFFINE_B 1.37459
+#define AFFINE_A 0.0646469
 
 float reverse_filter(uint32_t score) {
     return AFFINE_A*(float)score + AFFINE_B;
@@ -423,8 +423,8 @@ static void add_codependence_to_freq_table(struct frequency_info** frequency_tab
     }
 }
 
-#define POSITIVE_COD_INFLUENCE 0.00609352
-#define NEGATIVE_COD_INFLUENCE -0.129805
+#define POSITIVE_COD_INFLUENCE 0.00687069
+#define NEGATIVE_COD_INFLUENCE -0.236244
 
 //TODO here read frequency table and write vcf (take max of frequency table to find substitution if any)
 void create_vcf()
