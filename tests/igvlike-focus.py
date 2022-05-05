@@ -117,7 +117,9 @@ def get_intersecting_mappings(file_names, chromosome, start, end, max_read_size)
                         current_chr, index, address = line.split()
                         index = int(index)
                         address = int(address)
-                        if current_chr == chromosome and index >= start:
+                        if current_chr == chromosome and index >= start or current_chr != chromosome and last_chr == chromosome:
+                            if verbose>1:
+                                print("starting reading ("+current_chr+":"+str(index)+") at "+str(address))
                             break
                     mmap_map_file.seek(int(last_address))
                     yielded_line = False

@@ -424,7 +424,7 @@ bool update_frequency_table(
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 1);
 
     #if DEBUG_READ_MAPPING
-    write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], genome_pos, backtrack_end, read, num);
+    write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], result_tab[pos].coord.seed_nr, backtrack_end, read, num);
     #endif
 
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 2);
@@ -762,8 +762,8 @@ static void do_process_read(process_read_arg_t *arg)
             LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
           }*/
         }
-      }
-      if (true) {
+      } else {
+      //if (true) {
 
         // check mapping of R1 and R2 independently
         unsigned int best_score_R1[2] = { INVALID_SCORE, INVALID_SCORE };

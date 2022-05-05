@@ -2,6 +2,7 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#include <math.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -522,7 +523,8 @@ void create_vcf()
     unsigned int max_coverage = 0;
     unsigned int position_most_coverage = 0;
     unsigned int chromosome_most_coverage = 99999;
-    unsigned int total_coverage = 0;
+    uint64_t total_coverage = 0;
+    uint64_t total_cov_squared = 0;
     variant_t variants_to_call[5];
     // First pass on the frequency table to take into account variant codependence
     LOG_INFO("doing first pass of vc\n");
@@ -559,16 +561,16 @@ void create_vcf()
             total_score += frequency_table[2][ref_genome->pt_seq[seq_number] + seq_position].score;
             total_score += frequency_table[3][ref_genome->pt_seq[seq_number] + seq_position].score;
             total_coverage += total_score;
+            total_cov_squared += total_score*total_score;
             //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
             if (total_score == 0) {
                     uncovered_nucleotides++;
             } else if (total_score < 10) {
                     badly_covered_nucleotides++;
-            } else {
+            } else if (total_score < 90) {
                     well_covered_nucleotides++;
-                    if (total_score > 50) {
-                            overly_covered_nucleotides++;
-                    }
+            } else {
+                    overly_covered_nucleotides++;
                     if (total_score > max_coverage) {
                             max_coverage = total_score;
                             chromosome_most_coverage = seq_number;
@@ -601,17 +603,20 @@ void create_vcf()
 		    (long)badly_covered_nucleotides,
 		    (long)badly_covered_nucleotides*100/total_nucleotides,
 		    (long)badly_covered_nucleotides*10000/total_nucleotides%100);
-    printf("\twell covered nucleotides (10 reads or more): %lu (%lu.%lu%%)\n",
+    printf("\twell covered nucleotides (10 to 90 reads): %lu (%lu.%lu%%)\n",
 		    (long)well_covered_nucleotides,
 		    (long)well_covered_nucleotides*100/total_nucleotides,
 		    (long)well_covered_nucleotides*10000/total_nucleotides%100);
-    printf("\toverly covered nucleotides (more than 50 reads): %lu (%lu.%lu%%)\n",
+    printf("\toverly covered nucleotides (more than 90 reads): %lu (%lu.%lu%%)\n",
 		    (long)overly_covered_nucleotides,
 		    (long)overly_covered_nucleotides*100/total_nucleotides,
 		    (long)overly_covered_nucleotides*10000/total_nucleotides%100);
     printf("\tmax coverage: %u reads\n", max_coverage);
     printf("\tmax coverage position: chr%u:%u\n", chromosome_most_coverage, position_most_coverage);
-    printf("\ttotal coverage: %u (eq %lu reads; or %lux coverage)\n", total_coverage, (long)total_coverage/SIZE_READ, (long)total_coverage/total_nucleotides);
+    printf("\ttotal coverage: %lu (eq %lu reads; or %lux coverage)\n", total_coverage, (long)total_coverage/SIZE_READ, (long)total_coverage/total_nucleotides);
+   double mean = ((double)total_coverage) / (double) total_nucleotides;
+    printf("\tmean cov: %f (std dev: %f)\n", mean, sqrt((double)total_cov_squared/(double)total_nucleotides - mean*mean));
     printf("\tnumber of variants: %d (multiple %d)\n", nb_variant, nb_pos_multiple_var);
     printf("\ttime: %lf s\n", my_clock() - start_time);
+    fflush(stdout);
 }
