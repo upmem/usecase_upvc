@@ -25,6 +25,7 @@ static char *input_path = NULL;
 static bool simulation_mode = false;
 static bool no_filter = false;
 static bool index_with_dpus = false;
+static bool use_freq_table = false;
 static goal_t goal = goal_unknown;
 static unsigned int nb_dpu = DPU_ALLOCATE_ALL;
 static unsigned int nb_thread_for_simu = UINT_MAX;
@@ -35,14 +36,15 @@ static void usage()
 {
     ERROR_EXIT(ERR_USAGE,
         "\nusage: %s -i <input_prefix> -g <goal> [ -s [ -t <number_of_thread_for_dpu_simulation> ] | -n <number_of_dpus>] [ -d "
-        "]\n"
+        "] [ -q ]\n"
         "options:\n"
         "\t-i\tInput prefix that will be used to find the inputs files\n"
         "\t-g\tGoal of the run - values=index|map\n"
         "\t-d\tTry to use Hardware DPU to help indexing\n"
         "\t-s\tSimulation mode (not compatible with -n)\n"
         "\t-t\tNumber of thread to use to simulate DPUs (only in simulation mode) (default: 1/2 of the threads of the system)\n"
-        "\t-n\tNumber of DPUs to use when not in simulation mode (default: use all available DPUs)\n",
+        "\t-n\tNumber of DPUs to use when not in simulation mode (default: use all available DPUs)\n"
+        "\t-q\tUse a frequency table for variant calling (more precise but doesn't call indels)",
         prog_name);
 }
 
@@ -164,6 +166,15 @@ unsigned int get_nb_thread_for_simu() { return nb_thread_for_simu; }
 
 /**************************************************************************************/
 /**************************************************************************************/
+//TODO: validate use_freq_table
+static void validate_use_frequency_table() {
+    use_freq_table = true;
+}
+
+bool get_use_frequency_table() { return use_freq_table; }
+
+/**************************************************************************************/
+/**************************************************************************************/
 void validate_args(int argc, char **argv)
 {
     int opt;
@@ -172,7 +183,7 @@ void validate_args(int argc, char **argv)
     prog_name = strdup(argv[0]);
     check_permission();
 
-    while ((opt = getopt(argc, argv, "dfsi:g:n:t:")) != -1) {
+    while ((opt = getopt(argc, argv, "dfsqi:g:n:t:")) != -1) {
         switch (opt) {
         case 'd':
             validate_index_with_dpus_mode();
@@ -194,6 +205,9 @@ void validate_args(int argc, char **argv)
             break;
         case 'f':
             validate_no_filter();
+            break;
+        case 'q':
+            validate_use_frequency_table();
             break;
         default:
             ERROR("unknown option");

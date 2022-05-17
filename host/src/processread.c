@@ -81,6 +81,7 @@ static void DPD_compute(
     *Pij = min(Dijm + COST_GAPO, Pijm + COST_GAPE);
     // Similar for deletion :
     *Qij = min(Dimj + COST_GAPO, Qimj + COST_GAPE);
+    *xij = 0;
 
     //x_i_j is the backtracking
     *xij = 0;
@@ -203,7 +204,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
      */
     
 
-    // Compute first triangle (bottom left part)
+    // Compute first trapezoid (bottom left part)
     for (int i = 1; i < diagonal; i++) {
         for (int j = 1; j < i + diagonal; j++) {
             DPD_compute(s1[i - 1], s2[j - 1], &D[i][j], D[i][j - 1], D[i - 1][j], D[i - 1][j - 1], &P[i][j], P[i][j - 1],
@@ -266,7 +267,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
      *   i->
      */
 
-    // Compute last triangle (top right part)
+    // Compute last trapezoid (top right part)
     // (And check for best score in top-most row of D matrix)
     for (int i = matrix_size - diagonal; i < matrix_size; i++) {
         P[i][i - diagonal] = PQD_INIT_VAL;
@@ -320,41 +321,41 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
         int i = min_score_i_idx;
         int j = min_score_j_idx;
         backtrack[0].type = CODE_END;
-	(*backtrack_end) = &backtrack[1];
+        (*backtrack_end) = &backtrack[1];
         while ((i > 0) || (j > 0)) {
             if(X[i][j] == 0) {
-		    // Operation 0 : sequences match and nothing was done : decrease both indices.
-		    i--;
-		    j--;
-		    (*backtrack_end)->type = 0; // FIXME : use CODE_??? instead of 0
-		    (*backtrack_end)->ix = i;
-		    (*backtrack_end)->jx = j;
-		    (*backtrack_end)++;
-	    } else if(X[i][j] == 1) {
-		    // Operation 1 : substitution : decrease both indices and store substitution code.
-		    i--;
-		    j--;
-		    (*backtrack_end)->type = CODE_SUB;
-		    (*backtrack_end)->ix = i;
-		    (*backtrack_end)->jx = j;
-		    (*backtrack_end)++;
-	    } else if(X[i][j] == 2) {
-		    // Operation 2 : insertion : decrease read index but not genome index and store insertion code.
-		    j--;
-		    (*backtrack_end)->type = CODE_INS;
-		    (*backtrack_end)->ix = i;
-		    (*backtrack_end)->jx = j;
-		    (*backtrack_end)++;
-	    } else {
-		    // Operation 3 : deletion : decrease genome index but not read index and store deletion code.
-		    i--;
-		    (*backtrack_end)->type = CODE_DEL;
-		    (*backtrack_end)->ix = i;
-		    (*backtrack_end)->jx = j;
-		    (*backtrack_end)++;
+		        // Operation 0 : sequences match and nothing was done : decrease both indices.
+		        i--;
+		        j--;
+		        (*backtrack_end)->type = 0; // FIXME : use CODE_??? instead of 0
+		        (*backtrack_end)->ix = i;
+		        (*backtrack_end)->jx = j;
+		        (*backtrack_end)++;
+	        } else if(X[i][j] == 1) {
+		        // Operation 1 : substitution : decrease both indices and store substitution code.
+		        i--;
+		        j--;
+		        (*backtrack_end)->type = CODE_SUB;
+		        (*backtrack_end)->ix = i;
+		        (*backtrack_end)->jx = j;
+		        (*backtrack_end)++;
+	        } else if(X[i][j] == 2) {
+		        // Operation 2 : insertion : decrease read index but not genome index and store insertion code.
+		        j--;
+		        (*backtrack_end)->type = CODE_INS;
+		        (*backtrack_end)->ix = i;
+		        (*backtrack_end)->jx = j;
+		        (*backtrack_end)++;
+	        } else {
+		        // Operation 3 : deletion : decrease genome index but not read index and store deletion code.
+		        i--;
+		        (*backtrack_end)->type = CODE_DEL;
+		        (*backtrack_end)->ix = i;
+		        (*backtrack_end)->jx = j;
+		        (*backtrack_end)++;
+	        }
 	    }
-	}
-    (*backtrack_end)--;
+        (*backtrack_end)--;
     }
 
     STAT_RECORD_LAST_STEP(STAT_DPD, 5);
@@ -390,34 +391,15 @@ bool update_frequency_table(
 
 	/* First, try substitutions only */
 	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
-    //bool used_dpd = false;
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 0);
 
 	if (computed_score > result_tab[pos].score) {
-            /*
-            if (result_tab[pos].coord.nodp) {
-                LOG_ERROR("dpu result found with nodp but score not matched with sub only (DPU:%u, host:%d)\n", result_tab[pos].score, computed_score);
-            }
-            */
             computed_score = DPD(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
-            //used_dpd = true;
             if (computed_score == result_tab[pos].score) {
                 reads_correct_cost_DPD++;
             } else {
                 reads_not_correct_cost++;
             }
-            /*
-            if (computed_score > result_tab[pos].score) {
-                pthread_mutex_lock(&print_mutex);
-                LOG_WARN("found a computed score of %d where DPU found score of %u\n", computed_score, result_tab[pos].score);
-                printf("ref:  ");
-                log_nucleotides(&(ref_genome->data[genome_pos]), 130);
-                printf("\nread: ");
-                log_nucleotides(read, 120);
-                printf("\n");
-                pthread_mutex_unlock(&print_mutex);
-            }
-            */
 	} else {
         reads_correct_cost_sub_only++;
     }
@@ -574,6 +556,181 @@ static unsigned get_nb_scores(unsigned int * best_score) {
     return np;
 }
 
+static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer)
+{
+    int8_t *read = &reads_buffer[result_match.num * SIZE_READ];
+    char nucleotide[4] = { 'A', 'C', 'T', 'G' };
+    uint64_t genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
+
+    /* Get the differences betweend the read and the sequence of the reference genome that match */
+    read = &reads_buffer[result_match.num * SIZE_READ];
+
+    // code_alignment(code_result_tab, result_match.score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols);
+	backtrack_t backtrack[SIZE_READ<<1];
+	backtrack_t * backtrack_end = backtrack;
+
+	/* First, try substitutions only */
+	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
+
+	if (computed_score > result_match.score) {
+            computed_score = DPD(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
+            if (computed_score == result_match.score) {
+                reads_correct_cost_DPD++;
+            } else {
+                reads_not_correct_cost++;
+            }
+	} else {
+        reads_correct_cost_sub_only++;
+    }
+
+    if (backtrack_end->type == CODE_ERR)
+        return;
+
+    /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
+    for (int i = 0; i < SIZE_READ; i++) {
+        ref_genome->mapping_coverage[genome_pos + i] += 1;
+    }
+
+	for (; backtrack_end > backtrack; backtrack_end--) {
+            unsigned int current_position = genome_pos+backtrack_end->ix;
+            //printf("backtrack_end->ix=%u; current_position=%u\n", backtrack_end->ix, current_position);
+            if (current_position > ref_genome->fasta_file_size) {
+                    continue;
+            }
+
+            if (backtrack_end->type != 0) {
+                variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
+                newvar->depth = 1;
+                newvar->score = 1;
+                newvar->next = NULL;
+                int alt_idx = 0;
+                int ref_idx = 0;
+                int64_t pos_variant_genome = genome_pos + backtrack_end->ix;
+
+                switch (backtrack_end->type) {
+                    case CODE_INS:
+                    case CODE_DEL:
+                        pos_variant_genome--;
+                        newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+(backtrack_end+1)->ix] & 0x3];
+                        newvar->alt[alt_idx++] = nucleotide[read[(backtrack_end+1)->jx] & 0x3];
+                        break;
+                }
+
+                for (;backtrack_end->type != 0 && backtrack_end->type != CODE_END; backtrack_end--) {
+                    switch (backtrack_end->type) {
+                        case CODE_SUB:
+                            newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
+                            newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
+                            if (alt_idx >= MAX_SIZE_ALLELE || ref_idx >= MAX_SIZE_ALLELE) {
+                                LOG_WARN("ignored read because of a too complex variant\n")
+                            }
+                            break;
+                        case CODE_INS:
+                            newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
+                            if (alt_idx >= MAX_SIZE_ALLELE) {
+                                LOG_WARN("ignored read because of a too complex variant\n")
+                            }
+                            break;
+                        case CODE_DEL:
+                            newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
+                            if (ref_idx >= MAX_SIZE_ALLELE) {
+                                LOG_WARN("ignored read because of a too complex variant\n")
+                            }
+                            break;
+                    }
+                }
+                newvar->ref[ref_idx] = '\0';
+                newvar->alt[alt_idx] = '\0';
+                variant_tree_insert(
+                                newvar, result_match.coord.seq_nr, pos_variant_genome - ref_genome->pt_seq[result_match.coord.seq_nr]);
+
+            }
+    }
+    // TODO: remove following code
+    #if false
+    code_result_idx = 0;
+    while (code_result_tab[code_result_idx] != CODE_END) {
+        int code_result = code_result_tab[code_result_idx];
+        int64_t pos_variant_read = code_result_tab[code_result_idx + 1];
+        int64_t pos_variant_genome = genome_pos + pos_variant_read;
+        int ref_pos = 0;
+        int alt_pos = 0;
+        variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
+        newvar->depth = 1;
+        newvar->score = result_match.score;
+        newvar->next = NULL;
+        if (code_result == CODE_SUB) {
+            /* SNP = 0,1,2,3  (code A,C,T,G) */
+            int snp = code_result_tab[code_result_idx + 2];
+            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+            newvar->alt[alt_pos++] = nucleotide[snp & 3];
+
+            code_result_idx += 3;
+        } else if (code_result == CODE_INS) {
+            int64_t ps_var_genome = pos_variant_genome;
+            int64_t ps_var_read = pos_variant_read;
+            code_result_idx += 2;
+
+            while (code_result_tab[code_result_idx] < 4) {
+                ps_var_read++;
+                code_result_idx++;
+            }
+
+            while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
+                ps_var_genome--;
+                ps_var_read--;
+                pos_variant_genome--;
+                pos_variant_read--;
+            }
+
+            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+
+            while (pos_variant_read <= ps_var_read) {
+                newvar->alt[alt_pos++] = nucleotide[read[pos_variant_read] & 3];
+                if (alt_pos >= MAX_SIZE_ALLELE - 1) {
+                    free(newvar);
+                    return;
+                }
+                pos_variant_read++;
+            }
+
+        } else if (code_result == CODE_DEL) {
+            int64_t ps_var_genome = pos_variant_genome;
+            int64_t ps_var_read = pos_variant_read;
+            code_result_idx += 2;
+
+            while (code_result_tab[code_result_idx] < 4) {
+                ps_var_genome++;
+                code_result_idx++;
+            }
+
+            while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
+                ps_var_read--;
+                ps_var_genome--;
+                pos_variant_genome--;
+                pos_variant_read--;
+            }
+
+            newvar->alt[alt_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+
+            while (pos_variant_genome <= ps_var_genome) {
+                newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
+                if (ref_pos >= MAX_SIZE_ALLELE - 1) {
+                    free(newvar);
+                    return;
+                }
+                pos_variant_genome++;
+            }
+            pos_variant_genome -= ref_pos;
+        }
+        newvar->ref[ref_pos] = '\0';
+        newvar->alt[alt_pos] = '\0';
+        variant_tree_insert(
+            newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
+    }
+    #endif
+}
+
 static pthread_mutex_t non_mapped_mutex;
 static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
 {
@@ -583,19 +740,18 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     pthread_mutex_lock(&non_mapped_mutex);
     STAT_RECORD_STEP(STAT_ADD_TO_NON_MAPPED_READ, 0);
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
-    int size_read = SIZE_READ;
-    int8_t *read = &reads_buffer[numread * size_read];
+    int8_t *read = &reads_buffer[numread * SIZE_READ];
     fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
-    for (int j = SIZE_SEED; j < size_read; j++) {
+    for (int j = SIZE_SEED; j < SIZE_READ; j++) {
         fprintf(fpe1, "%c", nucleotide[read[j] & 3]);
     }
     for (int j = 0; j < SIZE_SEED; j++) {
         fprintf(fpe1, "A");
     }
     fprintf(fpe1, "\n");
-    read = &reads_buffer[(numread + 2) * size_read];
+    read = &reads_buffer[(numread + 2) * SIZE_READ];
     fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
-    for (int j = SIZE_SEED; j < size_read; j++) {
+    for (int j = SIZE_SEED; j < SIZE_READ; j++) {
         fprintf(fpe2, "%c", nucleotide[read[j] & 3]);
     }
     for (int j = 0; j < SIZE_SEED; j++) {
@@ -731,14 +887,26 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_PAIR_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            } else {
+                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
+                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
+            }
             update = true;
           } else {
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, true);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, true);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[1], mapq, true);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[1], mapq, true);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, true);
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, true);
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[1], mapq, true);
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[1], mapq, true);
+            } else {
+                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
+                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
+                set_variant(result_tab[P1[1]], ref_genome, reads_buffer);
+                set_variant(result_tab[P2[1]], ref_genome, reads_buffer);
+            }
             // LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
           }
         }
@@ -755,15 +923,20 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_PAIR_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            } else {
+                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
+                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
+            }
             update = true;
           }/* else {
             LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
           }*/
         }
-      } else {
-      //if (true) {
+      }// else {
+      if (true) {
 
         // check mapping of R1 and R2 independently
         unsigned int best_score_R1[2] = { INVALID_SCORE, INVALID_SCORE };
@@ -800,7 +973,11 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+            } else {
+                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
+            }
             update = true;
           }
         }
@@ -819,7 +996,11 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
+            } else {
+                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
+            }
             update = true;
           }
         }
@@ -842,7 +1023,11 @@ static void do_process_read(process_read_arg_t *arg)
           if(delta >= DIST_SINGLE_THRESHOLD) {
 #endif
 
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            } else {
+                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
+            }
             update = true;
           }
         }
@@ -861,7 +1046,11 @@ static void do_process_read(process_read_arg_t *arg)
 #else
           if (delta >= DIST_SINGLE_THRESHOLD) {
 #endif
-            hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            if (get_use_frequency_table()) {
+                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
+            } else {
+                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
+            }
             update = true;
           }
         }

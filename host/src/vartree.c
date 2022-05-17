@@ -38,6 +38,8 @@ void close_freq_table()
     fclose(freq_table_dump_file);
 }
 
+
+
 //The pragma pack shouldn't have any effect here as of now but it might have an effect if struct content is modified
 //In which case it should probably be kept.
 #pragma pack(push,1)
@@ -118,7 +120,6 @@ void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr
     }
     var->next = *entry;
     *entry = var;
-
 end:
     pthread_mutex_unlock(&mutex);
 }
@@ -145,7 +146,6 @@ typedef struct {
     uint32_t score;
 } depth_filter_t;
 
-#if 0
 #if (SIZE_READ == 120)
 depth_filter_t sub_filter[] = {
     [3] = { 15, 16 },
@@ -217,9 +217,7 @@ depth_filter_t indel_filter[] = {
 #else
 #error "Filter not defined for this size of read"
 #endif
-#endif
 
-#if 0
 static bool homopolymer(int8_t *seq, int offset)
 {
     for (int i = 0; i < offset - 1; i++) {
@@ -229,9 +227,8 @@ static bool homopolymer(int8_t *seq, int offset)
     }
     return true;
 }
-#endif
 
-static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
+static bool print_var_from_freq_table(variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
 {
     char *chr = ref_genome->seq_name[seq_nr];
     uint64_t genome_pos = ref_genome->pt_seq[seq_nr] + seq_pos;
@@ -280,6 +277,54 @@ print:
     //TODO
     fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos+1, var->ref, var->alt, var->depth, cov,
         score);
+
+    return true;
+}
+
+static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos, genome_t *ref_genome, FILE *vcf_file)
+{
+    char *chr = ref_genome->seq_name[seq_nr];
+    uint64_t genome_pos = ref_genome->pt_seq[seq_nr] + seq_pos;
+    uint32_t cov = ref_genome->mapping_coverage[genome_pos];
+    uint32_t depth = var->depth;
+    uint32_t score = var->score / depth;
+    uint32_t percentage = 100;
+    if (cov != 0) {
+        percentage = depth * 100 / cov;
+    }
+
+    uint32_t ref_len = strlen(var->ref);
+    uint32_t alt_len = strlen(var->alt);
+    if (ref_len > alt_len && percentage <= 25 && homopolymer(&ref_genome->data[genome_pos - 12], 12)) {
+        return false;
+    }
+
+    if (get_no_filter())
+        goto print;
+
+    if (ref_len == alt_len) { /* SUBSTITUTION */
+        if (depth < 3) {
+            return false;
+        } else if (depth > 20) {
+            depth = 20;
+        }
+        if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
+            return false;
+        }
+    } else { /* INSERTION OR DELETION */
+        if (depth < 2) {
+            return false;
+        } else if (depth > 11) {
+            depth = 11;
+        }
+        if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
+            return false;
+        }
+    }
+
+print:
+    fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos+1, var->ref, var->alt, var->depth, cov,
+            score);
 
     return true;
 }
@@ -464,8 +509,6 @@ void create_vcf()
 
     /* ####### END OF HEADER ####### */
 
-    struct frequency_info **frequency_table = get_frequency_table();
-    struct variants_codependence_info_list** codependence_table = get_codependence_table(NULL);// giving a NULL pointer should only work if the table is already allocated; which should be the case
     uint32_t nb_pos_multiple_var = 0;
 
     /**
@@ -510,11 +553,6 @@ void create_vcf()
     fclose(sub_file);
 #endif
 
-#if DUMP_FREQUENCY_TABLE
-    printf("dumping frequency table...\n");
-    dump_freq_table(ref_genome, frequency_table);
-    printf("table done dumping; starting variant calling...\n");
-#endif
 
     unsigned int uncovered_nucleotides = 0;
     unsigned int badly_covered_nucleotides = 0;
@@ -526,67 +564,89 @@ void create_vcf()
     uint64_t total_coverage = 0;
     uint64_t total_cov_squared = 0;
     variant_t variants_to_call[5];
-    // First pass on the frequency table to take into account variant codependence
-    LOG_INFO("doing first pass of vc\n");
-    /* for each sequence in the genome */
-    for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
-        /* for each position in the sequence */
-        LOG_INFO("sequence %u\n", seq_number);
-        for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
-            get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position, variants_to_call);
-            for (uint8_t i=0; i<4; i++) {
-                uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
-                if (variants_to_call[i].depth) {
-                    add_codependence_to_freq_table(frequency_table, codependence_table[genome_pos], genome_pos, i, POSITIVE_COD_INFLUENCE);
-                } else if (frequency_table[i][genome_pos].score>0) {
-                    add_codependence_to_freq_table(frequency_table, codependence_table[genome_pos], genome_pos, i, NEGATIVE_COD_INFLUENCE);
+    if (get_use_frequency_table()) { // Using freq-table and not var-tree
+        struct frequency_info **frequency_table = get_frequency_table();
+        struct variants_codependence_info_list** codependence_table = get_codependence_table(NULL);// giving a NULL pointer should only work if the table is already allocated; which should be the case
+#if DUMP_FREQUENCY_TABLE
+        printf("dumping frequency table...\n");
+        dump_freq_table(ref_genome, frequency_table);
+        printf("table done dumping; starting variant calling...\n");
+#endif
+        // First pass on the frequency table to take into account variant codependence
+        LOG_INFO("doing first pass of vc\n");
+        /* for each sequence in the genome */
+        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+            /* for each position in the sequence */
+            LOG_INFO("sequence %u\n", seq_number);
+            for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
+                get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position, variants_to_call);
+                for (uint8_t i=0; i<4; i++) {
+                    uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
+                    if (variants_to_call[i].depth) {
+                        add_codependence_to_freq_table(frequency_table, codependence_table[genome_pos], genome_pos, i, POSITIVE_COD_INFLUENCE);
+                    } else if (frequency_table[i][genome_pos].score>0) {
+                        add_codependence_to_freq_table(frequency_table, codependence_table[genome_pos], genome_pos, i, NEGATIVE_COD_INFLUENCE);
+                    }
                 }
             }
         }
-    }
 
-    free_codependence_chunks();
+        free_codependence_chunks();
 
-    LOG_INFO("doing second and final pass of vc\n");
-    /* for each sequence in the genome */
-    for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
-        /* for each position in the sequence */
-        LOG_INFO("sequence %u\n", seq_number);
-        for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
-            
-            get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position, variants_to_call);
-            unsigned int total_score = 0;
-            total_score += frequency_table[0][ref_genome->pt_seq[seq_number] + seq_position].score;
-            total_score += frequency_table[1][ref_genome->pt_seq[seq_number] + seq_position].score;
-            total_score += frequency_table[2][ref_genome->pt_seq[seq_number] + seq_position].score;
-            total_score += frequency_table[3][ref_genome->pt_seq[seq_number] + seq_position].score;
-            total_coverage += total_score;
-            total_cov_squared += total_score*total_score;
-            //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
-            if (total_score == 0) {
-                    uncovered_nucleotides++;
-            } else if (total_score < 10) {
-                    badly_covered_nucleotides++;
-            } else if (total_score < 90) {
-                    well_covered_nucleotides++;
-            } else {
-                    overly_covered_nucleotides++;
-                    if (total_score > max_coverage) {
-                            max_coverage = total_score;
-                            chromosome_most_coverage = seq_number;
-                            position_most_coverage = seq_position;
-                    }
+        LOG_INFO("doing second and final pass of vc\n");
+        /* for each sequence in the genome */
+        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+            /* for each position in the sequence */
+            LOG_INFO("sequence %u\n", seq_number);
+            for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
+                
+                get_most_frequent_variant(ref_genome, frequency_table, seq_number, seq_position, variants_to_call);
+                unsigned int total_score = 0;
+                total_score += frequency_table[0][ref_genome->pt_seq[seq_number] + seq_position].score;
+                total_score += frequency_table[1][ref_genome->pt_seq[seq_number] + seq_position].score;
+                total_score += frequency_table[2][ref_genome->pt_seq[seq_number] + seq_position].score;
+                total_score += frequency_table[3][ref_genome->pt_seq[seq_number] + seq_position].score;
+                total_coverage += total_score;
+                total_cov_squared += total_score*total_score;
+                //total_score += frequency_table[4][ref_genome->pt_seq[seq_number] + seq_position].score;
+                if (total_score == 0) {
+                        uncovered_nucleotides++;
+                } else if (total_score < 10) {
+                        badly_covered_nucleotides++;
+                } else if (total_score < 90) {
+                        well_covered_nucleotides++;
+                } else {
+                        overly_covered_nucleotides++;
+                        if (total_score > max_coverage) {
+                                max_coverage = total_score;
+                                chromosome_most_coverage = seq_number;
+                                position_most_coverage = seq_position;
+                        }
+                }
+                int nb_var = 0;
+                for(int i = 0; i < 5; ++i) {
+                  variant_t * var = &variants_to_call[i];
+                  if(var->depth) {
+                    // LOG_DEBUG("calling variant %d at %u:%lu, freq:%f\n", i, seq_number, seq_position, frequency_table[i][ref_genome->pt_seq[seq_number] + seq_position].freq);
+                    nb_variant += print_var_from_freq_table(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
+                    nb_var++;
+                  }
+                  if(nb_var > 1)
+                    nb_pos_multiple_var++;
+                }
             }
-            int nb_var = 0;
-            for(int i = 0; i < 5; ++i) {
-              variant_t * var = &variants_to_call[i];
-              if(var->depth) {
-                // LOG_DEBUG("calling variant %d at %u:%lu, freq:%f\n", i, seq_number, seq_position, frequency_table[i][ref_genome->pt_seq[seq_number] + seq_position].freq);
-                nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
-                nb_var++;
-              }
-              if(nb_var > 1)
-                nb_pos_multiple_var++;
+        }
+    } else { // Using var-tree and not freq-table
+        LOG_INFO("doing first and only pass of vc\n");
+        for (uint32_t seq_number = 0; seq_number < ref_genome->nb_seq; seq_number++) {
+            /* for each position in the sequence */
+            LOG_INFO("sequence %u\n", seq_number);
+            for (uint64_t seq_position = 0; seq_position < ref_genome->len_seq[seq_number]; seq_position++) {
+                variant_t *var = variant_list[seq_number][seq_position];
+                while (var != NULL) {
+                    nb_variant += print_variant_tree(var, seq_number, seq_position, ref_genome, vcf_file) ? 1 : 0;
+                    var = var->next;
+                }
             }
         }
     }

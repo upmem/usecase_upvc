@@ -5,7 +5,7 @@
 #ifndef __VARTREE_H__
 #define __VARTREE_H__
 
-#define MAX_SIZE_ALLELE 8
+#define MAX_SIZE_ALLELE 21
 
 #include <stdint.h>
 
