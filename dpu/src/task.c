@@ -56,9 +56,9 @@ __host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
  * @brief Maximum score allowed.
  */
 #if SIZE_READ>120
-#define MAX_SCORE 80
+#define MAX_SCORE 40
 #else
-#define MAX_SCORE 80
+#define MAX_SCORE 40
 #endif
 
 /**
