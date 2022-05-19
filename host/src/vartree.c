@@ -114,13 +114,13 @@ void variant_tree_insert(variant_t *var, uint32_t seq_nr, uint32_t offset_in_chr
             vars->depth++;
             vars->score += var->score;
             free(var);
-            goto end;
+            pthread_mutex_unlock(&mutex);
+            return;
         }
         vars = vars->next;
     }
     var->next = *entry;
     *entry = var;
-end:
     pthread_mutex_unlock(&mutex);
 }
 
@@ -235,46 +235,25 @@ static bool print_var_from_freq_table(variant_t *var, uint32_t seq_nr, uint64_t 
     uint32_t cov = ref_genome->mapping_coverage[genome_pos];
     uint32_t depth = var->depth;
     uint32_t score = var->score / depth;
-    // Note: commenting out the old version of variant calling, now using the frequency table
-    //uint32_t percentage = 100;
-    //if (cov != 0) {
-    //    percentage = depth * 100 / cov;
-    //}
 
     uint32_t ref_len = strlen(var->ref);
     uint32_t alt_len = strlen(var->alt);
-    //if (ref_len > alt_len && percentage <= 25 && homopolymer(&ref_genome->data[genome_pos - 12], 12)) {
-    //    return false;
-    //}
 
-    if (get_no_filter())
-        goto print;
+    if (!get_no_filter()) {
 
-    if (ref_len == alt_len) { /* SUBSTITUTION */
-        //if (depth < 3) {
-        //    return false;
-        //} else if (depth > 20) {
-        //    depth = 20;
-        //}
-        //if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
-        //    return false;
-        //}
-        if (depth > 20) {
-            depth = 20;
+        if (ref_len == alt_len) { /* SUBSTITUTION */
+            if (depth > 20) {
+                depth = 20;
+            }
+        } else { /* INSERTION OR DELETION */
+            if (depth < 2) {
+                return false;
+            } else if (depth > 11) {
+                depth = 11;
+            }
         }
-    } else { /* INSERTION OR DELETION */
-        if (depth < 2) {
-            return false;
-        } else if (depth > 11) {
-            depth = 11;
-        }
-        //if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
-        //    return false;
-        //}
     }
 
-print:
-    //TODO
     fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos+1, var->ref, var->alt, var->depth, cov,
         score);
 
@@ -299,30 +278,29 @@ static bool print_variant_tree(variant_t *var, uint32_t seq_nr, uint64_t seq_pos
         return false;
     }
 
-    if (get_no_filter())
-        goto print;
+    if (!get_no_filter()) {
 
-    if (ref_len == alt_len) { /* SUBSTITUTION */
-        if (depth < 3) {
-            return false;
-        } else if (depth > 20) {
-            depth = 20;
-        }
-        if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
-            return false;
-        }
-    } else { /* INSERTION OR DELETION */
-        if (depth < 2) {
-            return false;
-        } else if (depth > 11) {
-            depth = 11;
-        }
-        if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
-            return false;
+        if (ref_len == alt_len) { /* SUBSTITUTION */
+            if (depth < 3) {
+                return false;
+            } else if (depth > 20) {
+                depth = 20;
+            }
+            if (!(score <= sub_filter[depth].score && percentage >= sub_filter[depth].percentage)) {
+                return false;
+            }
+        } else { /* INSERTION OR DELETION */
+            if (depth < 2) {
+                return false;
+            } else if (depth > 11) {
+                depth = 11;
+            }
+            if (!(score <= indel_filter[depth].score && percentage >= indel_filter[depth].percentage)) {
+                return false;
+            }
         }
     }
 
-print:
     fprintf(vcf_file, "%s\t%lu\t.\t%s\t%s\t.\t.\tDEPTH=%d;COV=%d;SCORE=%d\n", chr, seq_pos+1, var->ref, var->alt, var->depth, cov,
             score);
 
