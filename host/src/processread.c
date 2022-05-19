@@ -327,7 +327,7 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
 		        // Operation 0 : sequences match and nothing was done : decrease both indices.
 		        i--;
 		        j--;
-		        (*backtrack_end)->type = 0; // FIXME : use CODE_??? instead of 0
+		        (*backtrack_end)->type = CODE_MATCH;
 		        (*backtrack_end)->ix = i;
 		        (*backtrack_end)->jx = j;
 		        (*backtrack_end)++;
@@ -457,7 +457,7 @@ bool update_frequency_table(
                             frequency_table[read_letter][current_position].unsure_score++;
                         }
                         break;
-                    case 0: // FIXME : CODE_MATCH
+                    case CODE_MATCH: // FIXME : CODE_MATCH
                         read_letter = read[backtrack_end->jx];
                         if (read_letter > 3) {
                             read_letter = read_letter>>1 & 0x3;
@@ -476,7 +476,6 @@ bool update_frequency_table(
                         //LOG_WARN("unhandled indel\n");
                         // TODO: handle indels
                         break;
-                        // TODO: handle errors even if they should never happen
             }
     }
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 4);
@@ -601,7 +600,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
             if (backtrack_end->type != 0) {
                 variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
                 newvar->depth = 1;
-                newvar->score = 1;
+                newvar->score = result_match.score;
                 newvar->next = NULL;
                 int alt_idx = 0;
                 int ref_idx = 0;

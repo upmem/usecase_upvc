@@ -14,6 +14,7 @@ typedef struct {
 } backtrack_t;
 
 
+#define CODE_MATCH 0
 #define CODE_SUB 10
 #define CODE_DEL 11
 #define CODE_INS 12
