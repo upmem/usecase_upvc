@@ -37,7 +37,6 @@ static char *get_mapping_filename()
 void open_mapping_file()
 {
     LOG_DEBUG("opening mapping file\n");
-    // TODO: check for memory leaks here
     char *filename = get_mapping_filename();
     mapping_file = fopen(filename, "w");
     if (mapping_file == NULL)
@@ -45,11 +44,6 @@ void open_mapping_file()
         LOG_FATAL("couldn't open mapping file; errno : %u\n", errno);
     }
     LOG_DEBUG("openned mapping file : %p\n", mapping_file);
-    // TODO: complete header
-    LOG_TRACE("writing mapping header\n");
-    //fprintf(mapping_file, "@HD VN:" MAP_VERSION " SO:unknown\n");
-    //fprintf(mapping_file, "@PG ID:1 PN:" PROGRAM_NAME "\n");
-    //LOG_DEBUG("mapping header written\n");
 }
 
 void write_read_mapping_from_backtrack(char *chromosome_name, uint64_t genome_pos, backtrack_t *backtrack_end, int8_t *read, int read_id)

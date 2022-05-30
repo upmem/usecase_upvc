@@ -166,7 +166,6 @@ unsigned int get_nb_thread_for_simu() { return nb_thread_for_simu; }
 
 /**************************************************************************************/
 /**************************************************************************************/
-//TODO: validate use_freq_table
 static void validate_use_frequency_table() {
     use_freq_table = true;
 }

@@ -394,7 +394,7 @@ FILE * sub_file = NULL;
 
 static void get_most_frequent_variant(genome_t * ref_genome, struct frequency_info ** frequency_table, uint32_t seq_number, uint64_t seq_position, variant_t * results) {
 
-  static char nucleotide[4] = { 'A', 'C', 'T', 'G' };// FIXME : const
+  const char nucleotide[4] = { 'A', 'C', 'T', 'G' };
 
   uint64_t genome_pos = ref_genome->pt_seq[seq_number] + seq_position;
 
@@ -450,7 +450,6 @@ static void add_codependence_to_freq_table(struct frequency_info** frequency_tab
 #define POSITIVE_COD_INFLUENCE 0.0212905
 #define NEGATIVE_COD_INFLUENCE -0.580356
 
-//TODO here read frequency table and write vcf (take max of frequency table to find substitution if any)
 void create_vcf()
 {
     double start_time = my_clock();

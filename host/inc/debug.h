@@ -10,7 +10,7 @@
 #define V_DEBUG 5
 #define V_TRACE 6
 
-#define VERBOSE V_INFO
+#define VERBOSE V_WARN
 #define VERBOSE_COLORS true
 #define VERBOSE_LOG_LEVEL true
 #define VERBOSE_TIMESTAMP true

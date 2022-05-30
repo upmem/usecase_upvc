@@ -42,15 +42,6 @@
 #define MAX_SCORE_DIFFERENCE_WITH_BEST 40
 #define MAX_CONSIDERED_MAPPINGS 4000
 
-/*
-static void log_nucleotides(int8_t *s, int max_len) {
-	char nucleotides[4] = {'A', 'C', 'T', 'G'};
-	for (int i=0; i<max_len; i++) {
-		printf("%c", nucleotides[s[i]]);
-	}
-}
-*/
-
 
 static int min(int a, int b) { return a < b ? a : b; }
 
@@ -645,89 +636,6 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
 
             }
     }
-    // TODO: remove following code
-    #if false
-    code_result_idx = 0;
-    while (code_result_tab[code_result_idx] != CODE_END) {
-        int code_result = code_result_tab[code_result_idx];
-        int64_t pos_variant_read = code_result_tab[code_result_idx + 1];
-        int64_t pos_variant_genome = genome_pos + pos_variant_read;
-        int ref_pos = 0;
-        int alt_pos = 0;
-        variant_t *newvar = (variant_t *)malloc(sizeof(variant_t));
-        newvar->depth = 1;
-        newvar->score = result_match.score;
-        newvar->next = NULL;
-        if (code_result == CODE_SUB) {
-            /* SNP = 0,1,2,3  (code A,C,T,G) */
-            int snp = code_result_tab[code_result_idx + 2];
-            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-            newvar->alt[alt_pos++] = nucleotide[snp & 3];
-
-            code_result_idx += 3;
-        } else if (code_result == CODE_INS) {
-            int64_t ps_var_genome = pos_variant_genome;
-            int64_t ps_var_read = pos_variant_read;
-            code_result_idx += 2;
-
-            while (code_result_tab[code_result_idx] < 4) {
-                ps_var_read++;
-                code_result_idx++;
-            }
-
-            while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
-                ps_var_genome--;
-                ps_var_read--;
-                pos_variant_genome--;
-                pos_variant_read--;
-            }
-
-            newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-
-            while (pos_variant_read <= ps_var_read) {
-                newvar->alt[alt_pos++] = nucleotide[read[pos_variant_read] & 3];
-                if (alt_pos >= MAX_SIZE_ALLELE - 1) {
-                    free(newvar);
-                    return;
-                }
-                pos_variant_read++;
-            }
-
-        } else if (code_result == CODE_DEL) {
-            int64_t ps_var_genome = pos_variant_genome;
-            int64_t ps_var_read = pos_variant_read;
-            code_result_idx += 2;
-
-            while (code_result_tab[code_result_idx] < 4) {
-                ps_var_genome++;
-                code_result_idx++;
-            }
-
-            while (ref_genome->data[ps_var_genome] == read[ps_var_read]) {
-                ps_var_read--;
-                ps_var_genome--;
-                pos_variant_genome--;
-                pos_variant_read--;
-            }
-
-            newvar->alt[alt_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-
-            while (pos_variant_genome <= ps_var_genome) {
-                newvar->ref[ref_pos++] = nucleotide[ref_genome->data[pos_variant_genome] & 3];
-                if (ref_pos >= MAX_SIZE_ALLELE - 1) {
-                    free(newvar);
-                    return;
-                }
-                pos_variant_genome++;
-            }
-            pos_variant_genome -= ref_pos;
-        }
-        newvar->ref[ref_pos] = '\0';
-        newvar->alt[alt_pos] = '\0';
-        variant_tree_insert(
-            newvar, result_match.coord.seq_nr, pos_variant_genome + 1 - ref_genome->pt_seq[result_match.coord.seq_nr]);
-    }
-    #endif
 }
 
 static pthread_mutex_t non_mapped_mutex;

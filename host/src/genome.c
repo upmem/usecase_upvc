@@ -129,7 +129,6 @@ static struct frequency_info* frequency_table[5];
 static struct variants_codependence_info_list** variant_codependences;
 #define NB_CODEPENDENCE_CHUNK_DIV (1<<10)
 struct codependence_chunk* last_allocated_codependence_chunk[NB_CODEPENDENCE_CHUNK_DIV];
-unsigned int allocated_chunks = 0;//for debug purposes (TODO: remove)
 static bool init_frequency_table = false;
 static bool init_codependence_table = false;
 
@@ -143,11 +142,6 @@ struct codependence_chunk {
 
 static void allocate_new_codependence_chunk(int i) {
     STAT_RECORD_START(STAT_ALLOCATE_NEW_CHUNK);
-    // LOG_INFO("size of pointer: %d\n", (int) sizeof(void*));
-    // LOG_INFO("size of co-info: %d\n", (int) sizeof(struct variants_codependence_info));
-    // LOG_INFO("size of co-info-list: %d\n", (int) sizeof(struct variants_codependence_info_list));
-    LOG_INFO("size of chunk:   %d\n", (int) sizeof(struct codependence_chunk));
-    LOG_INFO("allocating new codependence chunk (%d)\n", ++allocated_chunks);
     struct codependence_chunk* new_chunk = calloc(1, sizeof(struct codependence_chunk));
     assert(new_chunk != NULL);
     new_chunk->previous_chunk = last_allocated_codependence_chunk[i];
@@ -192,7 +186,6 @@ void add_codependence_info(struct variants_codependence_info_list** next_variant
             }
         }
     }
-    LOG_DEBUG("getting new codependence_info for : ? -> %010d (char:%d)\n", other_index_delta, other_letter);
     int chunk_div_index = (other_index_delta*NB_CODEPENDENCE_CHUNK_DIV)/genome_size;
     STAT_RECORD_STEP(STAT_ADD_CODEPENDENCE_INFO, 2);
     pthread_mutex_lock(mutex);
