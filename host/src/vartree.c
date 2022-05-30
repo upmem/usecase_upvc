@@ -180,7 +180,7 @@ depth_filter_t indel_filter[] = {
     [10] = { 1, 30 },
     [11] = { 1, 40 },
 };
-#elif (SIZE_READ == 150) || (SIZE_READ==148)
+#elif (SIZE_READ <= 160) && (SIZE_READ>=140)
 depth_filter_t sub_filter[] = {
     [3] = { 15, 16 },
     [4] = { 17, 20 },
