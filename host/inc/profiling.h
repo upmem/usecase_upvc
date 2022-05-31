@@ -3,6 +3,7 @@
 
 #include <time.h>
 
+#define PROFILE_STAT false
 #define STAT_MAX_SUBSTEPS 10
 
 struct time_stat_t {
@@ -32,6 +33,16 @@ struct time_stat_t profiling[25];
 #define STAT_GET_NEW_CODEPENDENCE_INFO 16
 #define STAT_ALLOCATE_NEW_CHUNK        17
 
+#define PRINT_MICROSECONDS(t)                         \
+    if (t<CLOCKS_PER_SEC) {                           \
+        printf("%fms", (float)t/CLOCKS_PER_SEC*1000); \
+    } else {                                          \
+        printf("%fs", (float)t/CLOCKS_PER_SEC);       \
+    }
+
+
+#if PROFILE_STAT
+
 #define STAT_RECORD_START(FUNCTION)                        \
     clock_t profiling_step_time, profiling_last_step_time; \
     clock_t profiling_start_time = clock();                \
@@ -47,13 +58,6 @@ struct time_stat_t profiling[25];
     STAT_RECORD_STEP(FUNCTION, STEP_N)                                               \
     profiling[FUNCTION].total_time += profiling_last_step_time-profiling_start_time;
 
-
-#define PRINT_MICROSECONDS(t)                         \
-    if (t<CLOCKS_PER_SEC) {                           \
-        printf("%fms", (float)t/CLOCKS_PER_SEC*1000); \
-    } else {                                          \
-        printf("%fs", (float)t/CLOCKS_PER_SEC);       \
-    }
 
 #define PRINT_FUNCTION_STAT(FUNCTION)                                      \
     printf(#FUNCTION ":\n");                                               \
@@ -90,6 +94,16 @@ struct time_stat_t profiling[25];
     PRINT_FUNCTION_STAT(STAT_ADD_CODEPENDENCE_INFO);                    \
     PRINT_FUNCTION_STAT(STAT_GET_NEW_CODEPENDENCE_INFO);                \
     PRINT_FUNCTION_STAT(STAT_ALLOCATE_NEW_CHUNK);
+
+#else
+
+#define STAT_RECORD_START(FUNCTION)
+#define STAT_RECORD_STEP(FUNCTION, STEP_N)
+#define STAT_RECORD_LAST_STEP(FUNCTION, STEP_N)
+#define PRINT_FUNCTION_STAT(FUNCTION)
+#define PRINT_ALL_FUNCTION_STAT()
+
+#endif
     
 
 #endif /* __PROFILING_H__ */

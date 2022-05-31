@@ -159,13 +159,6 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
     int min_score_i_idx = 0;
     int min_score_j_idx = 0;
 
-    // Set D matrix to 0
-    // FIXME : I'm pretty sure this is completely useless as those 0s should be written over before being read.
-    for (int i = 0; i < matrix_size; i++) {
-        for (int j = 0; j < matrix_size; j++) {
-            D[i][j] = 0;
-        }
-    }
 
     // Set first row and column of P and Q to high values
     // Set first row and column of D to correct values
@@ -448,7 +441,7 @@ bool update_frequency_table(
                             frequency_table[read_letter][current_position].unsure_score++;
                         }
                         break;
-                    case CODE_MATCH: // FIXME : CODE_MATCH
+                    case CODE_MATCH:
                         read_letter = read[backtrack_end->jx];
                         if (read_letter > 3) {
                             read_letter = read_letter>>1 & 0x3;
