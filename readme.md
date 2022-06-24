@@ -1,6 +1,13 @@
 Common work Dominique Lavenier (INRIA) and UPMEM.
 =================================================
 
+UPVC performs small paired reads mapping (~150 nucleotides per read) onto a reference genome followed by variant calling on the Host CPU.
+UPVC takes advantage of the high PIM parallelism to complete the mapping stage. It consists in finding all potential positions of short reads on the map of the reference genome loaded in memory. The CPU relieved from the data heavy computation is available to perform advanced dynamic computing and complex tasks such as alignment with variant calling. 
+
+The input dataset is composed of an indexed human reference genome generated from a fasta text file, along with two fastq files containing the paired reads and some metadata. UPVC outputs a text file listing called variants in vcf format.
+
+This program was developped by UPMEM team. Reach us at contact@upmem.com if you would like more details about this implementation (workflow structure, benchmarks, etc.).
+
 Installation
 ------------
 
@@ -52,4 +59,4 @@ python <path_to_build>/../tests/compareVCF.py <dataset_prefix>.vcf <dataset_pref
 Paper link
 ----------
 
-https://drive.google.com/open?id=1NJYijXnVzEpsVQdHgtMZ7RoL4d_BW-CJ
+https://hal.archives-ouvertes.fr/hal-03006764/document
