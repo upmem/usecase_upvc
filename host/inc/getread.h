@@ -5,29 +5,15 @@
 #ifndef __GETREAD_H__
 #define __GETREAD_H__
 
-#include "upvc.h"
 #include <stdint.h>
 #include <stdio.h>
 
-/**
- * @brief Fill "reads_buffer" with pairs of read.
- *
- * @param fpe1          First file of Pair-end read.
- * @param fpe2          Second file of Pair-end read.
- * @param reads_buffer  Output buffer to save pairs of read.
- * @param times_ctx     Times information for the while application.
- *
- * @return The number of read written in "reads_buffer".
- */
-int get_reads(FILE *fpe1, FILE *fpe2, int8_t *reads_buffer, times_ctx_t *times_ctx);
+int get_reads_in_buffer(unsigned int pass_id);
 
-/**
- * @brief Get the size of one read.
- *
- * @param input_pe1_file  File to parse to find the size of one read.
- *
- * @return The size of one read.
- */
-int get_read_size(char *input_pe1_file);
+int8_t *get_reads_buffer(unsigned int pass_id);
+
+void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id);
+
+int get_input_info(FILE *f, size_t *read_size, size_t *nb_read);
 
 #endif /* __GETREAD_H__ */

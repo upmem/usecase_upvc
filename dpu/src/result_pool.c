@@ -20,16 +20,14 @@
  * This output FIFO is shared by the tasklets to write back results to host, thus is protected by a critical section.
  *
  * @var cache      Local cache to perform memory transfers.
- * @var mutex      Critical section that protects the pool.
- * @var wridx      Index of the current output in the FIFO.
  * @var cur_write  Where to write in MRAM.
  */
 typedef struct {
     uint8_t cache[LOCAL_RESULTS_PAGE_SIZE];
-    mutex_id_t mutex;
-    unsigned int wridx;
-    mram_addr_t cur_write;
+    uintptr_t cur_write;
 } result_pool_t;
+
+__host nb_result_t DPU_NB_RESULT_VAR;
 
 /**
  * @brief The result pool shared by tasklets.
@@ -42,17 +40,10 @@ MUTEX_INIT(result_pool_mutex);
  */
 __mram_noinit dpu_result_out_t DPU_RESULT_VAR[MAX_DPU_RESULTS];
 
-#define DPU_RESULT_WRITE(res, addr)                                                                                              \
-    do {                                                                                                                         \
-        mram_write16(res, addr);                                                                                                 \
-    } while (0)
-_Static_assert(sizeof(dpu_result_out_t) == 16, "dpu_result_out_t size changed (make sure that DPU_RESULT_WRITE changed as well)");
-
 void result_pool_init()
 {
-    result_pool.mutex = MUTEX_GET(result_pool_mutex);
-    result_pool.wridx = 0;
-    result_pool.cur_write = (mram_addr_t)DPU_RESULT_VAR;
+    DPU_NB_RESULT_VAR = 0;
+    result_pool.cur_write = (uintptr_t)DPU_RESULT_VAR;
 }
 
 void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
@@ -60,47 +51,47 @@ void result_pool_write(const dout_t *results, STATS_ATTRIBUTE dpu_tasklet_stats_
     unsigned int each_result = 0;
     unsigned int pageno;
 
-    mutex_lock(result_pool.mutex);
+    mutex_lock(result_pool_mutex);
 
     /* Read back and write the swapped results */
     for (pageno = 0; pageno < results->nb_page_out; pageno++) {
-        mram_addr_t source_addr = dout_swap_page_addr(results, pageno);
+        __mram_ptr void *source_addr = dout_swap_page_addr(results, pageno);
 
-        if (result_pool.wridx + MAX_LOCAL_RESULTS_PER_READ >= (MAX_DPU_RESULTS - 1)) {
+        if (DPU_NB_RESULT_VAR + MAX_LOCAL_RESULTS_PER_READ >= (MAX_DPU_RESULTS - 1)) {
             printf("WARNING! too many result in DPU! (from swap)\n");
             halt();
         }
 
         ASSERT_DMA_ADDR(source_addr, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
         STATS_INCR_LOAD(stats, LOCAL_RESULTS_PAGE_SIZE);
-        LOCAL_RESULTS_PAGE_READ(source_addr, result_pool.cache);
+        mram_read(source_addr, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
 
         ASSERT_DMA_ADDR(result_pool.cur_write, result_pool.cache, LOCAL_RESULTS_PAGE_SIZE);
         STATS_INCR_STORE(stats, LOCAL_RESULTS_PAGE_SIZE);
         STATS_INCR_STORE_RESULT(stats, LOCAL_RESULTS_PAGE_SIZE);
-        LOCAL_RESULTS_PAGE_WRITE(result_pool.cache, result_pool.cur_write);
+        mram_write(result_pool.cache, (__mram_ptr void *)result_pool.cur_write, LOCAL_RESULTS_PAGE_SIZE);
 
-        result_pool.wridx += MAX_LOCAL_RESULTS_PER_READ;
+        DPU_NB_RESULT_VAR += MAX_LOCAL_RESULTS_PER_READ;
         result_pool.cur_write += LOCAL_RESULTS_PAGE_SIZE;
     }
 
-    while ((each_result < results->nb_cached_out) && (result_pool.wridx < (MAX_DPU_RESULTS - 1))) {
+    while ((each_result < results->nb_cached_out) && (DPU_NB_RESULT_VAR < (MAX_DPU_RESULTS - 1))) {
         /* Ensure that the size of a result out structure is two longs. */
         ASSERT_DMA_ADDR(result_pool.cur_write, &(results->outs[each_result]), sizeof(dpu_result_out_t));
         STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
         STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
-        DPU_RESULT_WRITE((void *)&(results->outs[each_result]), result_pool.cur_write);
+        mram_write((void *)&(results->outs[each_result]), (__mram_ptr void *)result_pool.cur_write, sizeof(dpu_result_out_t));
 
-        result_pool.wridx++;
+        DPU_NB_RESULT_VAR++;
         result_pool.cur_write += sizeof(dpu_result_out_t);
         each_result++;
     }
-    if (result_pool.wridx >= (MAX_DPU_RESULTS - 1)) {
+    if (DPU_NB_RESULT_VAR >= (MAX_DPU_RESULTS - 1)) {
         printf("WARNING! too many result in DPU! (from local)\n");
         halt();
     }
 
-    mutex_unlock(result_pool.mutex);
+    mutex_unlock(result_pool_mutex);
 }
 
 void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
@@ -110,13 +101,13 @@ void result_pool_finish(STATS_ATTRIBUTE dpu_tasklet_stats_t *stats)
     /* Note: will fill in the result pool until MAX_DPU_RESULTS -1, to be sure that the very last result
      * has a num equal to -1.
      */
-    mutex_lock(result_pool.mutex);
+    mutex_lock(result_pool_mutex);
     /* Mark the end of result data, do not increment the indexes, so that the next one restarts from this
      * point.
      */
-    DPU_RESULT_WRITE((void *)&end_of_results, result_pool.cur_write);
+    mram_write((void *)&end_of_results, (__mram_ptr void *)result_pool.cur_write, sizeof(dpu_result_out_t));
     STATS_INCR_STORE(stats, sizeof(dpu_result_out_t));
     STATS_INCR_STORE_RESULT(stats, sizeof(dpu_result_out_t));
 
-    mutex_unlock(result_pool.mutex);
+    mutex_unlock(result_pool_mutex);
 }

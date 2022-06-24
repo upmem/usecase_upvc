@@ -22,12 +22,9 @@
 
 #include "common.h"
 
-MUTEX_INIT(miscellaneous_mutex);
-BARRIER_INIT(init_barrier, NB_RUNNING_TASKLETS);
+BARRIER_INIT(init_barrier, NR_TASKLETS);
 
-#define TASKLETS_INITIALIZER TASKLETS(16, main, 256, 0)
-_Static_assert(16 == NB_TASKLET_PER_DPU, "NB_TASKLET_PER_DPU does not match the number of tasklets declare in rt.h");
-#include <rt.h>
+STDOUT_BUFFER_INIT(128 * 1024);
 
 /**
  * @brief The MRAM information, shared between the tasklets.
@@ -35,38 +32,25 @@ _Static_assert(16 == NB_TASKLET_PER_DPU, "NB_TASKLET_PER_DPU does not match the 
  * Information are gathered by the first tasklet during boot and used by other tasklets
  * to get the memory topology.
  */
-__mram_noinit delta_info_t DPU_MRAM_INFO_VAR;
-
-/**
- * WRAM image of the MRAM information
- */
-static uint32_t mram_info_delta;
+__host delta_info_t DPU_MRAM_INFO_VAR;
 
 /**
  * @brief The statistic of each tasklet in the mram.
  */
-__mram_noinit dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NB_TASKLET_PER_DPU];
+__mram_noinit dpu_tasklet_stats_t DPU_TASKLET_STATS_VAR[NR_TASKLETS];
 #ifdef STATS_ON
 #define DPU_TASKLET_STATS_WRITE(res, addr)                                                                                       \
     do {                                                                                                                         \
-        mram_write48(res, addr);                                                                                                 \
+        mram_write(res, addr, sizeof(dpu_tasklet_stats_t));                                                                      \
     } while (0)
 #else
 #define DPU_TASKLET_STATS_WRITE(res, addr)
 #endif
-_Static_assert(sizeof(dpu_tasklet_stats_t) == 48,
-    "dpu_tasklet_stats_t size changed (make sure that DPU_TASKLET_STATS_WRITE changed as well)");
 
 /**
  * @brief The compute time performance value store in mram.
  */
-__mram_noinit dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
-#define DPU_COMPUTE_TIME_WRITE(res)                                                                                              \
-    do {                                                                                                                         \
-        mram_write8(res, (mram_addr_t)&DPU_COMPUTE_TIME_VAR);                                                                    \
-    } while (0)
-_Static_assert(
-    sizeof(dpu_compute_time_t) == 8, "dpu_compute_time_t size changed (make sure that DPU_COMPUTE_TIME_WRITE changed as well)");
+__host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
 
 /**
  * @brief Maximum score allowed.
@@ -76,7 +60,7 @@ _Static_assert(
 /**
  * @brief Number of reference read to be fetch per mram read
  */
-#define NB_REF_PER_READ (8)
+#define NB_REF_PER_READ (4)
 
 /**
  * @brief Global table of dout_t structure.
@@ -85,15 +69,10 @@ _Static_assert(
  * Each tasklet will use the dout_t at the index of its tasklet_id.
  * It uses this structure to store temporary local results.
  */
-__dma_aligned static dout_t global_dout[NB_TASKLET_PER_DPU];
+__dma_aligned static dout_t global_dout[NR_TASKLETS];
 
-typedef struct {
-    dpu_result_coord_t coord;
-    uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
-} coords_and_nbr_t;
-
-__dma_aligned coords_and_nbr_t coords_and_nbr[NB_TASKLET_PER_DPU][NB_REF_PER_READ];
-__dma_aligned dpu_request_t requests[NB_TASKLET_PER_DPU];
+__dma_aligned coords_and_nbr_t coords_and_nbr[NR_TASKLETS][NB_REF_PER_READ];
+__dma_aligned dpu_request_t requests[NR_TASKLETS];
 
 /**
  * @brief Fetches a neighbour from the neighbour area.
@@ -109,11 +88,11 @@ static void load_reference_multiple_nbr_and_coords_at(
     /* The input starts with coordinates (8 bytes), followed by the neighbour. Structure is aligned
      * on 8 bytes boundary.
      */
-    mram_addr_t coords_nbr_address = (mram_addr_t)(DPU_MRAM_HEAP_POINTER + (base + idx) * sizeof(coords_and_nbr_t));
+    uintptr_t coords_nbr_address = ((uintptr_t)DPU_MRAM_HEAP_POINTER + (base + idx) * sizeof(coords_and_nbr_t));
     unsigned int coords_nbr_len_total = sizeof(coords_and_nbr_t) * NB_REF_PER_READ;
     ASSERT_DMA_ADDR(coords_nbr_address, cache, coords_nbr_len_total);
     ASSERT_DMA_LEN(coords_nbr_len_total);
-    mram_readX(coords_nbr_address, cache, coords_nbr_len_total);
+    mram_read((__mram_ptr void *)coords_nbr_address, cache, coords_nbr_len_total);
     STATS_INCR_LOAD(stats, coords_nbr_len_total);
     STATS_INCR_LOAD_DATA(stats, coords_nbr_len_total);
 }
@@ -127,26 +106,25 @@ static void get_time_and_accumulate(dpu_compute_time_t *accumulate_time, perfcou
     *last_time = current_time;
 }
 
-static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t *cached_coords_and_nbr,
-    uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats,
-    mutex_id_t *mutex_miscellaneous)
+static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_nbr_t *cached_coords_and_nbr,
+    uint8_t *current_read_nbr, dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats)
 {
-    int score, score_nodp, score_odpd = -1;
+    uint32_t score, score_nodp, score_odpd = UINT_MAX;
     uint8_t *ref_nbr = &cached_coords_and_nbr->nbr[0];
     STATS_TIME_VAR(start, end, acc);
 
     STATS_GET_START_TIME(start, acc, end);
 
-    score = score_nodp = noDP(current_read_nbr, ref_nbr, mram_info_delta, *mini);
+    score = score_nodp = nodp(current_read_nbr, ref_nbr, *mini, SIZE_NEIGHBOUR_IN_BYTES - DPU_MRAM_INFO_VAR);
 
     STATS_GET_END_TIME(end, acc);
     STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));
     STATS_INCR_NB_NODP_CALLS(*tasklet_stats);
 
-    if (score_nodp == -1) {
+    if (score_nodp == UINT_MAX) {
         STATS_GET_START_TIME(start, acc, end);
 
-        score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, mram_info_delta));
+        score_odpd = score = odpd(current_read_nbr, ref_nbr, *mini, NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR));
 
         STATS_GET_END_TIME(end, acc);
         STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
@@ -174,14 +152,13 @@ static void compare_neighbours(sysname_t tasklet_id, int *mini, coords_and_nbr_t
 }
 
 static void compute_request(sysname_t tasklet_id, coords_and_nbr_t *cached_coords_and_nbr, uint8_t *current_read_nbr,
-    dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats, mutex_id_t *mutex_miscellaneous)
+    dpu_request_t *request, dout_t *dout, dpu_tasklet_stats_t *tasklet_stats)
 {
-    int mini = MAX_SCORE;
+    uint32_t mini = MAX_SCORE;
     for (unsigned int idx = 0; idx < request->count; idx += NB_REF_PER_READ) {
         load_reference_multiple_nbr_and_coords_at(request->offset, idx, (uint8_t *)cached_coords_and_nbr, tasklet_stats);
         for (unsigned int ref_id = 0; ref_id < NB_REF_PER_READ && ((idx + ref_id) < request->count); ref_id++) {
-            compare_neighbours(tasklet_id, &mini, &cached_coords_and_nbr[ref_id], current_read_nbr, request, dout, tasklet_stats,
-                mutex_miscellaneous);
+            compare_neighbours(tasklet_id, &mini, &cached_coords_and_nbr[ref_id], current_read_nbr, request, dout, tasklet_stats);
         }
     }
 }
@@ -208,7 +185,6 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
         .nodp_time = 0ULL,
         .odpd_time = 0ULL,
     };
-    mutex_id_t mutex_miscellaneous = MUTEX_GET(miscellaneous_mutex);
     dout_t *dout = &global_dout[tasklet_id];
     coords_and_nbr_t *cached_coords_and_nbr = coords_and_nbr[tasklet_id];
     dpu_request_t *request = &requests[tasklet_id];
@@ -225,13 +201,13 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 
         dout_clear(dout);
 
-        compute_request(tasklet_id, cached_coords_and_nbr, current_read_nbr, request, dout, &tasklet_stats, &mutex_miscellaneous);
+        compute_request(tasklet_id, cached_coords_and_nbr, current_read_nbr, request, dout, &tasklet_stats);
 
         STATS_INCR_NB_RESULTS(tasklet_stats, dout->nb_results);
         result_pool_write(dout, &tasklet_stats);
     }
 
-    DPU_TASKLET_STATS_WRITE(&tasklet_stats, (mram_addr_t)(&DPU_TASKLET_STATS_VAR[tasklet_id]));
+    DPU_TASKLET_STATS_WRITE(&tasklet_stats, (__mram_ptr void *)(&DPU_TASKLET_STATS_VAR[tasklet_id]));
 
     result_pool_finish(&tasklet_stats);
 }
@@ -244,39 +220,32 @@ static void run_align(sysname_t tasklet_id, dpu_compute_time_t *accumulate_time,
 int main()
 {
     sysname_t tasklet_id = me();
-    barrier_id_t barrier = BARRIER_GET(init_barrier);
     perfcounter_t start_time, current_time;
-    dpu_compute_time_t accumulate_time;
 
     if (tasklet_id == 0) {
-        accumulate_time = 0ULL;
+        DPU_COMPUTE_TIME_VAR = 0ULL;
         mem_reset();
         perfcounter_config(COUNT_CYCLES, true);
         current_time = start_time = perfcounter_get();
 
-        mram_info_delta = DPU_MRAM_INFO_VAR;
         request_pool_init();
         result_pool_init();
 
-        if (((NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, mram_info_delta) + 2) * 3 * 16) >= 0x10000) {
+        if (((NB_BYTES_TO_SYMS(SIZE_NEIGHBOUR_IN_BYTES, DPU_MRAM_INFO_VAR) + 2) * 3 * 16) >= 0x10000) {
             printf("cannot run code: symbol length is larger than mulub operation\n");
             halt();
         }
     }
 
-    barrier_wait(barrier);
+    barrier_wait(&init_barrier);
 
-    /* For debugging purpose, one may reduce the number of operating tasklets. */
-    if (tasklet_id < NB_RUNNING_TASKLETS) {
-        run_align(tasklet_id, &accumulate_time, &current_time);
-    }
+    run_align(tasklet_id, &DPU_COMPUTE_TIME_VAR, &current_time);
 
-    barrier_wait(barrier);
+    barrier_wait(&init_barrier);
 
     if (tasklet_id == 0) {
-        get_time_and_accumulate(&accumulate_time, &current_time);
-        accumulate_time = (accumulate_time + current_time) - start_time;
-        DPU_COMPUTE_TIME_WRITE(&accumulate_time);
+        get_time_and_accumulate(&DPU_COMPUTE_TIME_VAR, &current_time);
+        DPU_COMPUTE_TIME_VAR = (DPU_COMPUTE_TIME_VAR + current_time) - start_time;
     }
 
     return 0;

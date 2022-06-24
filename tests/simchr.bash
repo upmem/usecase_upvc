@@ -23,10 +23,10 @@ wait_jobs() {
 ################## START OF SIMULATION ##################
 
 # Get the user-defined seed from input
-if [ $2 ]; then
-	seed=$2
+if [ $1 ]; then
+	seed=$1
 else
-	seed=$RANDOM
+	seed=64189 # 0xfabd
 fi
 
 # If the common variants do not already exist on disk, download them
@@ -59,7 +59,7 @@ for paternal in *chrall_paternal.fa
 do
     prefix=$(echo ${paternal} | sed 's/^\(.*\)_chrall_paternal.fa/\1/')
     echo "prefix=${prefix}"
-    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "paternal_${prefix}_chrall_PE" -i "${paternal}" &
+    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 15 -rs "${seed}" -na -o "paternal_${prefix}_chrall_PE" -i "${paternal}" &
 done
 
 wait_jobs
@@ -69,7 +69,7 @@ for maternal in *chrall_maternal.fa
 do
     prefix=$(echo ${maternal} | sed 's/^\(.*\)_chrall_maternal.fa/\1/')
     echo "prefix=${prefix}"
-    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 25 -rs "${seed}" -na -o "maternal_${prefix}_chrall_PE" -i "${maternal}" &
+    $ART_ILLUMINA -m 400 -s 50 -l 120 -p -f 15 -rs "${seed}" -na -o "maternal_${prefix}_chrall_PE" -i "${maternal}" &
 done
 
 wait_jobs

@@ -12,13 +12,10 @@
 
 #define MRAM_SIZE (64 << 20)
 
-#define NB_TASKLET_PER_DPU_LOG2 4
-#define NB_TASKLET_PER_DPU (1 << NB_TASKLET_PER_DPU_LOG2)
-
 #define ALIGN_DPU(val) (((val) + 7) & ~7)
 
-#define MAX_DPU_REQUEST (1 << 16)
-#define MAX_DPU_RESULTS (1 << 18)
+#define MAX_DPU_REQUEST (1 << 15)
+#define MAX_DPU_RESULTS (1 << 19)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
 #define SIZE_READ 120
@@ -32,7 +29,7 @@
  *
  * @var delta           Delta to apply to nodp and odpd comparison depending on the round.
  */
-typedef uint64_t delta_info_t;
+typedef uint32_t delta_info_t;
 #define DPU_MRAM_INFO_VAR m_mram_info
 
 /**
@@ -56,11 +53,22 @@ typedef struct {
  * @var coord Coordinate of the read that matched in the reference genome.
  */
 typedef struct {
-    int32_t num;
-    uint32_t score;
+    union {
+        struct {
+            uint32_t score;
+            int32_t num;
+        };
+        uint64_t key;
+    };
     dpu_result_coord_t coord;
 } dpu_result_out_t;
 #define DPU_RESULT_VAR m_dpu_result
+
+/**
+ * @brief Number of results produces by all the tasklets
+ */
+typedef uint32_t nb_result_t;
+#define DPU_NB_RESULT_VAR m_dpu_nb_result
 
 /**
  * @brief stats reported by every tasklet
@@ -77,7 +85,7 @@ typedef struct {
     uint64_t nodp_time;
     uint64_t odpd_time;
 } dpu_tasklet_stats_t;
-#define DPU_TASKET_STATS_VAR m_dpu_tasklet_stats
+#define DPU_TASKLET_STATS_VAR m_dpu_tasklet_stats
 
 typedef uint64_t dpu_compute_time_t;
 #define DPU_COMPUTE_TIME_VAR m_dpu_compute_time
@@ -85,7 +93,7 @@ typedef uint64_t dpu_compute_time_t;
 /**
  * @brief Information on the requests reads to a DPU.
  */
-typedef uint64_t nb_request_t;
+typedef uint32_t nb_request_t;
 #define DPU_NB_REQUEST_VAR m_dpu_nb_request
 
 /**
@@ -105,5 +113,10 @@ typedef struct {
     uint8_t nbr[SIZE_NEIGHBOUR_IN_BYTES];
 } dpu_request_t;
 #define DPU_REQUEST_VAR m_dpu_request
+
+typedef struct {
+    dpu_result_coord_t coord;
+    uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
+} coords_and_nbr_t;
 
 #endif /* __COMMON_H__ */

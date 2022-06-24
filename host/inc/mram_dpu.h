@@ -10,27 +10,16 @@
  *
  * Defines the structures representing the DPU MRAMs on both the host and DPU side.
  */
+#include <stddef.h>
+#include <stdint.h>
+
 #include "common.h"
+#include "index.h"
 
-#define FILE_NAME_SIZE 24
+size_t mram_load(uint8_t **mram, unsigned int dpu_id);
 
-/**
- * @brief create the name of the 'dpu_id'th mram
- *
- * @param dpu_id index of the mram
- *
- * @return the name of the mram
- */
-char *make_mram_file_name(char *str, unsigned int dpu_id);
-
-/**
- * @brief Loads an MRAM file into an MRAM image.
- *
- * @param mram the MRAM image
- * @param dpu_id index of the DPU
- *
- * @return the size of the mram
- */
-size_t mram_load(uint8_t *mram, unsigned int dpu_id);
+void init_vmis(unsigned int nb_dpu, distribute_index_t *table);
+void free_vmis(unsigned int nb_dpu);
+void write_vmi(unsigned int num_dpu, unsigned int num_ref, coords_and_nbr_t *coords_and_nbr);
 
 #endif /* __INTEGRATION_MDPU_H__ */

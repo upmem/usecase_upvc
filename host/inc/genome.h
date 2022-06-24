@@ -7,46 +7,27 @@
 
 #include <stdint.h>
 
-#define MAX_SEQ_GEN (1000)
+#define MAX_SEQ_GEN (24) // max number of chromosomes
+#define MAX_SEQ_NAME_SIZE (8)
 
-/**
- * @brief Reference genome information.
- *
- * @var data             Byte list of the genome.
- * @var nb_seq           Numbers of sequences composing the genome.
- * @var pt_seq           Index in data of the start of each sequence.
- * @var len_seq          Sequence lengths.
- * @var fasta_file_size  Size of the original file.
- * @var seq_name         Sequence names.
- * @var fasta_file_name  Name of the original file.
- */
 typedef struct {
-    int8_t *data;
+    uint32_t magic;
+    uint32_t version;
     uint32_t nb_seq;
     uint64_t pt_seq[MAX_SEQ_GEN];
     uint64_t len_seq[MAX_SEQ_GEN];
     uint64_t fasta_file_size;
-    char *seq_name[MAX_SEQ_GEN];
-    char *fasta_file_name;
+    char seq_name[MAX_SEQ_GEN][MAX_SEQ_NAME_SIZE];
+    int8_t *data;
+    int32_t *mapping_coverage;
 } genome_t;
 
-#include "upvc.h"
+void genome_create();
 
-/**
- * @brief Function that create the structure holding the information on the reference genome.
- *
- * @param filename_prefix  File to be parsed to find the genome information.
- * @param times_ctx        Times information for the whole application.
- *
- * @return The structure holding the informatino on the reference genome.
- */
-genome_t *get_genome(char *filename_prefix, times_ctx_t *times_ctx);
+void genome_load();
 
-/**
- * @brief Free a "genome_t" structure.
- *
- * @param genome  The "genome_t" structure to be freed.
- */
-void free_genome(genome_t *genome);
+void genome_free();
+
+genome_t *genome_get();
 
 #endif /* __GENOME_H__ */
