@@ -12,8 +12,8 @@
 typedef struct variant {
     uint32_t score;
     uint32_t depth;
-    char ref[MAX_SIZE_ALLELE];
-    char alt[MAX_SIZE_ALLELE];
+    char ref[MAX_SIZE_ALLELE+1];
+    char alt[MAX_SIZE_ALLELE+1];
     struct variant *next;
 } variant_t;
 

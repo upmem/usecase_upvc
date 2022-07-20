@@ -573,6 +573,10 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
     for (int i = 0; i < SIZE_READ; i++) {
         ref_genome->mapping_coverage[genome_pos + i] += 1;
     }
+    if (result_match.coord.seq_nr > ref_genome->nb_seq) {
+        LOG_WARN("skipping a read on a bogus sequence: %d\n", result_match.coord.seq_nr);
+        return;
+    }
 
 	for (; backtrack_end > backtrack; backtrack_end--) {
             unsigned int current_position = genome_pos+backtrack_end->ix;
@@ -605,19 +609,22 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
                             newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
                             newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
                             if (alt_idx >= MAX_SIZE_ALLELE || ref_idx >= MAX_SIZE_ALLELE) {
-                                LOG_WARN("ignored read because of a too complex variant\n")
+                                LOG_WARN("clipped a variant because it was too complex")
+                                break;
                             }
                             break;
                         case CODE_INS:
                             newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
                             if (alt_idx >= MAX_SIZE_ALLELE) {
-                                LOG_WARN("ignored read because of a too complex variant\n")
+                                LOG_WARN("clipped a variant because it was too complex")
+                                break;
                             }
                             break;
                         case CODE_DEL:
                             newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
                             if (ref_idx >= MAX_SIZE_ALLELE) {
-                                LOG_WARN("ignored read because of a too complex variant\n")
+                                LOG_WARN("clipped a variant because it was too complex")
+                                break;
                             }
                             break;
                     }
@@ -724,6 +731,11 @@ static void do_process_read(process_read_arg_t *arg)
           {
               considered_mappings[t][nb_considered_mappings[t]++] = x;
           }
+      }
+      for (int l=0; l<4; l++) {
+              if (nb_considered_mappings[l] > 4000) {
+                      LOG_WARN("nb_considered_mappings[%d] = %u\n", l, nb_considered_mappings[l]);
+              }
       }
 
       // i = start index in result_tab
