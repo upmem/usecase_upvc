@@ -569,6 +569,10 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
     if (backtrack_end->type == CODE_ERR)
         return;
 
+    #if DEBUG_READ_MAPPING
+    write_read_mapping_from_backtrack(ref_genome->seq_name[result_match.coord.seq_nr], result_match.coord.seed_nr, backtrack_end, read, result_match.num);
+    #endif
+
     /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
     for (int i = 0; i < SIZE_READ; i++) {
         ref_genome->mapping_coverage[genome_pos + i] += 1;
@@ -606,29 +610,30 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
                 for (;backtrack_end->type != 0 && backtrack_end->type != CODE_END; backtrack_end--) {
                     switch (backtrack_end->type) {
                         case CODE_SUB:
-                            newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
-                            newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
                             if (alt_idx >= MAX_SIZE_ALLELE || ref_idx >= MAX_SIZE_ALLELE) {
                                 LOG_WARN("clipped a variant because it was too complex")
-                                break;
+                                goto insert_variant;
                             }
+                            newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
+                            newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
                             break;
                         case CODE_INS:
-                            newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
                             if (alt_idx >= MAX_SIZE_ALLELE) {
                                 LOG_WARN("clipped a variant because it was too complex")
-                                break;
+                                goto insert_variant;
                             }
+                            newvar->alt[alt_idx++] = nucleotide[read[backtrack_end->jx] & 0x3];
                             break;
                         case CODE_DEL:
-                            newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
                             if (ref_idx >= MAX_SIZE_ALLELE) {
                                 LOG_WARN("clipped a variant because it was too complex")
-                                break;
+                                goto insert_variant;
                             }
+                            newvar->ref[ref_idx++] = nucleotide[ref_genome->data[genome_pos+backtrack_end->ix] & 0x3];
                             break;
                     }
                 }
+                insert_variant:
                 newvar->ref[ref_idx] = '\0';
                 newvar->alt[alt_idx] = '\0';
                 variant_tree_insert(
