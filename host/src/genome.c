@@ -142,6 +142,7 @@ struct codependence_chunk {
 
 static void allocate_new_codependence_chunk(int i) {
     STAT_RECORD_START(STAT_ALLOCATE_NEW_CHUNK);
+    LOG_INFO("allocating codependence_chunk (%lu)\n", sizeof(struct codependence_chunk));
     struct codependence_chunk* new_chunk = calloc(1, sizeof(struct codependence_chunk));
     assert(new_chunk != NULL);
     new_chunk->previous_chunk = last_allocated_codependence_chunk[i];

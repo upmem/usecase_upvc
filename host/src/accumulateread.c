@@ -177,6 +177,7 @@ acc_results_t accumulate_get_result(unsigned int pass_id, bool free_results)
     size_t size = ftell(result_file[pass_id]);
     rewind(result_file[pass_id]);
 
+    LOG_INFO("allocating %lu to accumulate results\n", size);
     dpu_result_out_t *results = (dpu_result_out_t *)malloc(size);
     assert(results != NULL);
     size_t size_read = fread(results, size, 1, result_file[pass_id]);
@@ -213,6 +214,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         return;
     }
 
+    LOG_INFO("allocating %lu for bucket_elems\n", sizeof(bucket_elem_t) * total_nb_res);
     bucket_elems = (bucket_elem_t *)malloc(sizeof(bucket_elem_t) * total_nb_res);
     assert(bucket_elems != NULL);
 
@@ -298,6 +300,7 @@ void accumulate_init(unsigned int max_nb_pass)
     result_file = (FILE **)calloc(nb_pass, sizeof(FILE *));
     assert(result_file != NULL);
 
+    LOG_INFO("allocating %lu for results_buffers\n", sizeof(acc_results_t) * nb_dpus_per_run * NB_DISPATCH_AND_ACC_BUFFER);
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpus_per_run);
         assert(results_buffers[each_pass] != NULL);

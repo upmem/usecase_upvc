@@ -11,6 +11,7 @@
 #include <math.h>
 
 #include "common.h"
+#include "debug.h"
 #include "getread.h"
 #include "upvc.h"
 
@@ -104,6 +105,7 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
     int8_t *reads_buffer = reads_buffers[pass_id];
     float* reads_quality_buffer = reads_quality_buffers[pass_id];
     if (reads_buffer == NULL) {
+        LOG_INFO("allocating %lu for reads_buffer\n", MAX_READS_BUFFER*SIZE_READ*(1+sizeof(float)));
         reads_buffer = (int8_t *)malloc(MAX_READS_BUFFER * SIZE_READ);
         reads_quality_buffer = (float *)malloc(MAX_READS_BUFFER/2 * SIZE_READ * sizeof(float));
         assert(reads_buffer != NULL);
