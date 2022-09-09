@@ -99,7 +99,7 @@ void variant_tree_init()
     genome_t *genome = genome_get();
     pthread_mutex_init(&mutex, NULL);
     for (unsigned int each_seq = 0; each_seq < genome->nb_seq; each_seq++) {
-        LOG_INFO("allocating variant_list (%luMB)\n", sizeof(variant_t*) * genome->len_seq[each_seq]);
+        LOG_INFO("allocating variant_list (%luMB)\n", sizeof(variant_t*) * genome->len_seq[each_seq]/1000000);
         variant_list[each_seq] = (variant_t **)calloc(genome->len_seq[each_seq], sizeof(variant_t *));
     }
 }

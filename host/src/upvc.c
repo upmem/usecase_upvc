@@ -313,7 +313,9 @@ static void do_mapping()
 {
     STAT_RECORD_START(STAT_DO_MAPPING);
     backends_functions.init_backend(&nb_dpus_per_run);
-    variant_tree_init();
+    if (!get_use_frequency_table()) {
+        variant_tree_init();
+    }
     dispatch_init();
     process_read_init();
     STAT_RECORD_STEP(STAT_DO_MAPPING, 0);
@@ -331,7 +333,9 @@ static void do_mapping()
 
     process_read_free();
     dispatch_free();
-    variant_tree_free();
+    if (!get_use_frequency_table()) {
+        variant_tree_free();
+    }
     backends_functions.free_backend();
     STAT_RECORD_LAST_STEP(STAT_DO_MAPPING, 3);
 }
