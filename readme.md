@@ -5,7 +5,7 @@ Installation
 ------------
 
 ```
-cmake -B build
+cmake -B build -D NB_DPU=128
 cd build
 make
 ```
