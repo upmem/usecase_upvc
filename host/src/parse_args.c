@@ -172,6 +172,23 @@ static void validate_use_frequency_table() {
 
 bool get_use_frequency_table() { return use_freq_table; }
 
+static char command_line[COMMAND_LINE_MAX_SIZE];
+static void store_command_line(int argc, char** argv) {
+    int index = 0;
+    for (int i=0; i<argc; i++) {
+        int len = strlen(argv[i]);
+        assert(index+len+1 < COMMAND_LINE_MAX_SIZE);
+        strcpy(&command_line[index], argv[i]);
+        index+=len;
+        command_line[index++] = ' ';
+    }
+    command_line[index] = 0;
+}
+
+char* get_command_line() {
+    return command_line;
+}
+
 /**************************************************************************************/
 /**************************************************************************************/
 void validate_args(int argc, char **argv)
@@ -179,6 +196,7 @@ void validate_args(int argc, char **argv)
     int opt;
     extern char *optarg;
 
+    store_command_line(argc, argv);
     prog_name = strdup(argv[0]);
     check_permission();
 

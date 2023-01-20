@@ -7,6 +7,9 @@
 
 #include <stdbool.h>
 
+
+#define COMMAND_LINE_MAX_SIZE 500
+
 typedef enum { goal_unknown, goal_index, goal_map } goal_t;
 
 /**
@@ -37,6 +40,8 @@ unsigned int get_nb_thread_for_simu();
 bool get_index_with_dpus();
 
 bool get_use_frequency_table();
+
+char* get_command_line();
 
 /**
  * @brief Parse and validate the argument of the application.

@@ -18,11 +18,12 @@
 #define MAX_DPU_RESULTS (1 << 19)
 #define MAX_RESULTS_PER_READ (1 << 10)
 
-#define SIZE_READ 120
+#define SIZE_READ 148
 #define SIZE_SEED 14
 #define SIZE_NEIGHBOUR_IN_BYTES ((SIZE_READ - SIZE_SEED) / 4)
 #define DELTA_NEIGHBOUR(round) ((SIZE_SEED * round) / 4)
 #define SIZE_IN_SYMBOLS(delta) ((SIZE_NEIGHBOUR_IN_BYTES - delta) * 4)
+#define SIZE_READ_NAME 64
 
 /**
  * @brief A snapshot of the MRAM.

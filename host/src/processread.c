@@ -2,6 +2,7 @@
  * Copyright 2016-2019 - Dominique Lavenier & UPMEM
  */
 
+#include <limits.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,9 +16,9 @@
 #include "genome.h"
 #include "getread.h"
 #include "processread.h"
+#include "samfile.h"
 #include "mapping_file.h"
 #include "upvc.h"
-#include "vartree.h"
 #include "parse_args.h"
 #include "profiling.h"
 
@@ -31,6 +32,8 @@
 #define CODE_T 2 /* ('T'>>1)&3   54H  0101 0100 */
 #define CODE_G 3 /* ('G'>>1)&3   47H  0100 0111 */
 
+char code_to_ascii[4] = "ACTG";
+
 #define PQD_INIT_VAL (999)
 
 #if SIZE_READ>120
@@ -39,8 +42,9 @@
 #define MAX_SUBSTITUTION 20
 #endif
 
-#define MAX_SCORE_DIFFERENCE_WITH_BEST 40
+#define MAX_SCORE_DIFFERENCE_WITH_BEST 20
 #define MAX_CONSIDERED_MAPPINGS 4000
+#define UNPAIRED_MALUS 50
 
 
 static int min(int a, int b) { return a < b ? a : b; }
@@ -121,7 +125,7 @@ int subOnlyPath(int8_t *s1, int8_t *s2, backtrack_t* backtrack, backtrack_t ** b
                     (*backtrack_end)++;
                     score += COST_SUB;
 		} else {
-                    (*backtrack_end)->type = 0;
+                    (*backtrack_end)->type = CODE_MATCH;
                     (*backtrack_end)->ix = i;
                     (*backtrack_end)->jx = i;
                     (*backtrack_end)++;
@@ -346,12 +350,71 @@ int DPD(int8_t *s1, int8_t *s2, backtrack_t *backtrack, backtrack_t ** backtrack
     return min_score;
 }
 
-#define NB_FREQ_TABLE_MUTEXES (1<<10)
-static pthread_mutex_t freq_table_mutexes[NB_FREQ_TABLE_MUTEXES+1];
-//static pthread_mutex_t print_mutex;
-static pthread_mutex_t codependence_list_mutex;
+int get_cigar(backtrack_t* backtrack_end, char* cigar)
+{
+    int cigar_length = 0;
+    char next_cigar_char = 0;
+    switch (backtrack_end->type) {
+        case CODE_MATCH:
+            next_cigar_char = '=';
+            break;
+        case CODE_SUB:
+            next_cigar_char = 'X';
+            break;
+        case CODE_INS:
+            next_cigar_char = 'I';
+            break;
+        case CODE_DEL:
+            next_cigar_char = 'D';
+            break;
+    }
+    unsigned int next_cigar_n = 0;
+    for (; backtrack_end->type!=CODE_END; backtrack_end--) {
+        switch (backtrack_end->type) {
+            case CODE_MATCH:
+                if (next_cigar_char != '=') {
+                    int written = sprintf(&(cigar[cigar_length]), "%u%c", next_cigar_n, next_cigar_char);
+                    cigar_length+=written;
+                    next_cigar_char = '=';
+                    next_cigar_n = 0;
+                }
+                break;
+            case CODE_SUB:
+                if (next_cigar_char != 'X') {
+                    int written = sprintf(&(cigar[cigar_length]), "%u%c", next_cigar_n, next_cigar_char);
+                    cigar+=written;
+                    next_cigar_char = 'X';
+                    next_cigar_n = 0;
+                }
+                break;
+            case CODE_INS:
+                if (next_cigar_char != 'I') {
+                    int written = sprintf(&(cigar[cigar_length]), "%u%c", next_cigar_n, next_cigar_char);
+                    cigar+=written;
+                    next_cigar_char = 'I';
+                    next_cigar_n = 0;
+                }
+                break;
+            case CODE_DEL:
+                if (next_cigar_char != 'D') {
+                    int written = sprintf(&(cigar[cigar_length]), "%u%c", next_cigar_n, next_cigar_char);
+                    cigar+=written;
+                    next_cigar_char = 'D';
+                    next_cigar_n = 0;
+                }
+                break;
+        }
+        next_cigar_n++;
+    }
+    int written = sprintf(&(cigar[cigar_length]), "%u%c", next_cigar_n, next_cigar_char);
+    cigar_length+=written;
+    cigar[cigar_length++] = 0;
+    return cigar_length;
+}
 
-bool update_frequency_table(
+
+/*
+bool report_mapping(
 		genome_t *ref_genome,
 		dpu_result_out_t *result_tab,
 		int8_t *reads_buffer,
@@ -362,8 +425,6 @@ bool update_frequency_table(
 		)
 {
     STAT_RECORD_START(STAT_UPDATE_FREQUENCY_TABLE);
-	struct frequency_info ** frequency_table = get_frequency_table();
-    struct variants_codependence_info_list** codependence_table = get_codependence_table(&codependence_list_mutex);
 	uint64_t genome_pos = ref_genome->pt_seq[result_tab[pos].coord.seq_nr] + result_tab[pos].coord.seed_nr;
 	int num = result_tab[pos].num;
 	int8_t *read = reads_buffer + (num * SIZE_READ);
@@ -373,7 +434,7 @@ bool update_frequency_table(
 	backtrack_t backtrack[SIZE_READ<<1];
 	backtrack_t * backtrack_end = backtrack;
 
-	/* First, try substitutions only */
+	// First, try substitutions only
 	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
     STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 0);
 
@@ -393,83 +454,9 @@ bool update_frequency_table(
     write_read_mapping_from_backtrack(ref_genome->seq_name[result_tab[pos].coord.seq_nr], result_tab[pos].coord.seed_nr, backtrack_end, read, num);
     #endif
 
-    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 2);
-
-	// /!\ Pointer arithmetics
-	unsigned int mutex_index = (genome_pos*NB_FREQ_TABLE_MUTEXES)/ref_genome->fasta_file_size;
-	unsigned int end_mutex_index = ((genome_pos+backtrack_end->ix)*NB_FREQ_TABLE_MUTEXES)/ref_genome->fasta_file_size;
-	pthread_mutex_lock(&freq_table_mutexes[mutex_index]);
-	if (end_mutex_index != mutex_index) {
-		pthread_mutex_lock(&freq_table_mutexes[end_mutex_index]);
-	}
-    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 3);
-	bool has_indel = false;
-        uint8_t read_letter;
-        //printf("genome_pos=%lu\n", genome_pos);
-    unsigned int variants_found = 0;
-    unsigned int variants_found_positions[SIZE_READ];
-    uint8_t variants_found_letters[SIZE_READ];
-	for (; backtrack_end > backtrack; backtrack_end--) {
-            unsigned int current_position = genome_pos+backtrack_end->ix;
-            //printf("backtrack_end->ix=%u; current_position=%u\n", backtrack_end->ix, current_position);
-            if (current_position > ref_genome->fasta_file_size) {
-                    continue;
-            }
-            switch (backtrack_end->type) {
-                    case CODE_SUB:
-                        read_letter = read[backtrack_end->jx];
-                        if (read_letter > 3) {
-                            read_letter = read_letter>>1 & 0x3;
-                        }
-
-                        // update codependence info
-                        for (unsigned int i=0; i<variants_found; i++) {
-                            //pthread_mutex_lock(&codependence_list_mutex);
-                            add_codependence_info(&codependence_table[current_position], (int16_t) (variants_found_positions[i]-current_position), read_letter, variants_found_letters[i], ref_genome->fasta_file_size, &codependence_list_mutex);
-                            add_codependence_info(&codependence_table[variants_found_positions[i]], (int16_t) (current_position-variants_found_positions[i]), variants_found_letters[i], read_letter, ref_genome->fasta_file_size, &codependence_list_mutex);
-                            //pthread_mutex_unlock(&codependence_list_mutex);
-                        }
-                        variants_found_positions[variants_found] = current_position;
-                        variants_found_letters[variants_found] = read_letter;
-                        variants_found++;
-
-                        frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
-                        frequency_table[read_letter][current_position].score++;
-
-
-                        if (unsure) {
-                            frequency_table[read_letter][current_position].unsure_score++;
-                        }
-                        break;
-                    case CODE_MATCH:
-                        read_letter = read[backtrack_end->jx];
-                        if (read_letter > 3) {
-                            read_letter = read_letter>>1 & 0x3;
-                        }
-                        frequency_table[read_letter][current_position].freq += mapq * read_quality[invert_read ? SIZE_READ-backtrack_end->jx-1 : backtrack_end->jx];
-                        frequency_table[read_letter][current_position].score++;
-
-
-                        if (unsure) {
-                            frequency_table[read_letter][current_position].unsure_score++;
-                        }
-                        break;
-                    case CODE_INS:
-                    case CODE_DEL:
-                        has_indel = true;
-                        //LOG_WARN("unhandled indel\n");
-                        // TODO: handle indels
-                        break;
-            }
-    }
-    STAT_RECORD_STEP(STAT_UPDATE_FREQUENCY_TABLE, 4);
-	pthread_mutex_unlock(&freq_table_mutexes[mutex_index]);
-	if (end_mutex_index != mutex_index) {
-		pthread_mutex_unlock(&freq_table_mutexes[end_mutex_index]);
-	}
-    STAT_RECORD_LAST_STEP(STAT_UPDATE_FREQUENCY_TABLE, 5);
-	return has_indel;
+    STAT_RECORD_LAST_STEP(STAT_UPDATE_FREQUENCY_TABLE, 2);
 }
+*/
 
 static volatile unsigned int curr_match;
 static pthread_mutex_t curr_match_mutex;
@@ -490,23 +477,25 @@ static pthread_barrier_t barrier;
 typedef struct {
     unsigned int nb_match;
     dpu_result_out_t *result_tab;
-    int round;
+    int processing_round;
     int8_t *reads_buffer;
     float *reads_quality_buffer;
+    char *reads_name_buffer;
     genome_t *ref_genome;
     FILE *fpe1;
     FILE *fpe2;
 } process_read_arg_t;
 
 static uint64_t nr_reads_total = 0ULL;
-static uint64_t nr_reads_total_from_dpus = 0ULL;
-static uint64_t nr_reads_non_mapped = 0ULL;
-static uint64_t nr_reads_with_indels = 0ULL;
-static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
+// static uint64_t nr_reads_total_from_dpus = 0ULL;
+// static uint64_t nr_reads_non_mapped = 0ULL;
+// static uint64_t nr_reads_with_indels = 0ULL;
+// static pthread_mutex_t nr_reads_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define MISMATCH_COUNT(X) (X.score / 10) 
 #define INVALID_SCORE 1000
 
+/*
 static void keep_best_2_scores(unsigned score, unsigned* P1, unsigned *P2, unsigned x1, unsigned x2, unsigned* best_score) {
 
   if(score < best_score[0]) {
@@ -528,7 +517,9 @@ static void keep_best_2_scores(unsigned score, unsigned* P1, unsigned *P2, unsig
     P2[1] = x2;
   }
 }
+*/
 
+/*
 static unsigned get_nb_scores(unsigned int * best_score) {
 
     unsigned np = 0;
@@ -538,21 +529,23 @@ static unsigned get_nb_scores(unsigned int * best_score) {
     }
     return np;
 }
+*/
 
+/*
 static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int8_t *reads_buffer)
 {
     int8_t *read = &reads_buffer[result_match.num * SIZE_READ];
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     uint64_t genome_pos = ref_genome->pt_seq[result_match.coord.seq_nr] + result_match.coord.seed_nr;
 
-    /* Get the differences betweend the read and the sequence of the reference genome that match */
+    // Get the differences betweend the read and the sequence of the reference genome that match
     read = &reads_buffer[result_match.num * SIZE_READ];
 
     // code_alignment(code_result_tab, result_match.score, &ref_genome->data[genome_pos], read, size_neighbour_in_symbols);
 	backtrack_t backtrack[SIZE_READ<<1];
 	backtrack_t * backtrack_end = backtrack;
 
-	/* First, try substitutions only */
+	// First, try substitutions only
 	unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
 
 	if (computed_score > result_match.score) {
@@ -573,7 +566,7 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
     write_read_mapping_from_backtrack(ref_genome->seq_name[result_match.coord.seq_nr], result_match.coord.seed_nr, backtrack_end, read, result_match.num);
     #endif
 
-    /* Update "mapping_coverage" with the number of reads that match at this position of the genome */
+    // Update "mapping_coverage" with the number of reads that match at this position of the genome
     for (int i = 0; i < SIZE_READ; i++) {
         ref_genome->mapping_coverage[genome_pos + i] += 1;
     }
@@ -642,9 +635,11 @@ static void set_variant(dpu_result_out_t result_match, genome_t *ref_genome, int
             }
     }
 }
+*/
 
+/*
 static pthread_mutex_t non_mapped_mutex;
-static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
+static void add_to_non_mapped_read(int numread, int processing_round, FILE *fpe1, FILE *fpe2, int8_t *reads_buffer)
 {
     STAT_RECORD_START(STAT_ADD_TO_NON_MAPPED_READ);
     if (fpe1 == NULL || fpe2 == NULL)
@@ -653,7 +648,7 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     STAT_RECORD_STEP(STAT_ADD_TO_NON_MAPPED_READ, 0);
     char nucleotide[4] = { 'A', 'C', 'T', 'G' };
     int8_t *read = &reads_buffer[numread * SIZE_READ];
-    fprintf(fpe1, ">>%d\n", SIZE_SEED * (round + 1));
+    fprintf(fpe1, ">>%d\n", SIZE_SEED * (processing_round + 1));
     for (int j = SIZE_SEED; j < SIZE_READ; j++) {
         fprintf(fpe1, "%c", nucleotide[read[j] & 3]);
     }
@@ -662,7 +657,7 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     }
     fprintf(fpe1, "\n");
     read = &reads_buffer[(numread + 2) * SIZE_READ];
-    fprintf(fpe2, ">>%d\n", SIZE_SEED * (round + 1));
+    fprintf(fpe2, ">>%d\n", SIZE_SEED * (processing_round + 1));
     for (int j = SIZE_SEED; j < SIZE_READ; j++) {
         fprintf(fpe2, "%c", nucleotide[read[j] & 3]);
     }
@@ -674,6 +669,45 @@ static void add_to_non_mapped_read(int numread, int round, FILE *fpe1, FILE *fpe
     pthread_mutex_unlock(&non_mapped_mutex);
     STAT_RECORD_LAST_STEP(STAT_ADD_TO_NON_MAPPED_READ, 2);
 }
+*/
+
+static void report_unmapped_read(process_read_arg_t *arg, int read_num, bool pair_unmapped, dpu_result_out_t *paired_mapping)
+{
+    int8_t *reads_buffer = arg->reads_buffer;
+    float *reads_quality_buffer = arg->reads_quality_buffer;
+    char *reads_name_buffer = arg->reads_name_buffer;
+    genome_t *ref_genome = arg->ref_genome;
+
+    char *qname = &reads_name_buffer[SIZE_READ_NAME*read_num/2];
+    uint16_t flag = IS_PAIR | SEGMENT_UNMAPPED;
+    if (pair_unmapped) flag |= PAIRED_SEGMENT_UNMAPPED;
+
+    char cigar[2] = "*";
+    int8_t *read = &reads_buffer[read_num*SIZE_READ];
+    float* read_qual = &reads_quality_buffer[(read_num/2)*SIZE_READ];
+    char seq[SIZE_READ+1];
+    char qual[SIZE_READ+1];
+    for (int i=0; i<SIZE_READ; i++) {
+        seq[i] = code_to_ascii[read[i]];
+        qual[i] = (int) round(33-10*log10f(1-read_qual[i]));
+    }
+    int ref = 0;
+    int pos = 0;
+    int mapq = 255;
+
+    int ref_next;
+    int pos_next;
+    int tlen = 0;
+    if (pair_unmapped) {
+        ref_next = paired_mapping->coord.seq_nr;
+        pos_next = paired_mapping->coord.seed_nr+1;
+    } else {
+        ref_next = 0;
+        pos_next = 0;
+    }
+
+    write_sam_alignment(ref_genome, ref, pos, qname, mapq, cigar, ref_next, pos_next, tlen, seq, qual, flag, INT_MAX, 255);
+}
 
 /*#define USE_MAPQ_SCORE*/
 static void do_process_read(process_read_arg_t *arg)
@@ -681,12 +715,10 @@ static void do_process_read(process_read_arg_t *arg)
     STAT_RECORD_START(STAT_DO_PROCESS_READ);
     const unsigned int nb_match = arg->nb_match;
     dpu_result_out_t *result_tab = arg->result_tab;
-    int round = arg->round;
     int8_t *reads_buffer = arg->reads_buffer;
     float *reads_quality_buffer = arg->reads_quality_buffer;
+    char *reads_name_buffer = arg->reads_name_buffer;
     genome_t *ref_genome = arg->ref_genome;
-    FILE *fpe1 = arg->fpe1;
-    FILE *fpe2 = arg->fpe2;
 
     /*
      * The number of a pair is given by "num_read / 4 " (see dispatch_read function)
@@ -719,16 +751,23 @@ static void do_process_read(process_read_arg_t *arg)
       STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 1);
 
       // find best mapping scores for each of the four reads considered
-      unsigned int best_individual_scores[4] = {UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX};
+      uint32_t best_individual_scores[4] = {UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX};
+      int n_best_individual_scores[4] = {0, 0, 0, 0};
+      int best_individual_indices[4] = {i,i,j-1,j-1};
       for (unsigned int x=i; x<j; x++)
       {
           unsigned int t = result_tab[x].num % 4;
-          if (best_individual_scores[t] > result_tab[x].score)
+          if (best_individual_scores[t] > result_tab[x].score) {
               best_individual_scores[t] = result_tab[x].score;
+              best_individual_indices[t] = x;
+              n_best_individual_scores[t] = 1;
+          } else if (best_individual_scores[t] == result_tab[x].score) {
+              n_best_individual_scores[t]++;
+          }
       }
 
-      unsigned int nb_considered_mappings[4] = {0,0,0,0};
-      unsigned int considered_mappings[4][MAX_CONSIDERED_MAPPINGS];
+      int nb_considered_mappings[4] = {0,0,0,0};
+      int considered_mappings[4][MAX_CONSIDERED_MAPPINGS];
       for (unsigned int x=i; x<j; x++)
       {
           int t = result_tab[x].num % 4;
@@ -743,250 +782,141 @@ static void do_process_read(process_read_arg_t *arg)
               }
       }
 
-      // i = start index in result_tab
-      // j = stop index in result_tab
-      // select best couples of paired reads
-      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 2);
-      unsigned int P1[2] = {i,i};
-      unsigned int P2[2] = {j-1,j-1};
-      unsigned int pos1, pos2;
-      unsigned int best_score[2] = { INVALID_SCORE, INVALID_SCORE };
-
-      for (unsigned int x1 = 0; x1 < nb_considered_mappings[0]; x1++) {
-        pos1 = result_tab[considered_mappings[0][x1]].coord.seed_nr;
-        int score1 = result_tab[considered_mappings[0][x1]].score;
-        for (unsigned int x2 = 0; x2 < nb_considered_mappings[3]; x2++) {
-          pos2 = result_tab[considered_mappings[3][x2]].coord.seed_nr;
-          int score2 = result_tab[considered_mappings[3][x2]].score;
-          if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
-            // update if this is one of the two best scores
-            keep_best_2_scores(score1 + score2, P1, P2, considered_mappings[0][x1], considered_mappings[3][x2], best_score);
+      // Select best pair
+      unsigned int primary_alignments[2] = {best_individual_indices[1],best_individual_indices[2]};
+      uint32_t best_score = best_individual_scores[1] + best_individual_scores[2];
+      // By default, start by selecting the best individual scores (but trying to match differing alignment order)
+      if (best_individual_scores[0] + best_individual_scores[3] > best_score) {
+          best_score = best_individual_scores[0] + best_individual_scores[3];
+          primary_alignments[0] = best_individual_indices[0];
+          primary_alignments[1] = best_individual_indices[3];
+      }
+      best_score += UNPAIRED_MALUS;
+      for (int x1 = 0; x1 < nb_considered_mappings[0]; x1++) {
+        int pos1 = result_tab[considered_mappings[0][x1]].coord.seed_nr;
+        uint32_t score1 = result_tab[considered_mappings[0][x1]].score;
+        for (int x2 = 0; x2 < nb_considered_mappings[3]; x2++) {
+          int pos2 = result_tab[considered_mappings[3][x2]].coord.seed_nr;
+          uint32_t score2 = result_tab[considered_mappings[3][x2]].score;
+          if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND)) &&
+              score1+score2 < best_score) {
+              best_score = score1+score2;
+              primary_alignments[0] = considered_mappings[0][x1];
+              primary_alignments[1] = considered_mappings[3][x2];
           }
         }
       }
-      for (unsigned int x1 = 0; x1 < nb_considered_mappings[1]; x1++) {
-        pos1 = result_tab[considered_mappings[1][x1]].coord.seed_nr;
-        int score1 = result_tab[considered_mappings[1][x1]].score;
-        for (unsigned int x2 = 0; x2 < nb_considered_mappings[2]; x2++) {
-          pos2 = result_tab[considered_mappings[2][x2]].coord.seed_nr;
-          int score2 = result_tab[considered_mappings[2][x2]].score;
-          if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND))) {
-            // update if this is one of the two best scores
-            keep_best_2_scores(score1 + score2, P1, P2, considered_mappings[1][x1], considered_mappings[2][x2], best_score);
+      for (int x1 = 0; x1 < nb_considered_mappings[1]; x1++) {
+        int pos1 = result_tab[considered_mappings[1][x1]].coord.seed_nr;
+        uint32_t score1 = result_tab[considered_mappings[1][x1]].score;
+        for (int x2 = 0; x2 < nb_considered_mappings[2]; x2++) {
+          int pos2 = result_tab[considered_mappings[2][x2]].coord.seed_nr;
+          uint32_t score2 = result_tab[considered_mappings[2][x2]].score;
+          if ((abs((int)pos2 - (int)pos1) > READ_DIST_LOWER_BOUND && (abs((int)pos2 - (int)pos1) < READ_DIST_UPPER_BOUND)) &&
+              score1+score2 < best_score) {
+              best_score = score1+score2;
+              primary_alignments[0] = considered_mappings[1][x1];
+              primary_alignments[1] = considered_mappings[2][x2];
           }
         }
       }
-      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 3);
 
-      bool update = false;
-      bool hasIndel = false;
-
-      unsigned np = get_nb_scores(best_score);
-      if (np > 0) {
-	LOG_DEBUG("found at least a pair (%u)\n", np);
-
-        if(np == 2) {//if(false) {
-
-          // found at least 2 matching pairs of positions. Check the delta between the two pairs to 
-          // decide whether we should keep the best pair
-          int delta = abs((int)(MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) 
-              - (int)(MISMATCH_COUNT(result_tab[P1[1]]) + MISMATCH_COUNT(result_tab[P2[1]])));
-
-          float mapq = 1.0f;
-#ifdef USE_MAPQ_SCORE
-          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) 
-            + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
-          if(delta_corrected < 0) {
-            LOG_WARN("negative delta for square root %d\n", delta_corrected);
-          }
-          else if(delta >= DIST_PAIR_THRESHOLD) {
-            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-#else
-          if(delta >= DIST_PAIR_THRESHOLD) {
-#endif
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
-            } else {
-                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
-                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
-            }
-            update = true;
-          } else {
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, true);
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, true);
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[1], mapq, true);
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[1], mapq, true);
-            } else {
-                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
-                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
-                set_variant(result_tab[P1[1]], ref_genome, reads_buffer);
-                set_variant(result_tab[P2[1]], ref_genome, reads_buffer);
-            }
-            // LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
-          }
-        }
-        else if(np) { // only one result, take it
-          int delta = abs((int)(MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]])) - (2 * (MAX_SUBSTITUTION + 1)));
-          float mapq = 1.0f;
-#ifdef USE_MAPQ_SCORE
-          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((2 * (MAX_SUBSTITUTION + 1)) - delta);
-          if(delta_corrected < 0) {
-            LOG_WARN("negative delta (np == 1) for square root %d\n", delta_corrected);
-          }
-          else if(delta >= DIST_PAIR_THRESHOLD) {
-            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-#else
-          if(delta >= DIST_PAIR_THRESHOLD) {
-#endif
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
-            } else {
-                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
-                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
-            }
-            update = true;
-          }/* else {
-            LOG_WARN("unusable pair (%u)\n", result_tab[i].num/4);
-          }*/
-        }
-      }// else {
-      if (true) {
-
-        // check mapping of R1 and R2 independently
-        unsigned int best_score_R1[2] = { INVALID_SCORE, INVALID_SCORE };
-        unsigned int best_score_R2[2] = { INVALID_SCORE, INVALID_SCORE };
-        unsigned int throwaway[2];
-        P1[0] = 0;
-        P2[0] = 0;
-        P1[1] = 0;
-        P2[1] = 0;
-        for (unsigned int read = i; read < j; read++) {
-          unsigned t1 = result_tab[read].num % 4;
-          if(t1 < 2) { // PE1 or RPE1
-            keep_best_2_scores(result_tab[read].score, P1, throwaway, read, 0, best_score_R1);
-          }
-          else { // PE2 or RPE2
-            keep_best_2_scores(result_tab[read].score, throwaway, P2, 0, read, best_score_R2);
-          }
-        }
-
-        unsigned np1 = get_nb_scores(best_score_R1), np2 = get_nb_scores(best_score_R2);
-        if(np1 == 2) {
-
-          int delta = abs((int)MISMATCH_COUNT(result_tab[P1[0]]) - (int)MISMATCH_COUNT(result_tab[P1[1]]));
-
-          float mapq = 1.0f;
-#ifdef USE_MAPQ_SCORE
-          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
-
-          if(delta_corrected < 0) {
-            LOG_WARN("negative delta (np1 == 2) for square root %d\n", delta_corrected);
-          }
-          else if(delta >= DIST_SINGLE_THRESHOLD) {
-            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-#else
-          if(delta >= DIST_SINGLE_THRESHOLD) {
-#endif
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
-            } else {
-                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
-            }
-            update = true;
-          }
-        }
-        else if(np1) {
-          int delta = abs((int)MISMATCH_COUNT(result_tab[P1[0]]) - (MAX_SUBSTITUTION + 1));
-
-          float mapq = 1.0f;
-#ifdef USE_MAPQ_SCORE
-          int delta_corrected = MISMATCH_COUNT(result_tab[P1[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
-
-          if(delta_corrected < 0) {
-            LOG_WARN("negative delta (np1 == 1) for square root %d\n", delta_corrected);
-          }
-          else if(delta >= DIST_SINGLE_THRESHOLD) {
-            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-#else
-          if(delta >= DIST_SINGLE_THRESHOLD) {
-#endif
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P1[0], mapq, false);
-            } else {
-                set_variant(result_tab[P1[0]], ref_genome, reads_buffer);
-            }
-            update = true;
-          }
-        }
-
-        if(np2 == 2) {
-
-          int delta = abs((int)MISMATCH_COUNT(result_tab[P2[0]]) - (int)MISMATCH_COUNT(result_tab[P2[1]]));
-
-          float mapq = 1.0f;
-#ifdef USE_MAPQ_SCORE
-          int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
-
-          if(delta_corrected < 0) {
-            LOG_WARN("negative delta (np2 == 2) for square root %d, %d %d %d %d\n", 
-                delta_corrected, MISMATCH_COUNT(result_tab[P2[0]]), MISMATCH_COUNT(result_tab[P2[1]]), MAX_SUBSTITUTION + 1, delta);
-          }
-          else if(delta >= DIST_SINGLE_THRESHOLD) {
-            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-#else
-          if(delta >= DIST_SINGLE_THRESHOLD) {
-#endif
-
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
-            } else {
-                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
-            }
-            update = true;
-          }
-        }
-        else if(np2) {
-          int delta = abs((int)MISMATCH_COUNT(result_tab[P2[0]]) - (MAX_SUBSTITUTION + 1));
-
-          float mapq = 1.0f;
-#ifdef USE_MAPQ_SCORE
-          int delta_corrected = MISMATCH_COUNT(result_tab[P2[0]]) + MAPQ_SCALING_FACTOR * ((MAX_SUBSTITUTION + 1) - delta);
-
-          if(delta_corrected < 0) {
-            LOG_WARN("negative delta (np2 == 1) for square root %d\n", delta_corrected);
-          }
-          else if (delta >= DIST_SINGLE_THRESHOLD) {
-            mapq = 1.0 - sqrt((double)delta_corrected / SIZE_READ);
-#else
-          if (delta >= DIST_SINGLE_THRESHOLD) {
-#endif
-            if (get_use_frequency_table()) {
-                hasIndel |= update_frequency_table(ref_genome, result_tab, reads_buffer, reads_quality_buffer, P2[0], mapq, false);
-            } else {
-                set_variant(result_tab[P2[0]], ref_genome, reads_buffer);
-            }
-            update = true;
-          }
-        }
-      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 4);
-        if(!update) {
-            //pthread_mutex_lock(&nr_reads_mutex);
-            nr_reads_non_mapped++;
-            //pthread_mutex_unlock(&nr_reads_mutex);
-            add_to_non_mapped_read(numpair * 4, round, fpe1, fpe2, reads_buffer);
-        }
-        if(hasIndel)
-            nr_reads_with_indels++;
-        pthread_mutex_lock(&nr_reads_mutex);
-        nr_reads_total_from_dpus++;
-        pthread_mutex_unlock(&nr_reads_mutex);
+      // Print sam records
+      // Todo: print unmapped segments if their pair is mapped.
+      if (n_best_individual_scores[0]+n_best_individual_scores[1] == 0) {
+          report_unmapped_read(arg, numpair*4, (n_best_individual_scores[2]+n_best_individual_scores[3] == 0), &result_tab[primary_alignments[1]]);
       }
-      STAT_RECORD_STEP(STAT_DO_PROCESS_READ, 5);
+      float mapq_offsets[2];
+      int best_read_score[2];
+      if (best_individual_scores[0] < best_individual_scores[1]) best_read_score[0] = best_individual_scores[0];
+      else best_read_score[0] = best_individual_scores[1];
+      if (best_individual_scores[2] < best_individual_scores[3]) best_read_score[1] = best_individual_scores[2];
+      else best_read_score[1] = best_individual_scores[3];
+      mapq_offsets[0] = 10*log10f((float) (n_best_individual_scores[0]+n_best_individual_scores[1]));
+      mapq_offsets[1] = 10*log10f((float) (n_best_individual_scores[2]+n_best_individual_scores[3]));
+      for (int category = 0; category<4; category++) {
+          for (int t=0; t<nb_considered_mappings[category]; t++) {
+              unsigned int x = considered_mappings[category][t];
+              if (result_tab[x].score < result_tab[primary_alignments[category>>1]].score || x == primary_alignments[category>>1]) {
+                  uint64_t genome_pos = ref_genome->pt_seq[result_tab[x].coord.seq_nr] + result_tab[x].coord.seed_nr;
+                  int8_t* read = &reads_buffer[result_tab[x].num*SIZE_READ];
+                  float* read_qual = &reads_quality_buffer[(result_tab[x].num>>1)*SIZE_READ];
+
+                  backtrack_t backtrack[SIZE_READ<<1];
+                  backtrack_t * backtrack_end = backtrack;
+                  // First, try substitutions only
+                  unsigned int computed_score = subOnlyPath(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
+                  if (computed_score > result_tab[x].score) {
+                      computed_score = DPD(&ref_genome->data[genome_pos], read, backtrack, &backtrack_end);
+                      if (computed_score == result_tab[x].score) {
+                          reads_correct_cost_DPD++;
+                      } else {
+                          // assert(initially_computed_score < 50);
+                          // assert(computed_score < 50);
+                          // assert(initially_computed_score > computed_score);
+                          reads_not_correct_cost++;
+                      }
+                  } else {
+                      reads_correct_cost_sub_only++;
+                  }
+                  int category = result_tab[x].num % 4;
+                  int paired = 1-(category>>1);
+                  int ref = result_tab[x].coord.seq_nr;
+                  int pos = result_tab[x].coord.seed_nr+1;
+                  // char qname[2] = "*";// TODO: find qname
+                  char *qname = &reads_name_buffer[SIZE_READ_NAME*result_tab[x].num/2];
+                  // assert(reads_name_buffer[SIZE_READ_NAME*result_tab[x].num] != '\0');
+                  char cigar[SIZE_READ<<2];
+                  get_cigar(backtrack_end, cigar);
+                  int ref_next = result_tab[primary_alignments[paired]].coord.seq_nr;
+                  int pos_next = result_tab[primary_alignments[paired]].coord.seed_nr+1;
+                  int tlen = 0;
+                  if (ref == ref_next && x==primary_alignments[category>>1]) {
+                      tlen = pos_next-pos;
+                      // FIXME: use actual mapping length in tlen computation
+                      if (pos > pos_next) {
+                          tlen += SIZE_READ;//mapping length
+                      } else {
+                          tlen += SIZE_READ;//paired mapping length
+                      }
+                  }
+                  char seq[SIZE_READ+1];
+                  char qual[SIZE_READ+1];
+                  for (int i=0; i<SIZE_READ; i++) {
+                      seq[i] = code_to_ascii[read[i]];
+                      qual[i] = (int) round(33-10*log10f(1-read_qual[i]));
+                  }
+                  uint16_t flag = IS_PAIR;
+                  // FIXME: output unmapped reads at the correct place in the template.
+                  if (best_individual_scores[paired<<1] == UINT32_MAX && best_individual_scores[(paired<<1)+1] == UINT32_MAX) flag |= PAIRED_SEGMENT_UNMAPPED;
+                  if ((flag & (SEGMENT_UNMAPPED | PAIRED_SEGMENT_UNMAPPED)) == 0) flag |= ALL_SEGMENTS_MAPPED;
+                  if (category&0x1) flag |= SEQ_REVERSED;
+                  if (result_tab[primary_alignments[paired]].num&0x1) flag |= NEXT_SEQ_REVERSED;
+                  if (category&0x2) { flag |= IS_LAST_SEGMENT; } else { flag |= IS_FIRST_SEGMENT; }
+                  if (x!=primary_alignments[category>>1]) flag |= IS_SECONDARY_ALIGNMENT;
+
+
+                  int alignment_score = computed_score;
+                  int independent_mapq = (int)(SCORE_TO_MAPQ_FACTOR * (float) (alignment_score-best_read_score[category>>1]));
+                  if (alignment_score <= best_read_score[category>>1]) independent_mapq += mapq_offsets[category>>1];
+                  if (independent_mapq<0) independent_mapq=0;
+                  int mapq = independent_mapq;
+                  if (independent_mapq>254) independent_mapq=254;
+                  if (result_tab[x].coord.seq_nr == result_tab[primary_alignments[paired]].coord.seq_nr  &&
+                          abs((int)result_tab[x].coord.seed_nr - (int)result_tab[primary_alignments[paired]].coord.seed_nr) < READ_DIST_UPPER_BOUND) {
+                      mapq -= 10;// TODO: adjust this value; probably a little bullshit. Maybe instead add to mapq
+                      if (mapq<0) mapq = 0;
+                  }
+                  if (mapq>254) mapq=254;
+
+                  write_sam_alignment(ref_genome, ref, pos, qname, mapq, cigar, ref_next, pos_next, tlen, seq, qual, flag, alignment_score, independent_mapq);
+              }
+          }
+      }
+      if (n_best_individual_scores[2]+n_best_individual_scores[3] == 0) {
+          report_unmapped_read(arg, numpair*4+2, (n_best_individual_scores[0]+n_best_individual_scores[1] == 0), &result_tab[primary_alignments[0]]);
+      }
     }
-    STAT_RECORD_LAST_STEP(STAT_DO_PROCESS_READ, 6);
 }
 
 #define PROCESS_READ_THREAD (8)
@@ -995,20 +925,22 @@ static process_read_arg_t args;
 static pthread_t thread_id[PROCESS_READ_THREAD_SLAVE];
 static bool stop_threads = false;
 
-void process_read(FILE *fpe1, FILE *fpe2, int round, unsigned int pass_id)
+void process_read(FILE *fpe1, FILE *fpe2, int processing_round, unsigned int pass_id)
 {
     STAT_RECORD_START(STAT_PROCESS_READ);
     int8_t *reads_buffer = get_reads_buffer(pass_id);
     float *reads_quality_buffer = get_reads_quality_buffer(pass_id);
+    char *reads_name_buffer = get_reads_name_buffer(pass_id);
     acc_results_t acc_res = accumulate_get_result(pass_id, true);
     nr_reads_total += get_reads_in_buffer(pass_id) / 4;
     curr_match = 0;
 
     args.nb_match = acc_res.nb_res;
     args.result_tab = acc_res.results;
-    args.round = round;
+    args.processing_round = processing_round;
     args.reads_buffer = reads_buffer;
     args.reads_quality_buffer = reads_quality_buffer;
+    args.reads_name_buffer = reads_name_buffer;
     args.fpe1 = fpe1;
     args.fpe2 = fpe2;
 
@@ -1042,12 +974,9 @@ void process_read_init()
 #endif
     genome_t *ref_genome = genome_get();
     args.ref_genome = ref_genome;
+    init_sam_file("samfile_name_tbd.sam", ref_genome);
 
     assert(pthread_mutex_init(&curr_match_mutex, NULL) == 0);
-    assert(pthread_mutex_init(&non_mapped_mutex, NULL) == 0);
-    for (int i=0; i<NB_FREQ_TABLE_MUTEXES+1; i++) {
-        assert(pthread_mutex_init(&freq_table_mutexes[i], NULL) == 0);
-    }
     assert(pthread_barrier_init(&barrier, NULL, PROCESS_READ_THREAD) == 0);
 
     for (unsigned int each_thread = 0; each_thread < PROCESS_READ_THREAD_SLAVE; each_thread++) {
@@ -1069,6 +998,7 @@ void process_read_free()
 
     assert(pthread_barrier_destroy(&barrier) == 0);
     assert(pthread_mutex_destroy(&curr_match_mutex) == 0);
+    /*
     assert(pthread_mutex_destroy(&non_mapped_mutex) == 0);
     for (int i=0; i<NB_FREQ_TABLE_MUTEXES+1; i++) {
         assert(pthread_mutex_init(&freq_table_mutexes[i], NULL) == 0);
@@ -1082,4 +1012,5 @@ void process_read_free()
     fprintf(stderr, "%% reads with indels: %f%%\n", (float)nr_reads_with_indels * 100.0 / (float)(nr_reads_total_from_dpus - nr_reads_non_mapped));
     fprintf(stderr, "%% Total reads from dpus: %ld\n", nr_reads_total_from_dpus);
     fprintf(stderr, "%% Total reads: %ld\n", nr_reads_total);
+    */
 }

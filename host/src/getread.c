@@ -20,6 +20,7 @@
 static int nb_reads[NB_READS_BUFFER];
 static int8_t *reads_buffers[NB_READS_BUFFER];
 static float *reads_quality_buffers[NB_READS_BUFFER];
+static char *reads_name_buffers[NB_READS_BUFFER];
 static float quality_lookup_table[43];
 static bool lookup = false;
 #define PASS(pass_id) (pass_id % NB_READS_BUFFER)
@@ -36,7 +37,7 @@ static bool lookup = false;
  *
  * @return The size of the read.
  */
-static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, float *read_quality_factor)
+static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, float *read_quality_factor, char *read_name)
 {
     static const int invnt[4] = { 2, 3, 0, 1 };
     int offset = 0;
@@ -54,10 +55,10 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, float *read_qu
      * it means that we need the skip the first 14 characters of the read.
      */
     if (comment[1] == '>') {
-          sscanf(&comment[2], "%d", &offset);
-      }
-      int i;
-      for (i = 0; i < SIZE_READ - offset; i++) {
+        sscanf(&comment[2], "%d", &offset);
+    }
+    int i;
+    for (i = 0; i < SIZE_READ - offset; i++) {
         read1[i] = (((int)sequence_buffer[i]) >> 1) & 3;
         read2[SIZE_READ - i - 1 - offset] = invnt[read1[i]];
     }
@@ -65,6 +66,22 @@ static int get_seq_fast_AQ(FILE *f, int8_t *read1, int8_t *read2, float *read_qu
         read1[i] = 0;
         read2[i] = 0;
     }
+    for (i=0; i<SIZE_READ_NAME; i++) {
+        switch (comment[i+1]) {
+            case ' ':
+            case '\n':
+            case '\t':
+            case '\0':
+                read_name[i] = '\0';
+                break;
+                // TODO: also break out of the loop then.
+            default:
+                read_name[i] = comment[i+1];
+        }
+        // printf("%c", read_name[i]);
+    }
+    // printf("\n");
+    read_name[SIZE_READ_NAME-1] = '\0';
 
     if (comment[0] == '>') {
         return SIZE_READ;
@@ -103,13 +120,17 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
 
     int8_t *reads_buffer = reads_buffers[pass_id];
     float* reads_quality_buffer = reads_quality_buffers[pass_id];
+    char *reads_name_buffer = reads_name_buffers[pass_id];
     if (reads_buffer == NULL) {
         reads_buffer = (int8_t *)malloc(MAX_READS_BUFFER * SIZE_READ);
         reads_quality_buffer = (float *)malloc(MAX_READS_BUFFER/2 * SIZE_READ * sizeof(float));
+        reads_name_buffer = (char *)malloc(MAX_READS_BUFFER * SIZE_READ_NAME);
         assert(reads_buffer != NULL);
         assert(reads_quality_buffer != NULL);
+        assert(reads_name_buffer != NULL);
         reads_buffers[pass_id] = reads_buffer;
         reads_quality_buffers[pass_id] = reads_quality_buffer;
+        reads_name_buffers[pass_id] = reads_name_buffer;
     }
 
     while (nb_read < MAX_READS_BUFFER) {
@@ -118,9 +139,9 @@ void get_reads(FILE *fpe1, FILE *fpe2, unsigned int pass_id)
             break;
             */
         if ((get_seq_fast_AQ(fpe1, &reads_buffer[(nb_read + 0) * SIZE_READ], &reads_buffer[(nb_read + 1) * SIZE_READ], 
-                &reads_quality_buffer[nb_read/2 * SIZE_READ]) <= 0)
+                &reads_quality_buffer[nb_read/2 * SIZE_READ], &reads_name_buffer[nb_read/2 * SIZE_READ_NAME]) <= 0)
             || (get_seq_fast_AQ(fpe2, &reads_buffer[(nb_read + 2) * SIZE_READ], &reads_buffer[(nb_read + 3) * SIZE_READ], 
-                &reads_quality_buffer[(nb_read/2 + 1) * SIZE_READ]) <= 0))
+                &reads_quality_buffer[(nb_read/2 + 1) * SIZE_READ], &reads_name_buffer[(nb_read/2 + 1) * SIZE_READ_NAME]) <= 0))
             break;
         nb_read += 4;
     }
@@ -132,6 +153,7 @@ int get_reads_in_buffer(unsigned int pass_id) { return nb_reads[PASS(pass_id)]; 
 
 int8_t *get_reads_buffer(unsigned int pass_id) { return reads_buffers[PASS(pass_id)]; }
 float *get_reads_quality_buffer(unsigned int pass_id) { return reads_quality_buffers[PASS(pass_id)]; }
+char *get_reads_name_buffer(unsigned int pass_id) {return reads_name_buffers[PASS(pass_id)];}
 
 int get_input_info(FILE *f, size_t *read_size, size_t *nb_read)
 {

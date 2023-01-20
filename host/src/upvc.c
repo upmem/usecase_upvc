@@ -19,9 +19,9 @@
 #include "index.h"
 #include "parse_args.h"
 #include "processread.h"
+#include "samfile.h"
 #include "simu_backend.h"
 #include "upvc.h"
-#include "vartree.h"
 #include "profiling.h"
 
 #include "backends_functions.h"
@@ -180,6 +180,7 @@ void *thread_process(__attribute__((unused)) void *arg)
     }
 
     STAT_RECORD_STEP(STAT_THREAD_PROCESS, 1);
+    close_sam_file();
     sem_post(&accprocess_to_getreads_sem);
     STAT_RECORD_LAST_STEP(STAT_THREAD_PROCESS, 2);
 
@@ -313,7 +314,6 @@ static void do_mapping()
 {
     STAT_RECORD_START(STAT_DO_MAPPING);
     backends_functions.init_backend(&nb_dpus_per_run);
-    variant_tree_init();
     dispatch_init();
     process_read_init();
     STAT_RECORD_STEP(STAT_DO_MAPPING, 0);
@@ -326,12 +326,11 @@ static void do_mapping()
         exec_round();
     }
     STAT_RECORD_STEP(STAT_DO_MAPPING, 1);
-    create_vcf();
+    // create_vcf();
     STAT_RECORD_STEP(STAT_DO_MAPPING, 2);
 
     process_read_free();
     dispatch_free();
-    variant_tree_free();
     backends_functions.free_backend();
     STAT_RECORD_LAST_STEP(STAT_DO_MAPPING, 3);
 }
