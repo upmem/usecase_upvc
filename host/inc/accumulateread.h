@@ -6,6 +6,7 @@
 #define __ACCUMULATEREAD_H__
 
 #include "common.h"
+#include <stdbool.h>
 
 typedef struct {
     nb_result_t nb_res;
@@ -13,7 +14,7 @@ typedef struct {
 } acc_results_t;
 
 acc_results_t *accumulate_get_buffer(unsigned int dpu_id, unsigned int pass_id);
-acc_results_t accumulate_get_result(unsigned int pass_id);
+acc_results_t accumulate_get_result(unsigned int pass_id, bool free_results);
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset);
 

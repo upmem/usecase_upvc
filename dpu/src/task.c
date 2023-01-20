@@ -55,7 +55,11 @@ __host dpu_compute_time_t DPU_COMPUTE_TIME_VAR;
 /**
  * @brief Maximum score allowed.
  */
-#define MAX_SCORE (40)
+#if SIZE_READ>120
+#define MAX_SCORE 40
+#else
+#define MAX_SCORE 40
+#endif
 
 /**
  * @brief Number of reference read to be fetch per mram read
@@ -121,6 +125,10 @@ static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_
     STATS_STORE_NODP_TIME(tasklet_stats, (end + acc - start));
     STATS_INCR_NB_NODP_CALLS(*tasklet_stats);
 
+    bool nodp = true;
+
+    //TODO uncomment for indel
+#ifdef USE_INDEL
     if (score_nodp == UINT_MAX) {
         STATS_GET_START_TIME(start, acc, end);
 
@@ -129,7 +137,9 @@ static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_
         STATS_GET_END_TIME(end, acc);
         STATS_STORE_ODPD_TIME(tasklet_stats, (end + acc - start));
         STATS_INCR_NB_ODPD_CALLS(*tasklet_stats);
+        nodp = false;
     }
+#endif
 
     if (score > *mini) {
         return;
@@ -148,7 +158,7 @@ static void compare_neighbours(sysname_t tasklet_id, uint32_t *mini, coords_and_
     }
 
     dout_add(dout, request->num, (unsigned int)score, cached_coords_and_nbr->coord.seed_nr, cached_coords_and_nbr->coord.seq_nr,
-        tasklet_stats);
+        tasklet_stats, nodp);
 }
 
 static void compute_request(sysname_t tasklet_id, coords_and_nbr_t *cached_coords_and_nbr, uint8_t *current_read_nbr,

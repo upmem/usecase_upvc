@@ -36,13 +36,14 @@ typedef uint32_t delta_info_t;
  * @brief Coordonates of the read that matched in the reference genome.
  */
 typedef struct {
-    union {
-        uint64_t coord;
+    //union {
+        //uint64_t coord;
         struct {
             uint32_t seed_nr;
-            uint32_t seq_nr;
+            uint32_t seq_nr:31;
+            uint32_t nodp:1;
         };
-    };
+    //};
 } dpu_result_coord_t;
 
 /**
@@ -118,5 +119,21 @@ typedef struct {
     dpu_result_coord_t coord;
     uint8_t nbr[ALIGN_DPU(SIZE_NEIGHBOUR_IN_BYTES)];
 } coords_and_nbr_t;
+
+
+// configuration for variant calling using frequency table
+
+// to activate use of reads with indels
+#define USE_INDEL
+// to activate use of mapq score
+//#define USE_MAPQ_SCORE
+
+// various parameters/thresholds
+#define DIST_PAIR_THRESHOLD 1
+#define DIST_SINGLE_THRESHOLD 0
+#define MAPQ_SCALING_FACTOR 2
+#define READ_DIST_LOWER_BOUND 50
+#define READ_DIST_UPPER_BOUND 2000
+#define depth_filter depth_filter3
 
 #endif /* __COMMON_H__ */

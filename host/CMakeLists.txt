@@ -21,7 +21,7 @@ file(GLOB_RECURSE SOURCES src/*.c)
 add_executable(upvc ${SOURCES})
 
 target_include_directories(upvc PUBLIC "${DPU_HOST_INCLUDE_DIRECTORIES}" inc/ ../common/inc/)
-target_link_libraries(upvc ${DPU_HOST_LIBRARIES} pthread)
+target_link_libraries(upvc ${DPU_HOST_LIBRARIES} pthread m)
 
 set(NB_DPU_MARK)
 if (NB_DPU)

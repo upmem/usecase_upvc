@@ -6,6 +6,8 @@
 #include "common.h"
 #include "index.h"
 #include "upvc.h"
+#include "profiling.h"
+#include "debug.h"
 
 #include <assert.h>
 #include <dpu_backend.h>
@@ -158,7 +160,7 @@ static void merge_bucket_and_acc_list(
     }
 }
 
-acc_results_t accumulate_get_result(unsigned int pass_id)
+acc_results_t accumulate_get_result(unsigned int pass_id, bool free_results)
 {
     if (result_file[pass_id] == NULL) {
         static const dpu_result_out_t dummy_res = { .num = -1 };
@@ -175,17 +177,23 @@ acc_results_t accumulate_get_result(unsigned int pass_id)
     size_t size = ftell(result_file[pass_id]);
     rewind(result_file[pass_id]);
 
+    LOG_INFO("allocating %lu to accumulate results\n", size);
     dpu_result_out_t *results = (dpu_result_out_t *)malloc(size);
     assert(results != NULL);
     size_t size_read = fread(results, size, 1, result_file[pass_id]);
     assert(size_read == 1);
 
+    if (free_results) {
+        fclose(result_file[pass_id]);
+        result_file[pass_id] = NULL;
+    }
     return (acc_results_t) { .nb_res = (size / sizeof(dpu_result_out_t)) - 1, .results = results };
 }
 
 void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
 {
     printf("DPU_OFFSET: %u - PASS_ID: %u\n", dpu_offset, pass_id);
+    PRINT_ALL_FUNCTION_STAT();
     nb_dpus_used_current_run = MIN(index_get_nb_dpu() - dpu_offset, nb_dpus_per_run);
     acc_res = RESULTS_BUFFERS(pass_id);
 
@@ -206,6 +214,7 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
         return;
     }
 
+    LOG_INFO("allocating %lu for bucket_elems\n", sizeof(bucket_elem_t) * total_nb_res);
     bucket_elems = (bucket_elem_t *)malloc(sizeof(bucket_elem_t) * total_nb_res);
     assert(bucket_elems != NULL);
 
@@ -232,11 +241,12 @@ void accumulate_read(unsigned int pass_id, unsigned int dpu_offset)
     }
 
     // Get data from FILE *
-    acc_results_t acc_res_from_file = accumulate_get_result(pass_id);
+    acc_results_t acc_res_from_file = accumulate_get_result(pass_id, false);
     unsigned int nb_read = acc_res_from_file.nb_res + total_nb_res;
     size_t size = sizeof(dpu_result_out_t) * (nb_read + 1);
 
     // Alloc the merged and sorted tab of result for this pass
+    LOG_INFO("allocating %lu for dpu results\n", size);
     dpu_result_out_t *merged_result_tab = malloc(size);
     assert(merged_result_tab != NULL);
 
@@ -290,6 +300,7 @@ void accumulate_init(unsigned int max_nb_pass)
     result_file = (FILE **)calloc(nb_pass, sizeof(FILE *));
     assert(result_file != NULL);
 
+    LOG_INFO("allocating %lu for results_buffers\n", sizeof(acc_results_t) * nb_dpus_per_run * NB_DISPATCH_AND_ACC_BUFFER);
     for (unsigned int each_pass = 0; each_pass < NB_DISPATCH_AND_ACC_BUFFER; each_pass++) {
         results_buffers[each_pass] = (acc_results_t *)malloc(sizeof(acc_results_t) * nb_dpus_per_run);
         assert(results_buffers[each_pass] != NULL);

@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "accumulateread.h"
+#include "debug.h"
 #include "dispatch.h"
 #include "dpu_backend.h"
 #include "genome.h"
@@ -21,6 +22,7 @@
 #include "simu_backend.h"
 #include "upvc.h"
 #include "vartree.h"
+#include "profiling.h"
 
 #include "backends_functions.h"
 
@@ -39,6 +41,7 @@ static sem_t getreads_to_dispatch_sem, dispatch_to_exec_sem, exec_to_dispatch_se
 
 void *thread_get_reads(__attribute__((unused)) void *arg)
 {
+    STAT_RECORD_START(STAT_THREAD_GET_READS);
     FOREACH_RUN(dpu_offset)
     {
         FOR(NB_READS_BUFFER) { sem_post(&accprocess_to_getreads_sem); }
@@ -55,17 +58,23 @@ void *thread_get_reads(__attribute__((unused)) void *arg)
 
         FOR(NB_READS_BUFFER) { sem_wait(&accprocess_to_getreads_sem); }
     }
+    STAT_RECORD_LAST_STEP(STAT_THREAD_GET_READS, 0);
 
     return NULL;
 }
 
 void exec_dpus()
 {
+    STAT_RECORD_START(STAT_EXEC_DPUS);
     FOREACH_RUN(dpu_offset)
     {
         backends_functions.load_mram(dpu_offset, 0);
 
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 0);
+
         sem_wait(&dispatch_to_exec_sem);
+
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 1);
 
         FOREACH_PASS(each_pass)
         {
@@ -73,14 +82,20 @@ void exec_dpus()
                 dpu_offset, each_pass, &exec_to_dispatch_sem, &acc_to_exec_sem, &exec_to_acc_sem, &dispatch_to_exec_sem);
         }
 
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 2);
+
         backends_functions.wait_dpu();
+
+        STAT_RECORD_STEP(STAT_EXEC_DPUS, 3);
 
         sem_post(&exec_to_acc_sem);
     }
+    STAT_RECORD_LAST_STEP(STAT_EXEC_DPUS, 4);
 }
 
 void *thread_dispatch(__attribute__((unused)) void *arg)
 {
+    STAT_RECORD_START(STAT_THREAD_DISPATCH);
     FOREACH_RUN(dpu_offset)
     {
         FOR(NB_DISPATCH_AND_ACC_BUFFER)
@@ -104,11 +119,13 @@ void *thread_dispatch(__attribute__((unused)) void *arg)
             sem_wait(&exec_to_dispatch_sem);
         }
     }
+    STAT_RECORD_LAST_STEP(STAT_THREAD_DISPATCH, 0);
     return NULL;
 }
 
 void *thread_acc(__attribute__((unused)) void *arg)
 {
+    STAT_RECORD_START(STAT_THREAD_ACC);
     FOREACH_RUN(dpu_offset)
     {
         FOR(NB_DISPATCH_AND_ACC_BUFFER)
@@ -140,27 +157,38 @@ void *thread_acc(__attribute__((unused)) void *arg)
             sem_wait(&acc_to_exec_sem);
         }
     }
+    STAT_RECORD_LAST_STEP(STAT_THREAD_ACC, 0);
     return NULL;
 }
 
 void *thread_process(__attribute__((unused)) void *arg)
 {
+    struct timespec start_time, current_time;
+    STAT_RECORD_START(STAT_THREAD_PROCESS);
     sem_wait(&acc_to_process_sem);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start_time);
+    STAT_RECORD_STEP(STAT_THREAD_PROCESS, 0);
 
     FOREACH_PASS(each_pass)
     {
         process_read(fope1, fope2, round, each_pass);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &current_time);
+        int spent = current_time.tv_sec-start_time.tv_sec;
+        printf("time spent: %02dh%02dm%02ds (%ds), id:%d\n", spent/3600, spent/60%60, spent%60, spent, each_pass);
         sem_post(&accprocess_to_getreads_sem);
         sem_wait(&acc_to_process_sem);
     }
 
+    STAT_RECORD_STEP(STAT_THREAD_PROCESS, 1);
     sem_post(&accprocess_to_getreads_sem);
+    STAT_RECORD_LAST_STEP(STAT_THREAD_PROCESS, 2);
 
     return NULL;
 }
 
 static void exec_round()
 {
+    STAT_RECORD_START(STAT_EXEC_ROUND);
     char filename[FILENAME_MAX];
     char *input_prefix = get_input_path();
     static unsigned int max_nb_pass;
@@ -172,6 +200,7 @@ static void exec_round()
         fipe1 = fopen(filename, "r");
         CHECK_FILE(fipe1, filename);
         assert(get_input_info(fipe1, &read_size1, &nb_read1) == 0);
+        printf("read_size1 %zu SIZE_READ %u\n", read_size1, SIZE_READ);
         assert(read_size1 == SIZE_READ);
 
         sprintf(filename, "%s_PE2.fastq", input_prefix);
@@ -201,7 +230,9 @@ static void exec_round()
         assert(unlink(filename) == 0);
     }
 
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 0);
     accumulate_init(max_nb_pass);
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 1);
 
     pthread_t tid_get_reads;
     pthread_t tid_dispatch;
@@ -225,6 +256,7 @@ static void exec_round()
     assert(ret == 0);
     ret = sem_init(&accprocess_to_getreads_sem, 0, 0);
     assert(ret == 0);
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 2);
 
     // CREATE
     ret = pthread_create(&tid_get_reads, NULL, thread_get_reads, NULL);
@@ -235,9 +267,11 @@ static void exec_round()
     assert(ret == 0);
     ret = pthread_create(&tid_process, NULL, thread_process, NULL);
     assert(ret == 0);
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 3);
 
     // EXECUTE
     exec_dpus();
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 4);
 
     // JOIN
     ret = pthread_join(tid_get_reads, NULL);
@@ -248,6 +282,7 @@ static void exec_round()
     assert(ret == 0);
     ret = pthread_join(tid_process, NULL);
     assert(ret == 0);
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 5);
 
     // DESTROY
     ret = sem_destroy(&getreads_to_dispatch_sem);
@@ -264,19 +299,26 @@ static void exec_round()
     assert(ret == 0);
     ret = sem_destroy(&accprocess_to_getreads_sem);
     assert(ret == 0);
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 6);
 
     accumulate_free();
+    STAT_RECORD_STEP(STAT_EXEC_ROUND, 7);
 
     fclose(fipe1);
     fclose(fipe2);
+    STAT_RECORD_LAST_STEP(STAT_EXEC_ROUND, 8);
 }
 
 static void do_mapping()
 {
+    STAT_RECORD_START(STAT_DO_MAPPING);
     backends_functions.init_backend(&nb_dpus_per_run);
-    variant_tree_init();
+    if (!get_use_frequency_table()) {
+        variant_tree_init();
+    }
     dispatch_init();
     process_read_init();
+    STAT_RECORD_STEP(STAT_DO_MAPPING, 0);
 
     for (round = 0; round < NB_ROUND; round++) {
         printf("#################\n"
@@ -285,12 +327,17 @@ static void do_mapping()
             round);
         exec_round();
     }
+    STAT_RECORD_STEP(STAT_DO_MAPPING, 1);
     create_vcf();
+    STAT_RECORD_STEP(STAT_DO_MAPPING, 2);
 
     process_read_free();
     dispatch_free();
-    variant_tree_free();
+    if (!get_use_frequency_table()) {
+        variant_tree_free();
+    }
     backends_functions.free_backend();
+    STAT_RECORD_LAST_STEP(STAT_DO_MAPPING, 3);
 }
 
 static void print_time()
@@ -309,9 +356,12 @@ static void print_time()
 int main(int argc, char *argv[])
 {
     validate_args(argc, argv);
+    memset(profiling, 0, sizeof(profiling));
 
     printf("%s\n", VERSION);
     print_time();
+    for (int i=0; i<15; i++)
+            profiling[i] = (struct time_stat_t){0};
 
     printf("Information:\n");
     printf("\tread size: %d\n", SIZE_READ);
@@ -360,7 +410,9 @@ int main(int argc, char *argv[])
     printf("time: %f\n"
            "process time: %f\n"
            "ratio: %f\n",
-        time, process_time, process_time / time * 100.0);
+        time, process_time, process_time / time);
+
+    PRINT_ALL_FUNCTION_STAT();
 
     index_free();
     genome_free();

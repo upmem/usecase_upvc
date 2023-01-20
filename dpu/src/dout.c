@@ -25,7 +25,7 @@ void dout_init(unsigned int tid, dout_t *dout)
     dout_clear(dout);
 }
 
-void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, uint32_t seq_nr, dpu_tasklet_stats_t *stats)
+void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, uint32_t seq_nr, dpu_tasklet_stats_t *stats, uint8_t nodp)
 {
     dpu_result_out_t *new_out;
     if (dout->nb_cached_out == MAX_LOCAL_RESULTS_PER_READ) {
@@ -49,6 +49,7 @@ void dout_add(dout_t *dout, uint32_t num, unsigned int score, uint32_t seed_nr, 
     new_out->score = score;
     new_out->coord.seed_nr = seed_nr;
     new_out->coord.seq_nr = seq_nr;
+    new_out->coord.nodp = nodp;
 
     dout->nb_cached_out++;
     dout->nb_results++;

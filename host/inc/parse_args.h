@@ -36,6 +36,8 @@ unsigned int get_nb_thread_for_simu();
 
 bool get_index_with_dpus();
 
+bool get_use_frequency_table();
+
 /**
  * @brief Parse and validate the argument of the application.
  */
